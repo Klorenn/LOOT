@@ -5,19 +5,20 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { shortAddr } from "@/lib/format";
+import { useHandle } from "@/lib/handle";
 import { useSession } from "@/lib/session";
 
 const ITEMS = [
   { href: "/profile", label: "Profile" },
   { href: "/claimed-chests", label: "My claimed chests" },
-  { href: "/send", label: "Send" },
-  { href: "/qr", label: "Receive" },
+  { href: "/wallet", label: "Wallet" },
   { href: "/dashboard", label: "Creator dashboard" },
 ] as const;
 
 /** Account button + attached dropdown (260px, s1, 1px line, radius 10, no shadow). */
 export function AccountMenu({ address }: { address: string }) {
   const { player, disconnect } = useSession();
+  const handle = useHandle(address);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -70,7 +71,7 @@ export function AccountMenu({ address }: { address: string }) {
         className="btn-landing btn-landing-s btn-landing-sm gap-2 font-mono"
       >
         <Avatar seed={address} size="xs" />
-        <span className="hidden md:inline">{shortAddr(address)}</span>
+        <span className="hidden md:inline">{handle ? `@${handle}` : shortAddr(address)}</span>
         <span className="hidden text-[var(--dim)] md:inline" aria-hidden>
           ▾
         </span>
@@ -83,12 +84,12 @@ export function AccountMenu({ address }: { address: string }) {
           <div className="flex items-center gap-3 border-b border-[var(--line)] p-4">
             <Avatar seed={address} size="sm" />
             <div className="min-w-0">
-              <p className="text-[14px] font-medium">{kind}</p>
+              <p className="text-[14px] font-medium">{handle ? `@${handle}` : kind}</p>
               <p
                 className="truncate font-mono text-[12px] text-[var(--dim)]"
                 title={address}
               >
-                {shortAddr(address, 6)}
+                {handle ? `${kind} · ${shortAddr(address, 4)}` : shortAddr(address, 6)}
               </p>
             </div>
           </div>

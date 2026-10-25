@@ -25,11 +25,16 @@ import {
 } from "./wallet";
 import {
   connectFreighter,
+  assertWalletOnTestnet,
   connectGWallet,
   disconnectGWallet,
   restoreGWallet,
 } from "./wallets-kit";
 import { WalletPicker } from "@/components/wallet-picker";
+import { HandlePrompt } from "@/components/handle-prompt";
+import { getHandle, hasSkippedHandle } from "./handle";
+
+type EnrollOptsStage = EnrollOpts["onStage"];
 
 export type ConnectMethod =
   | "passkey" // reconecta o crea la passkey
@@ -115,8 +120,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     [],
   );
   const pickWallet = useCallback(async (id: string) => {
-    const { address, walletId } = await connectGWallet(id);
-    const p = enrollWalletAccount(address, walletId);
+    let p: Player;
+    if (id === "passkey") {
+      p = await enrollWithPasskey();
+    } else {
+      const { address, walletId } = await connectGWallet(id);
+      await assertWalletOnTestnet(walletId); // WrongNetworkError: no se guarda la sesión
+      p = enrollWalletAccount(address, walletId);
+      try {
+        localStorage.setItem("chestzk.lastWallet", walletId);
+      } catch {
+        /* ignorado */
+      }
+    }
     pending.current?.res(p);
     pending.current = null;
     setPickerOpen(false);
@@ -129,10 +145,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setPickerOpen(false);
   }, []);
 
-  const connect = useCallback(
+  // "Pick a name?": tras conectar una wallet G (kit o demo) sin nombre y sin "Skip" previo.
+  const [promptFor, setPromptFor] = useState<string | null>(null);
+  const maybePrompt = useCallback((p: Player) => {
+    if (p.kind !== "passkey" && !getHandle(p.publicKey) && !hasSkippedHandle(p.publicKey)) {
+      setPromptFor(p.publicKey);
+    }
+    return p;
+  }, []);
+
+  const connectInner = useCallback(
     async (
       method: ConnectMethod,
-      onStage?: EnrollOpts["onStage"],
+      onStage?: EnrollOptsStage,
     ): Promise<Player> => {
     if (method === "passkey") return enrollWithPasskey();
     if (method === "passkey-new") return enrollWithPasskey({ forceNew: true, onStage });
@@ -140,11 +165,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // enrollClassic reemplaza la sesión solo si termina bien (no se borra antes).
     if (method === "demo") return enrollClassic();
     if (method === "wallet") {
-      // Por defecto: modal de Stellar Wallets Kit con tema Loot (ver lib/wallets-kit.ts).
-      // NEXT_PUBLIC_WALLET_MODAL=loot: selector propio (components/wallet-picker.tsx).
-      if (process.env.NEXT_PUBLIC_WALLET_MODAL === "loot") return openPicker();
-      const { address, walletId } = await connectGWallet();
-      return enrollWalletAccount(address, walletId);
+      // Por defecto: selector propio de Loot (components/wallet-picker.tsx).
+      // NEXT_PUBLIC_WALLET_MODAL=kit: modal de Stellar Wallets Kit con tema Loot (fallback).
+      if (process.env.NEXT_PUBLIC_WALLET_MODAL === "kit") {
+        const { address, walletId } = await connectGWallet();
+        return enrollWalletAccount(address, walletId);
+      }
+      return openPicker();
     }
     if (method.startsWith("wallet:")) {
       const { address, walletId } = await connectGWallet(method.slice(7));
@@ -157,6 +184,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return enrollWalletAccount(address, walletId);
   },
     [openPicker],
+  );
+
+  const connect = useCallback(
+    async (method: ConnectMethod, onStage?: EnrollOptsStage): Promise<Player> =>
+      maybePrompt(await connectInner(method, onStage)),
+    [connectInner, maybePrompt],
   );
 
   const disconnect = useCallback(async () => {
@@ -182,6 +215,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={value}>
       {children}
       <WalletPicker open={pickerOpen} onClose={closePicker} onSelect={pickWallet} />
+      <HandlePrompt address={promptFor} onClose={() => setPromptFor(null)} />
     </Ctx.Provider>
   );
 }

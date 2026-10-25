@@ -43,7 +43,8 @@ export class SendError extends Error {
 export type MemoInput =
   | { type: "none" }
   | { type: "text"; value: string }
-  | { type: "id"; value: string };
+  | { type: "id"; value: string }
+  | { type: "hash"; value: string };
 
 export type Destination = {
   /** G… / C… / M… tal cual lo escribió el usuario (recortado) */
@@ -86,6 +87,8 @@ export function validateMemo(m: MemoInput, dest: Destination): string | null {
   if (m.type === "text") {
     if (!m.value) return "Enter the memo text or choose “None”.";
     if (new TextEncoder().encode(m.value).length > 28) return "Memo text can be at most 28 bytes.";
+  } else if (m.type === "hash") {
+    if (!/^[0-9a-fA-F]{64}$/.test(m.value)) return "Memo hash must be 32 bytes (64 hex characters).";
   } else {
     if (!/^\d{1,20}$/.test(m.value)) return "Memo ID must be a whole number.";
     if (BigInt(m.value) > BigInt("18446744073709551615")) return "Memo ID is too large (max 2^64−1).";
@@ -113,14 +116,16 @@ const toStroops = (decimal: string) => {
 };
 
 /** Saldo y máximo enviable (stroops). G: saldo − reserva mínima − liabilities − 0,01 XLM de colchón de fee. */
-export async function balanceInfo(player: Player): Promise<{ balance: bigint; max: bigint }> {
+export async function balanceInfo(
+  player: Player,
+): Promise<{ balance: bigint; max: bigint; reserve: bigint }> {
   if (player.kind === "passkey") {
     const { readPrizeBalance } = await import("./chain");
     const b = await readPrizeBalance(player.publicKey);
-    return { balance: b, max: b }; // el relayer paga las fees: se puede enviar todo
+    return { balance: b, max: b, reserve: BigInt(0) }; // el relayer paga las fees: se puede enviar todo
   }
   const acc = await loadG(player.publicKey);
-  if (!acc) return { balance: BigInt(0), max: BigInt(0) };
+  if (!acc) return { balance: BigInt(0), max: BigInt(0), reserve: BigInt(0) };
   const native = acc.balances.find((b) => b.asset_type === "native");
   const balance = toStroops(native?.balance ?? "0");
   const liabilities = toStroops(
@@ -135,7 +140,7 @@ export async function balanceInfo(player: Player): Promise<{ balance: bigint; ma
   const reserve = BigInt(Math.max(2, entries)) * (XLM / BigInt(2));
   const buffer = XLM / BigInt(100);
   const max = balance - reserve - liabilities - buffer;
-  return { balance, max: max > BigInt(0) ? max : BigInt(0) };
+  return { balance, max: max > BigInt(0) ? max : BigInt(0), reserve };
 }
 
 export type Plan = {
@@ -158,9 +163,9 @@ export async function planSend(
 
   if (player.kind === "passkey") {
     const notes: string[] = [];
-    if (memo.type === "text")
+    if (memo.type === "text" || memo.type === "hash")
       throw new SendError(
-        "Memos aren’t supported from a passkey wallet. For exchanges that require a memo, use an M… address.",
+        "Smart account: ID memos only. Text and hash memos need a G… wallet. For exchanges that require a memo, use an M… address.",
       );
     if (memo.type === "id") {
       if (dest.kind !== "G") throw new SendError("A memo ID needs a G… destination (it becomes an M… address).");
@@ -203,6 +208,7 @@ export async function planSend(
 function toMemo(m: MemoInput): Memo {
   if (m.type === "text") return Memo.text(m.value);
   if (m.type === "id") return Memo.id(m.value);
+  if (m.type === "hash") return Memo.hash(m.value.toLowerCase());
   return Memo.none();
 }
 
@@ -212,9 +218,10 @@ export async function sendXlm(
   dest: Destination,
   amount: bigint,
   memo: MemoInput,
+  onPhase?: (phase: "signing" | "pending") => void,
 ): Promise<{ hash: string }> {
   const plan = await planSend(player, dest, amount, memo);
-  if (player.kind === "passkey") return sendFromPasskey(player, dest, amount, memo);
+  if (player.kind === "passkey") return sendFromPasskey(player, dest, amount, memo, onPhase);
 
   const acc = await horizon().loadAccount(player.publicKey);
   const b = new TransactionBuilder(acc, { fee: BASE_FEE, networkPassphrase: NETWORK.passphrase });
@@ -230,6 +237,7 @@ export async function sendXlm(
   const tx = b.build();
 
   let signedXdr: string;
+  onPhase?.("signing");
   if (player.kind === "classic" && player.secretKey) {
     tx.sign(Keypair.fromSecret(player.secretKey));
     signedXdr = tx.toXDR();
@@ -239,6 +247,7 @@ export async function sendXlm(
     throw new SendError("This session can’t sign transactions.");
   }
   const signed = TransactionBuilder.fromXDR(signedXdr, NETWORK.passphrase);
+  onPhase?.("pending");
   const res = await horizon().submitTransaction(signed);
   return { hash: res.hash };
 }
@@ -268,6 +277,7 @@ async function sendFromPasskey(
   dest: Destination,
   amount: bigint,
   memo: MemoInput,
+  onPhase?: (phase: "signing" | "pending") => void,
 ): Promise<{ hash: string }> {
   const kit = getPasskeyKit();
   // passkey-kit 0.19: connectWallet fija wallet+keyId y luego crashea (bug conocido de expiración
@@ -298,9 +308,11 @@ async function sendFromPasskey(
 
   // La expiración se calcula con nuestro ledger aproximado (getLatestLedger tarda 15–60 s hoy).
   const expiration = (await latestLedgerHint()) + 120;
+  onPhase?.("signing");
   const signed = await kit.sign(at as never, undefined, { expiration });
   const xdrStr = (signed as { built?: { toXDR(): string } }).built?.toXDR();
   if (!xdrStr) throw new SendError("Couldn’t build the signed transaction.");
+  onPhase?.("pending");
   const hash = await submitPasskeyTx(xdrStr);
   return { hash };
 }

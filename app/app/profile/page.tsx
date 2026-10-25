@@ -15,7 +15,7 @@ import {
 import { chestPath } from "@/lib/chest-code";
 import { CONTRACTS, DEMO_CHEST, PRIZE, stroopsToXlm, tokenDecimals } from "@/lib/config";
 import { expertAddress, shortAddr } from "@/lib/format";
-import { getHandle, HANDLE_RE, setHandle } from "@/lib/handle";
+import { HANDLE_HINT, HANDLE_RE, setHandle, useHandle } from "@/lib/handle";
 import { useSession } from "@/lib/session";
 
 type Load<T> = { s: "loading" } | { s: "ok"; v: T } | { s: "error" };
@@ -25,16 +25,12 @@ export default function ProfilePage() {
   const { address, player, disconnect } = useSession();
   const [balance, setBalance] = useState<Load<bigint>>({ s: "loading" });
   const [won, setWon] = useState<Load<WonChestsResult>>({ s: "loading" });
-  const [handle, setHandleState] = useState<string | null>(null);
+  const handle = useHandle(address);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [handleErr, setHandleErr] = useState<string | null>(null);
   const [confirmOut, setConfirmOut] = useState(false);
   const seq = useRef(0);
-
-  useEffect(() => {
-    if (address) setHandleState(getHandle(address));
-  }, [address]);
 
   const refresh = useCallback(async () => {
     if (!address) return;
@@ -97,11 +93,10 @@ export default function ProfilePage() {
   function saveHandle() {
     const h = draft.trim().toLowerCase();
     if (!HANDLE_RE.test(h)) {
-      setHandleErr("Use 3–20 characters: a–z, 0–9 and _.");
+      setHandleErr(HANDLE_HINT);
       return;
     }
     setHandle(address!, h);
-    setHandleState(h);
     setEditing(false);
     setHandleErr(null);
   }
@@ -142,8 +137,8 @@ export default function ProfilePage() {
             </div>
           </div>
           <div className="flex gap-3">
-            <Link href="/qr" className="btn-landing btn-landing-s">
-              Receive
+            <Link href="/wallet?tab=receive" className="btn-landing btn-landing-s">
+              Wallet
             </Link>
             <Link href={chestPath(DEMO_CHEST.id)} className="btn-landing btn-landing-p">
               Open a chest
@@ -197,7 +192,7 @@ export default function ProfilePage() {
                 )}
               </p>
               {cell.k === "Balance" && (
-                <Link href="/send" className="btn-landing btn-landing-s btn-landing-sm mt-3">
+                <Link href="/wallet?tab=send" className="btn-landing btn-landing-s btn-landing-sm mt-3">
                   Send
                 </Link>
               )}

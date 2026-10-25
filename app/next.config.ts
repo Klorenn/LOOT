@@ -27,7 +27,8 @@ const nextConfig: NextConfig = {
       { source: "/cofre/:id/error", destination: "/chest/:id", permanent: true },
       { source: "/panel", destination: "/dashboard", permanent: true },
       { source: "/enter", destination: "/login", permanent: false },
-      { source: "/wallet", destination: "/profile", permanent: false },
+      { source: "/qr", destination: "/wallet", permanent: true },
+      { source: "/send", destination: "/wallet?tab=send", permanent: true },
     ];
   },
   serverExternalPackages: [

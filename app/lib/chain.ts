@@ -116,7 +116,7 @@ export type WonChestsResult = {
 };
 
 const WINDOW_LEDGERS = 120_000; // ~7 días a 5 s por ledger (con margen)
-const MAX_PAGES = 80;
+
 /** El RPC escanea como mucho ~10.000 ledgers por request: hay que seguir el cursor hasta el último ledger. */
 const ledgerOfCursor = (c: string) =>
   Number(BigInt(c.split("-")[0]) >> BigInt(32));
@@ -146,54 +146,118 @@ export async function latestLedgerHint(): Promise<number> {
   return withRpc(async (s) => (await s.getLatestLedger()).sequence);
 }
 
-async function scanEvents(name: "claimed" | "created"): Promise<EventsScan> {
-  const latest = await latestLedgerHint();
-  let start = Math.max(1, latest - WINDOW_LEDGERS);
+type EventFilter = {
+  type: "contract";
+  contractIds: string[];
+  topics: string[][];
+};
 
-  const filters = [
+async function scanEvents(name: "claimed" | "created"): Promise<EventsScan> {
+  return scanWithFilters([
     {
       type: "contract" as const,
       contractIds: [CONTRACTS.chest],
       topics: [[xdr.ScVal.scvSymbol(name).toXDR("base64"), "*"]],
     },
-  ];
+  ]);
+}
 
-  const events: rpc.Api.EventResponse[] = [];
-  let cursor: string | undefined;
+/** Ventana máxima que el RPC escanea por request (el resto se pide en ventanas paralelas). */
+const SCAN_STEP = 10_000;
+const SCAN_PAGES_PER_WINDOW = 20;
+const SCAN_TIMEOUT_MS = 25_000;
+const SCAN_CONCURRENCY = 6;
+
+async function mapPool<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) {
+        const i = next++;
+        out[i] = await fn(items[i]);
+      }
+    }),
+  );
+  return out;
+}
+
+/**
+ * Eventos que cumplen `filters` en la ventana de retención del RPC (~7 días). Cada request del RPC
+ * escanea como mucho ~10.000 ledgers, así que se pide por ventanas [from, to] en paralelo (con
+ * tope de concurrencia) y se pagina por cursor dentro de cada una. La última ventana va sin
+ * endLedger para no depender de la estimación del ledger actual.
+ */
+async function scanWithFilters(filters: EventFilter[]): Promise<EventsScan> {
+  const latest = await latestLedgerHint();
+  let start = Math.max(1, latest - WINDOW_LEDGERS);
   let truncated = false;
 
-  for (let page = 0; page < MAX_PAGES; page++) {
-    let res: Awaited<ReturnType<rpc.Server["getEvents"]>>;
-    try {
-      res = await withRpc((s) =>
-        s.getEvents(
-          cursor
-            ? { filters, cursor, limit: 200 }
-            : { filters, startLedger: start, limit: 200 },
-        ),
+  const fetchRaw = async (from: number, to: number) => {
+    // Con cursor el RPC no acepta endLedger: se pagina re-pidiendo desde el ledger del último
+    // evento (inclusive) y se deduplica por id.
+    const seen = new Set<string>();
+    const evs: rpc.Api.EventResponse[] = [];
+    let cur = from;
+    for (let page = 0; page < SCAN_PAGES_PER_WINDOW; page++) {
+      const res = await withRpc(
+        (s) => s.getEvents({ filters, startLedger: cur, endLedger: to, limit: 200 }),
+        { timeoutMs: SCAN_TIMEOUT_MS },
       );
       noteLedger(res.latestLedger);
+      let added = 0;
+      for (const ev of res.events) {
+        if (seen.has(ev.id)) continue;
+        seen.add(ev.id);
+        evs.push(ev);
+        added++;
+      }
+      if (res.events.length < 200 || added === 0) return evs;
+      const lastLedger = res.events[res.events.length - 1].ledger;
+      if (lastLedger <= cur && page > 0) return evs;
+      cur = lastLedger;
+      if (page === SCAN_PAGES_PER_WINDOW - 1) truncated = true;
+    }
+    return evs;
+  };
+
+  /** Si el RPC corta por "processing limit" (-32001), la ventana se parte a la mitad y se reintenta. */
+  const fetchWindow = async (from: number, to: number): Promise<rpc.Api.EventResponse[]> => {
+    try {
+      return await fetchRaw(from, to);
     } catch (e) {
-      // el SDK lanza el objeto JSON-RPC ({code, message}), no un Error
       const msg = (e as { message?: string })?.message ?? String(e);
-      const m = msg.match(/ledger range:\s*(\d+)\s*-\s*(\d+)/i);
-      if (!cursor && m && Number(m[1]) > start) {
-        start = Number(m[1]);
-        page--; // reintento con el mínimo que informa el RPC
-        continue;
+      if (/processing limit|-32001/i.test(msg) && to - from > 400) {
+        const mid = Math.floor((from + to) / 2);
+        const [x, y] = await Promise.all([fetchWindow(from, mid), fetchWindow(mid + 1, to)]);
+        return [...x, ...y];
       }
       throw e;
     }
-    events.push(...res.events);
-    cursor = res.cursor ?? cursor;
-    // fin: página parcial y el cursor ya alcanzó el último ledger
-    if (
-      res.events.length < 200 &&
-      (!cursor || ledgerOfCursor(cursor) >= res.latestLedger - 1)
-    )
-      break;
-    if (page === MAX_PAGES - 1) truncated = true;
+  };
+
+  const windows = (from: number): [number, number][] => {
+    const w: [number, number][] = [];
+    for (let a = from; a <= latest; a += SCAN_STEP) w.push([a, a + SCAN_STEP - 1]);
+    return w;
+  };
+
+  // La primera ventana revela, vía su error de rango, el ledger más viejo que conserva el RPC.
+  let plan = windows(start);
+  let first: rpc.Api.EventResponse[];
+  try {
+    first = await fetchWindow(plan[0][0], plan[0][1]);
+  } catch (e) {
+    // el SDK lanza el objeto JSON-RPC ({code, message}), no un Error
+    const msg = (e as { message?: string })?.message ?? String(e);
+    const m = msg.match(/ledger range:\s*(\d+)\s*-\s*(\d+)/i);
+    if (!m || Number(m[1]) <= start) throw e;
+    start = Number(m[1]);
+    plan = windows(start);
+    first = await fetchWindow(plan[0][0], plan[0][1]);
   }
+  const rest = await mapPool(plan.slice(1), SCAN_CONCURRENCY, ([f, t]) => fetchWindow(f, t));
+  const events = [first, ...rest].flat();
   return { events, oldestLedger: start, latestLedger: latest, truncated };
 }
 
@@ -329,4 +393,64 @@ export async function readClaimedEvents(): Promise<{
     }
   }
   return { items, oldestLedger: scan.oldestLedger, truncated: scan.truncated };
+}
+
+export type SacTransfer = {
+  hash: string;
+  ledger: number;
+  closedAt: string;
+  dir: "out" | "in";
+  /** la otra parte (G… o C…) */
+  counterparty: string;
+  amount: bigint;
+  /** id de la dirección M… si el pago llegó multiplexado */
+  muxId?: string;
+};
+
+/** Transferencias del SAC de XLM donde `address` es origen o destino (ventana ~7 días del RPC). */
+export async function readSacTransfers(address: string): Promise<SacTransfer[]> {
+  const t = xdr.ScVal.scvSymbol("transfer").toXDR("base64");
+  const a = Address.fromString(address).toScVal().toXDR("base64");
+  const mk = (pos: "from" | "to") => ({
+    type: "contract" as const,
+    contractIds: [CONTRACTS.token],
+    topics:
+      pos === "from"
+        ? [
+            [t, a, "*", "*"],
+            [t, a, "*"],
+          ]
+        : [
+            [t, "*", a, "*"],
+            [t, "*", a],
+          ],
+  });
+  const [out, inn] = await Promise.all([scanWithFilters([mk("from")]), scanWithFilters([mk("to")])]);
+  const parse = (events: rpc.Api.EventResponse[], dir: "out" | "in"): SacTransfer[] =>
+    events.flatMap((ev) => {
+      try {
+        const raw = scValToNative(ev.value) as unknown;
+        const amount = typeof raw === "bigint" ? raw : BigInt((raw as { amount: bigint }).amount);
+        const muxId =
+          typeof raw === "object" && raw && "to_muxed_id" in raw
+            ? String((raw as { to_muxed_id: unknown }).to_muxed_id)
+            : undefined;
+        const from = String(scValToNative(ev.topic[1]));
+        const to = String(scValToNative(ev.topic[2]));
+        return [
+          {
+            hash: ev.txHash,
+            ledger: ev.ledger,
+            closedAt: ev.ledgerClosedAt,
+            dir,
+            counterparty: dir === "out" ? to : from,
+            amount,
+            muxId,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    });
+  return [...parse(out.events, "out"), ...parse(inn.events, "in")].sort((x, y) => y.ledger - x.ledger);
 }

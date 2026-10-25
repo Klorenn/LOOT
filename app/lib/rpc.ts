@@ -48,7 +48,7 @@ const DOWN_MS = 30_000;
 /** Ejecuta `fn(url)` contra cada RPC en orden según el modo. */
 export async function withRpcUrl<T>(
   fn: (rpcUrl: string) => Promise<T>,
-  opts: { write?: boolean } = {},
+  opts: { write?: boolean; timeoutMs?: number } = {},
 ): Promise<T> {
   const all = NETWORK.rpcUrls as readonly string[];
   const now = Date.now();
@@ -61,7 +61,7 @@ export async function withRpcUrl<T>(
     try {
       return opts.write
         ? await fn(urls[i])
-        : await withTimeout(fn(urls[i]), urls[i], NETWORK.rpcTimeoutMs);
+        : await withTimeout(fn(urls[i]), urls[i], opts.timeoutMs ?? NETWORK.rpcTimeoutMs);
     } catch (e) {
       lastErr = e;
       if (isNetworkError(e)) downUntil.set(urls[i], Date.now() + DOWN_MS);
@@ -78,7 +78,7 @@ export async function withRpcUrl<T>(
 /** Igual que withRpcUrl pero entrega un rpc.Server ya creado. */
 export function withRpc<T>(
   fn: (server: rpc.Server) => Promise<T>,
-  opts: { write?: boolean } = {},
+  opts: { write?: boolean; timeoutMs?: number } = {},
 ): Promise<T> {
   return withRpcUrl((url) => fn(new rpc.Server(url)), opts);
 }

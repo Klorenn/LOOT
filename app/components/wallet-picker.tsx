@@ -2,26 +2,28 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { InlineAlert } from "@/components/inline-alert";
-import { listWallets, type WalletOption } from "@/lib/wallets-kit";
+import { IconSmartAccountKit as PasskeyGlyph } from "@/components/stack-logos";
+import { listWallets, WrongNetworkError, type WalletOption } from "@/lib/wallets-kit";
 
-/** Wallets que no son una extensión: siempre se pueden usar desde el navegador. */
-/** (xBull también corre como PWA web, por eso el kit siempre lo reporta disponible.) */
+/** Wallets web: no hay nada que instalar (xBull también corre como PWA). */
 const WEB_IDS = new Set(["albedo", "hot-wallet", "xbull"]);
+/** Apps móviles: en el sheet de móvil van en su propia grilla; las extensiones de escritorio se ocultan. */
+const MOBILE_IDS = new Set(["lobstr", "onekey", "bitget", "hana"]);
+const WALLET_INFO_URL = "https://stellar.org/ecosystem/wallets";
+const LAST_KEY = "chestzk.lastWallet";
 
-type Group = 0 | 1 | 2; // 0 detectada · 1 web · 2 no instalada
-const groupOf = (w: WalletOption): Group =>
-  WEB_IDS.has(w.id) ? 1 : w.isAvailable ? 0 : 2;
+type View =
+  | { kind: "list" }
+  | { kind: "connecting"; wallet: WalletOption }
+  | { kind: "rejected"; wallet: WalletOption }
+  | { kind: "network"; wallet: WalletOption; network: string; checking?: boolean };
 
-const STATUS: Record<Group, string> = {
-  0: "detected",
-  1: "web wallet",
-  2: "not installed",
-};
+const isDetected = (w: WalletOption) => w.isAvailable && !WEB_IDS.has(w.id);
 
 /**
- * Selector de wallets de Loot (reemplaza el modal blanco de Stellar Wallets Kit).
- * Dialog 420px, s1, borde 1px line, sin sombra; en <640px es un bottom sheet.
- * `onSelect` conecta la wallet elegida y devuelve cuando terminó (lanza si falló).
+ * Selector de wallets de Loot sobre Stellar Wallets Kit (no usa authModal). Dialog 420px,
+ * bottom sheet en <640px. `onSelect(id)` conecta ("passkey" = cuenta con passkey) y lanza si falla;
+ * WrongNetworkError = conectó, pero la wallet está en otra red (no se guarda sesión).
  */
 export function WalletPicker({
   open,
@@ -34,22 +36,30 @@ export function WalletPicker({
 }) {
   const [wallets, setWallets] = useState<WalletOption[] | null>(null);
   const [listErr, setListErr] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<View>({ kind: "list" });
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [mobile, setMobile] = useState(false);
+  const [last, setLast] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
+  const attempt = useRef(0);
 
   useEffect(() => {
     if (!open) return;
     opener.current = document.activeElement as HTMLElement | null;
-    setBusy(null);
-    setError(null);
+    setView({ kind: "list" });
+    setMoreOpen(false);
     setListErr(false);
+    setMobile(window.matchMedia("(max-width: 639px)").matches);
+    try {
+      setLast(localStorage.getItem(LAST_KEY));
+    } catch {
+      setLast(null);
+    }
     let live = true;
     listWallets()
       .then((l) => live && setWallets(l))
       .catch(() => live && setListErr(true));
-    // el foco entra al dialog de inmediato (si no, Esc/flechas irían a la página de atrás)
     const t = setTimeout(() => root.current?.focus(), 0);
     document.body.style.overflow = "hidden";
     return () => {
@@ -60,55 +70,77 @@ export function WalletPicker({
     };
   }, [open]);
 
-  const sorted = useMemo(
-    () =>
-      wallets
-        ? [...wallets].sort(
-            (a, b) => groupOf(a) - groupOf(b) || a.name.localeCompare(b.name),
-          )
-        : null,
-    [wallets],
-  );
+  const groups = useMemo(() => {
+    const byLast = (a: WalletOption, b: WalletOption) =>
+      (b.id === last ? 1 : 0) - (a.id === last ? 1 : 0) || a.name.localeCompare(b.name);
+    const all = wallets ?? [];
+    const detected = all.filter(isDetected).sort(byLast);
+    const web = all.filter((w) => WEB_IDS.has(w.id)).sort(byLast);
+    const apps = all.filter((w) => MOBILE_IDS.has(w.id) && !isDetected(w) && !WEB_IDS.has(w.id)).sort(byLast);
+    const more = all
+      .filter((w) => !isDetected(w) && !WEB_IDS.has(w.id))
+      .filter((w) => !mobile) // móvil: las apps van arriba y las extensiones de escritorio se ocultan
+      .sort(byLast);
+    return { detected, web, apps, more };
+  }, [wallets, last, mobile]);
 
-  // cuando llega la lista, el foco pasa a la primera fila habilitada
+  // isPlatformWrapper: la wallet que nos abrió se autoselecciona
   useEffect(() => {
-    if (!open || !sorted) return;
-    const t = setTimeout(
-      () => root.current?.querySelector<HTMLElement>("[data-row]:not([disabled])")?.focus(),
-      0,
-    );
-    return () => clearTimeout(t);
-  }, [open, sorted]);
+    if (!open || !wallets || view.kind !== "list") return;
+    const w = wallets.find((x) => x.isPlatformWrapper && x.isAvailable);
+    if (w) void choose(w);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, wallets]);
+
+  async function choose(w: WalletOption) {
+    const mine = ++attempt.current;
+    setView({ kind: "connecting", wallet: w });
+    try {
+      await onSelect(w.id);
+      try {
+        if (w.id !== "passkey") localStorage.setItem(LAST_KEY, w.id);
+      } catch {
+        /* ignorado */
+      }
+    } catch (e) {
+      if (mine !== attempt.current) return; // cancelado mientras tanto
+      if (e instanceof WrongNetworkError) setView({ kind: "network", wallet: w, network: e.networkName });
+      else setView({ kind: "rejected", wallet: w });
+    }
+  }
+
+  async function recheck(w: WalletOption, network: string) {
+    setView({ kind: "network", wallet: w, network, checking: true });
+    await choose(w);
+  }
 
   if (!open) return null;
+
+  const busy = view.kind === "connecting";
 
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Escape") {
       e.stopPropagation();
-      if (!busy) onClose();
+      if (view.kind === "connecting") attempt.current++;
+      onClose();
       return;
     }
     const focusables = Array.from(
-      root.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-      ) ?? [],
+      root.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])') ?? [],
     );
     if (e.key === "Tab" && focusables.length) {
-      // focus trap
       const first = focusables[0];
-      const last = focusables[focusables.length - 1];
+      const lastEl = focusables[focusables.length - 1];
       if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
         e.preventDefault();
         first.focus();
       }
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      const rows = Array.from(
-        root.current?.querySelectorAll<HTMLElement>("[data-row]:not([disabled])") ?? [],
-      );
+      const rows = Array.from(root.current?.querySelectorAll<HTMLElement>("[data-row]:not([disabled])") ?? []);
       const i = rows.indexOf(document.activeElement as HTMLElement);
       if (rows.length) {
         e.preventDefault();
@@ -118,16 +150,40 @@ export function WalletPicker({
     }
   }
 
-  async function choose(w: WalletOption) {
-    setError(null);
-    setBusy(w.id);
-    try {
-      await onSelect(w.id);
-    } catch {
-      setError(w.name);
-      setBusy(null);
-    }
-  }
+  const row =
+    "flex min-h-[44px] w-full min-w-0 items-center gap-3 px-5 py-2.5 text-left outline-none hover:bg-[var(--s2)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--proof)] disabled:cursor-default disabled:opacity-60";
+  const label = "px-5 pt-4 pb-2 font-mono text-[11px] tracking-[0.08em] text-[var(--dim)] uppercase";
+
+  const Icon = ({ w, size = 28 }: { w: WalletOption; size?: number }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={w.icon} alt="" width={size} height={size} className="shrink-0 rounded-[6px]" style={{ width: size, height: size }} />
+  );
+
+  const Row = ({ w, status, dot }: { w: WalletOption; status: string; dot?: boolean }) => (
+    <li className="border-t border-[var(--line)] first:border-t-0">
+      <button type="button" data-row disabled={busy} onClick={() => void choose(w)} className={row}>
+        <Icon w={w} />
+        <span className="min-w-0 flex-1 text-[15px] font-medium">
+          {w.name}
+          {w.id === last && <span className="ml-2 font-mono text-[11px] font-normal text-[var(--dim)]">last used</span>}
+        </span>
+        <span className="flex items-center gap-2 font-mono text-[12px] text-[var(--dim)]">
+          {dot && <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden />}
+          <span className={dot ? "text-[var(--ok)]" : ""}>{status}</span>
+        </span>
+      </button>
+    </li>
+  );
+
+  const passkeyOption = {
+    id: "passkey",
+    name: "Passkey",
+    icon: "",
+    url: "",
+    isAvailable: true,
+    isPlatformWrapper: false,
+    type: "passkey",
+  } satisfies WalletOption;
 
   return (
     <div
@@ -143,110 +199,231 @@ export function WalletPicker({
         aria-labelledby="wp-title"
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="max-h-[85vh] w-full overflow-y-auto rounded-t-[14px] outline-none border border-[var(--line)] bg-[var(--s1)] sm:w-[420px] sm:rounded-[14px]"
+        className="max-h-[88vh] w-full overflow-y-auto rounded-t-[14px] border border-[var(--line)] bg-[var(--s1)] outline-none sm:w-[420px] sm:rounded-[14px]"
       >
-        <header className="flex items-center justify-between px-5 pt-5">
-          <h2
-            id="wp-title"
-            className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)] uppercase"
-          >
-            Connect a Stellar wallet
-          </h2>
+        <header className="flex items-start justify-between px-5 pt-5">
+          <div>
+            <h2 id="wp-title" className="text-[20px] font-semibold tracking-[-0.02em]">
+              Connect a wallet
+            </h2>
+            <p className="mt-1 flex items-center gap-2 font-mono text-[12px] text-[var(--dim)]">
+              <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden /> Stellar testnet
+            </p>
+          </div>
           <button
             type="button"
             aria-label="Close"
-            onClick={onClose}
-            disabled={!!busy}
-            className="focus-landing -mr-2 flex size-8 items-center justify-center rounded-[8px] text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-40"
+            onClick={() => {
+              attempt.current++;
+              onClose();
+            }}
+            className="focus-landing -mr-2 flex size-8 items-center justify-center rounded-[8px] text-[var(--muted)] hover:text-[var(--text)]"
           >
             ✕
           </button>
         </header>
-        <p className="px-5 pt-2 pb-4 text-[15px] leading-[1.5] text-[var(--muted)]">
-          Uses your G… address. Nothing is signed until you claim.
-        </p>
 
-        {error && (
-          <div className="px-5 pb-4">
-            <InlineAlert
-              tone="red"
-              title="Wallet not connected"
-              body={`Couldn’t connect to ${error}. The request was cancelled or failed.`}
-            />
+        {view.kind === "list" && (
+          <>
+            <p className="px-5 pt-2 pb-4 text-[15px] leading-[1.5] text-[var(--muted)]">
+              Pick how you sign. Nothing is signed until you claim or send.
+            </p>
+
+            <p className={label}>Recommended</p>
+            <ul className="border-y border-[var(--line)]">
+              <li>
+                <button type="button" data-row onClick={() => void choose(passkeyOption)} className={`${row} min-h-[56px]`}>
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-[6px] bg-[var(--proof)] text-[var(--bg)]">
+                    <PasskeyGlyph style={{ height: 16, width: "auto" }} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-medium">Passkey</span>
+                    <span className="block text-[13px] text-[var(--muted)]">
+                      Passkey smart account · Face ID or Touch ID, no extension
+                    </span>
+                  </span>
+                </button>
+              </li>
+            </ul>
+
+            {listErr && (
+              <p className="px-5 py-6 text-[14px] text-[var(--muted)]">
+                Couldn’t load the wallet list. Close and try again.
+              </p>
+            )}
+            {!wallets && !listErr && <div className="mx-5 mt-4 h-[88px] rounded-[8px] bg-[var(--s2)] opacity-40" />}
+
+            {groups.detected.length > 0 && (
+              <>
+                <p className={label}>Detected</p>
+                <ul className="border-y border-[var(--line)]">
+                  {groups.detected.map((w) => (
+                    <Row key={w.id} w={w} status="detected" dot />
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {groups.web.length > 0 && (
+              <>
+                <p className={label}>Web wallets · no install</p>
+                <ul className="border-y border-[var(--line)]">
+                  {groups.web.map((w) => (
+                    <Row key={w.id} w={w} status="web wallet" />
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {mobile && groups.apps.length > 0 && (
+              <>
+                <p className={label}>Mobile apps</p>
+                <ul className="grid grid-cols-2 gap-px border-y border-[var(--line)] bg-[var(--line)]">
+                  {groups.apps.map((w) => (
+                    <li key={w.id} className="bg-[var(--s1)]">
+                      <a href={w.url} target="_blank" rel="noopener noreferrer" className={`${row} px-4`}>
+                        <Icon w={w} />
+                        <span className="min-w-0 flex-1 truncate text-[14px]">{w.name}</span>
+                        <span className="text-[var(--dim)]" aria-hidden>
+                          ↗
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {groups.more.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  aria-expanded={moreOpen}
+                  onClick={() => setMoreOpen((m) => !m)}
+                  className={`${label} flex w-full items-center justify-between text-left hover:text-[var(--text)]`}
+                >
+                  <span>More wallets · {groups.more.length}</span>
+                  <span className="flex items-center gap-2">
+                    {!moreOpen &&
+                      groups.more.slice(0, 4).map((w) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={w.id} src={w.icon} alt="" width={16} height={16} className="size-4 rounded-[4px]" />
+                      ))}
+                    {moreOpen ? "Hide ▴" : "Show ▾"}
+                  </span>
+                </button>
+                {moreOpen && (
+                  <ul className="grid grid-cols-3 gap-px border-y border-[var(--line)] bg-[var(--line)]">
+                    {groups.more.map((w) => (
+                      <li key={w.id} className="bg-[var(--s1)]">
+                        <a
+                          href={w.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`${w.name} · not installed (opens its site)`}
+                          className="flex min-h-[72px] flex-col items-center justify-center gap-1.5 px-2 py-3 text-center outline-none hover:bg-[var(--s2)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--proof)]"
+                        >
+                          <Icon w={w} />
+                          <span className="max-w-full truncate text-[12px] text-[var(--muted)]">
+                            {w.name} <span aria-hidden>↗</span>
+                          </span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {view.kind === "connecting" && (
+          <div className="px-5 pt-6 pb-2" role="status">
+            <div className="flex flex-col items-center py-8 text-center">
+              <div className="relative">
+                {view.wallet.id === "passkey" ? (
+                  <span className="flex size-12 items-center justify-center rounded-[10px] bg-[var(--proof)] text-[var(--bg)]">
+                    <PasskeyGlyph style={{ height: 24, width: "auto" }} />
+                  </span>
+                ) : (
+                  <Icon w={view.wallet} size={48} />
+                )}
+              </div>
+              <span
+                className="chestzk-spin mt-5 size-8 rounded-full border-2 border-[var(--line)] border-t-[var(--proof)]"
+                aria-hidden
+              />
+              <p className="mt-4 text-[15px] font-medium">
+                {view.wallet.id === "passkey"
+                  ? "Confirm with your passkey…"
+                  : `Approve the connection in the ${view.wallet.name} popup…`}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                attempt.current++;
+                setView({ kind: "list" });
+              }}
+              className="btn-landing btn-landing-s mb-5 w-full"
+            >
+              Cancel
+            </button>
           </div>
         )}
 
-        <ul className="border-t border-[var(--line)]" aria-busy={!sorted && !listErr}>
-          {listErr && (
-            <li className="px-5 py-6 text-[14px] text-[var(--muted)]">
-              Couldn’t load the wallet list. Close and try again.
-            </li>
-          )}
-          {!sorted &&
-            !listErr &&
-            [0, 1, 2].map((i) => (
-              <li key={i} className="h-[60px] border-b border-[var(--line)] bg-[var(--s2)] opacity-40" />
-            ))}
-          {sorted?.map((w) => {
-            const g = groupOf(w);
-            const connecting = busy === w.id;
-            return (
-              <li key={w.id} className="flex items-center border-b border-[var(--line)] last:border-b-0">
-                <button
-                  type="button"
-                  data-row
-                  disabled={!!busy}
-                  onClick={() => void choose(w)}
-                  className="flex min-w-0 flex-1 items-center gap-3 px-5 py-3.5 text-left outline-none hover:bg-[var(--s2)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--proof)] disabled:cursor-default disabled:opacity-60"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={w.icon}
-                    alt=""
-                    width={28}
-                    height={28}
-                    className="size-7 shrink-0 rounded-[6px]"
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-medium">{w.name}</span>
-                    {connecting && (
-                      <span className="mt-0.5 flex items-center gap-2 font-mono text-[12px] text-[var(--proof)]">
-                        <span
-                          className="chestzk-spin size-3.5 rounded-full border-2 border-[var(--line)] border-t-[var(--proof)]"
-                          aria-hidden
-                        />
-                        Confirm in {w.name}…
-                      </span>
-                    )}
-                  </span>
-                  {!connecting && (
-                    <span className="flex items-center gap-2 font-mono text-[12px] text-[var(--dim)]">
-                      {g === 0 && (
-                        <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden />
-                      )}
-                      <span className={g === 0 ? "text-[var(--ok)]" : ""}>{STATUS[g]}</span>
-                    </span>
-                  )}
-                </button>
-                {g === 2 && !connecting && (
-                  <a
-                    href={w.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-landing btn-landing-s btn-landing-sm mr-4 shrink-0"
-                    tabIndex={busy ? -1 : 0}
-                  >
-                    Install ↗
-                  </a>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        {view.kind === "rejected" && (
+          <div className="space-y-4 px-5 pt-4 pb-5">
+            <InlineAlert
+              tone="red"
+              title="Wallet not connected"
+              body={`Couldn’t connect to ${view.wallet.name}. The request was cancelled or failed.`}
+            />
+            <button type="button" onClick={() => void choose(view.wallet)} className="btn-landing btn-landing-p w-full">
+              Try again
+            </button>
+            <button type="button" onClick={() => setView({ kind: "list" })} className="btn-landing btn-landing-s w-full">
+              Choose another wallet
+            </button>
+          </div>
+        )}
 
-        <footer className="flex items-center gap-2 border-t border-[var(--line)] px-5 py-3 font-mono text-[12px] text-[var(--dim)]">
-          Powered by Stellar Wallets Kit ·{" "}
-          <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden /> Testnet
+        {view.kind === "network" && (
+          <div className="space-y-4 px-5 pt-4 pb-5">
+            <InlineAlert
+              tone="gold"
+              title="Wrong network"
+              body={`${view.wallet.name} is on ${view.network}. Loot runs on Stellar testnet.`}
+            />
+            <ol className="space-y-1 pl-5 text-[14px] leading-[1.6] text-[var(--muted)]" style={{ listStyle: "decimal" }}>
+              <li>Open {view.wallet.name} and go to its network settings.</li>
+              <li>Switch to “Testnet”.</li>
+              <li>Come back and check again.</li>
+            </ol>
+            <button
+              type="button"
+              disabled={view.checking}
+              onClick={() => void recheck(view.wallet, view.network)}
+              className="btn-landing btn-landing-p w-full disabled:opacity-50"
+            >
+              I switched, check again
+            </button>
+            <button type="button" onClick={() => setView({ kind: "list" })} className="btn-landing btn-landing-s w-full">
+              Choose another wallet
+            </button>
+          </div>
+        )}
+
+        <footer className="flex items-center justify-between gap-3 border-t border-[var(--line)] px-5 py-3 font-mono text-[12px] text-[var(--dim)]">
+          <a
+            href={WALLET_INFO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-[var(--text)]"
+          >
+            What is a wallet? ↗
+          </a>
+          <span>Stellar Wallets Kit</span>
         </footer>
       </div>
     </div>

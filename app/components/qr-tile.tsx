@@ -10,14 +10,17 @@ export function QrTile({
   value,
   id,
   size = 220,
+  pad = 18,
 }: {
   value: string;
   id?: string;
   size?: number;
+  pad?: number;
 }) {
   return (
     <div
-      className="inline-block rounded-[14px] bg-[#F5F2EC] p-[18px]"
+      className="inline-block rounded-[14px] bg-[#F5F2EC]"
+      style={{ padding: pad }}
       role="img"
       aria-label={`QR code for ${value}`}
     >

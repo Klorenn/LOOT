@@ -10,7 +10,7 @@ import { InlineAlert } from "@/components/inline-alert";
 import { chestPath } from "@/lib/chest-code";
 import { DEMO_CHEST } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
-import { HANDLE_RE, setHandle } from "@/lib/handle";
+import { HANDLE_HINT, HANDLE_RE, setHandle } from "@/lib/handle";
 import { safeNext } from "@/lib/safe-next";
 import { useSession } from "@/lib/session";
 import {
@@ -93,11 +93,18 @@ export function AuthForm({ mode }: { mode: Mode }) {
     }
   }
 
-  function validHandle(): string | null | false {
+  const handleValid = HANDLE_RE.test(handle.trim().toLowerCase());
+
+  /** null = vacío (solo permitido con wallet: se pregunta después de conectar), false = inválido. */
+  function validHandle(required = false): string | null | false {
     const h = handle.trim().toLowerCase();
-    if (!h) return null;
+    if (!h) {
+      if (!required) return null;
+      setHandleErr(HANDLE_HINT);
+      return false;
+    }
     if (!HANDLE_RE.test(h)) {
-      setHandleErr("Use 3–20 characters: a–z, 0–9 and _.");
+      setHandleErr(HANDLE_HINT);
       return false;
     }
     return h;
@@ -121,7 +128,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       }
       return;
     }
-    const h = validHandle();
+    const h = validHandle(true);
     if (h === false) return;
     setHandleErr(null);
     setStage(0);
@@ -387,7 +394,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             {!isLogin && (
               <div>
                 <label htmlFor="handle" className="block text-[14px] font-medium">
-                  Handle <span className="font-normal text-[var(--dim)]">· optional</span>
+                  Choose a name
                 </label>
                 <div
                   className={`mt-2 flex h-11 items-center rounded-[10px] border bg-[var(--bg)] px-3.5 focus-within:outline-2 focus-within:outline-offset-[3px] focus-within:outline-[var(--proof)] ${
@@ -400,7 +407,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
                     value={handle}
                     onChange={(e) => {
                       setHandleText(e.target.value);
-                      setHandleErr(null);
+                      const v = e.target.value.trim().toLowerCase();
+                      setHandleErr(v && !HANDLE_RE.test(v) ? HANDLE_HINT : null);
                     }}
                     placeholder="keeper"
                     autoComplete="off"
@@ -412,15 +420,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
                 <p
                   className={`mt-2 text-[13px] ${handleErr ? "text-[var(--red)]" : "text-[var(--dim)]"}`}
                 >
-                  {handleErr ??
-                    "Shown on this device instead of your address. Stored only in this browser."}
+                  {handleErr ?? "Shown instead of your address. You can change it later in Profile."}
                 </p>
               </div>
             )}
 
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || (!isLogin && !handleValid)}
               onClick={() => void withPasskey()}
               className="btn-landing btn-landing-p w-full gap-2 disabled:opacity-50"
             >

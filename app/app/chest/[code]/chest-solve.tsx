@@ -441,7 +441,7 @@ export function ChestSolve({
                   onClick={() => void doConnect("wallet")}
                   className="btn-landing btn-landing-s disabled:opacity-40"
                 >
-                  Use Freighter wallet
+                  Connect a wallet
                 </button>
               </div>
               {!connected && (

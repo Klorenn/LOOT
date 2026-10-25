@@ -91,8 +91,20 @@ export type WalletOption = {
   icon: string;
   url: string;
   isAvailable: boolean;
+  /** wallet que corre dentro de su propia app/navegador: se autoselecciona */
+  isPlatformWrapper: boolean;
   type: string;
 };
+
+export class WrongNetworkError extends Error {
+  /** "Mainnet", "Futurenet"… */
+  networkName: string;
+  constructor(networkName: string) {
+    super(`Wallet is on ${networkName}`);
+    this.name = "WrongNetworkError";
+    this.networkName = networkName;
+  }
+}
 
 /** Wallets soportadas por el kit con su estado de detección (para nuestro selector). */
 export async function listWallets(): Promise<WalletOption[]> {
@@ -104,8 +116,31 @@ export async function listWallets(): Promise<WalletOption[]> {
     icon: w.icon,
     url: w.url,
     isAvailable: w.isAvailable,
+    isPlatformWrapper: w.isPlatformWrapper,
     type: w.type,
   }));
+}
+
+/**
+ * Red a la que está conectada la wallet elegida. Lanza WrongNetworkError si no es testnet; si la
+ * wallet no sabe informarla (no todas lo implementan) se asume correcta.
+ */
+export async function assertWalletOnTestnet(walletId: string): Promise<void> {
+  const kit = await loadKit();
+  kit.setWallet(walletId);
+  let passphrase: string | undefined;
+  try {
+    passphrase = (await kit.getNetwork()).networkPassphrase;
+  } catch {
+    return;
+  }
+  if (!passphrase || passphrase === "Test SDF Network ; September 2015") return;
+  const name = /Public Global/i.test(passphrase)
+    ? "Mainnet"
+    : /Future/i.test(passphrase)
+      ? "Futurenet"
+      : "another network";
+  throw new WrongNetworkError(name);
 }
 
 /** Abre el selector de wallets y devuelve la cuenta G… elegida y el id del módulo. */
