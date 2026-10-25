@@ -1,9 +1,9 @@
 "use client";
 
-import { Address, contract, Keypair, rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
+import { Address, contract, Keypair, nativeToScVal, rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { latestLedgerHint } from "./chain";
-import { FACTORY, NETWORK } from "./config";
+import { CONTRACTS, FACTORY, NETWORK } from "./config";
 import { createArgs, scheduleError } from "./factory";
 import { getPasskeyKit } from "./passkey-client";
 import { SendError } from "./send";
@@ -108,8 +108,8 @@ export async function createChestOnChain(
 ): Promise<{ address: string; hash: string }> {
   const bad = scheduleError(input.prizes);
   if (bad) throw new SendError(bad);
-  if (!Number.isInteger(input.days) || input.days < 1 || input.days > FACTORY.maxDurationDays)
-    throw new SendError(`Duration must be between 1 and ${FACTORY.maxDurationDays} days.`);
+  if (!Number.isInteger(input.days) || input.days < 1)
+    throw new SendError("Duration must be a whole number of days, at least 1."); // el máximo lo fija el contrato
   if (!input.question.trim()) throw new SendError("The puzzle text is required.");
   const hash = await invoke(
     player,
@@ -134,6 +134,25 @@ export async function closeChestOnChain(
     FACTORY.contract,
     "close",
     [xdr.ScVal.scvAddress(Address.fromString(chestAddress).toScAddress())],
+    onPhase,
+  );
+  return { hash, refunded: BigInt((await returnValueFromTx(hash)) as bigint) };
+}
+
+/**
+ * Cofres legacy (contrato registry): el creador cierra uno vencido y recupera el premio sin reclamar.
+ * El contrato solo permite cerrar si venció o se agotó (`StillActive` si no).
+ */
+export async function closeLegacyChestOnChain(
+  player: Player,
+  chestId: number,
+  onPhase?: Phase,
+): Promise<{ hash: string; refunded: bigint }> {
+  const hash = await invoke(
+    player,
+    CONTRACTS.chest,
+    "close_chest",
+    [nativeToScVal(BigInt(chestId), { type: "u64" })],
     onPhase,
   );
   return { hash, refunded: BigInt((await returnValueFromTx(hash)) as bigint) };

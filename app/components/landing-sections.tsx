@@ -281,7 +281,7 @@ const SECURITY_ITEMS: { k: string; h: string; hc: string; b: string }[] = [
     k: "Funds",
     h: "Each chest is its own contract",
     hc: "text-[var(--gold)]",
-    b: "A factory deploys one contract per chest and funds never pass through it, so a bug in one chest cannot reach another chest's funds.",
+    b: "A factory deploys one contract per chest and funds never pass through it: each chest holds its own funds, and one chest can't spend another's.",
   },
 ];
 

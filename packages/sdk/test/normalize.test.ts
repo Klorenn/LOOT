@@ -15,21 +15,21 @@ import {
 
 test("normalizeAnswer: trim, lowercase, strip accents, remove all spaces", () => {
   const variants = [
-    "Mazières", // precomposed
-    "mazieres",
-    " MAZIERES ",
-    "Mazières", // combining grave accent
-    "Maz iè res",
+    "Thérèse", // precomposed
+    "therese",
+    " THERESE ",
+    "Thérèse", // combining grave accent
+    "Thé rè se",
   ];
   const fields = variants.map((v) => answerToField(normalizeAnswer(v)));
   for (const f of fields) assert.equal(f, fields[0]);
-  assert.equal(normalizeAnswer(variants[0]), "mazieres");
+  assert.equal(normalizeAnswer(variants[0]), "therese");
 });
 
 test("same fingerprint for every spelling of the answer", async () => {
   const salt = saltFromQuestion("Which test question?");
   const fps = await Promise.all(
-    ["Mazières", "mazieres", " MAZIERES ", "Mazières"].map(
+    ["Thérèse", "therese", " THERESE ", "Thérèse"].map(
       async (a) => (await fingerprintAnswer(a, salt)).fingerprintHex,
     ),
   );

@@ -10,7 +10,7 @@ import { PRIZE, stroopsToXlm } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import type { DashboardData } from "@/lib/listing";
 import { useSession } from "@/lib/session";
-import { closeChestOnChain } from "@/lib/create-chest";
+import { closeChestOnChain, closeLegacyChestOnChain } from "@/lib/create-chest";
 
 type Load = { s: "loading" } | { s: "ok"; v: DashboardData } | { s: "error" };
 
@@ -23,18 +23,21 @@ export default function DashboardPage() {
 
   async function closeAndRefund(r: DashboardData["rows"][number]) {
     if (!player || closing !== null) return;
+    const legacy = r.kind === "legacy";
     const pool = BigInt(r.poolStroops);
     const upTo = r.refundStroops ? BigInt(r.refundStroops) : pool;
     const ok = window.confirm(
-      `Close chest ${r.code}?\n\n` +
-        `Unclaimed prize: ${stroopsToXlm(pool)} XLM, plus the unused part of the prepaid fee reserve ` +
-        `(up to ${stroopsToXlm(upTo)} XLM in total) returns to your account. This can't be undone.`,
+      legacy
+        ? `Close chest ${r.code}?\n\nThe unclaimed prize (${stroopsToXlm(pool)} XLM) returns to your account. This can't be undone.`
+        : `Close chest ${r.code}?\n\n` +
+            `Unclaimed prize: ${stroopsToXlm(pool)} XLM, plus the unused part of the prepaid fee reserve ` +
+            `(up to ${stroopsToXlm(upTo)} XLM in total) returns to your account. This can't be undone.`,
     );
     if (!ok) return;
     setClosing(r.code);
     setNotice(null);
     try {
-      const { hash, refunded } = await closeChestOnChain(player, r.address as string);
+      const { hash, refunded } = legacy ? await closeLegacyChestOnChain(player, r.id) : await closeChestOnChain(player, r.address as string);
       setNotice({ tone: "ok", text: `Closed. ${stroopsToXlm(refunded)} XLM returned to your account.`, hash });
       setReload((n) => n + 1);
     } catch (e) {
@@ -195,7 +198,7 @@ export default function DashboardPage() {
                         {r.claims} / {r.maxClaims}
                       </td>
                       <td className="py-4 text-right whitespace-nowrap">
-                        {r.address && !r.closed && (
+                        {!r.closed && (r.address || r.status === "expired") && (
                           <button
                             type="button"
                             disabled={closing !== null}
