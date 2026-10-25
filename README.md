@@ -10,15 +10,20 @@ Native BN254 verification + cheap claims → knowledge-gated airdrops/events tha
 
 ## Testnet
 
+Each chest is its own contract, deployed by a factory (`contracts/factory`, `contracts/chest-one`). The creator signs `create_chest` and pays prizes + creation fee + prepaid fee reserve from their own account; funds never pass through the factory.
+
 | | |
 |---|---|
-| Chest | `CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ` |
+| Factory | `CBKH5Z25DDQRGMJDXQWUADOND4DUM5CN4CVZOX7M3OFH2HL7KYFONRRV` |
+| Treasury (creation fee) | `GBTDED5SE2QAKFQ3Y6NY75QGCKQTQ3Z6H3ZYM4PWUX3X36QMOKEEJFPQ` |
 | Verifier | `CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE` |
 | Prize token (native XLM SAC) | `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` |
-| Test token CHEST (fallback chest #2) | `CD3RI5RAQX4CB62IVD5XD6HIE5TZWJ55VF7GKAT23NPBVW3JLP6TP4AA` |
-| Judge chest | **#6** (10 XLM × 10 slots) — Stellar question about the creator of SCP; answer not published |
-| Attack-demo chest | **#7** (100 × 0.1 XLM, public answer on purpose; only used to build a proof the contract rejects) |
-| Normal chest (attack demo, no ZK) | `CDMYX46WAU66OOAVXLBPTVXZ7EZF5NTS3X3T6S2AKSOADEBZD7OGEXCA` · chest **#1** · 30 slots · XLM · answer in plain text |
+| Judge chest | `CDNU6Q35QZP56ND5XWHKQTH3QPPEQWV4QXSYFTAXSRR2SZ6QHQBCL5HR` (10 places × 10 XLM, Stellar question about the creator of SCP; answer not published) |
+| Attack-demo chest | `CA2LAPG3EIALHEJHASSUPKXEIXXDT5GX3WADABYWHVK4LJPAVFN6BIJ2` (50 places × 0.1 XLM, public answer on purpose; only used to build a proof the contract rejects) |
+| Normal chest (attack demo, no ZK) | `CDMYX46WAU66OOAVXLBPTVXZ7EZF5NTS3X3T6S2AKSOADEBZD7OGEXCA` · 30 slots · XLM · answer in plain text |
+| Legacy registry (many chests by id, still readable) | `CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ` |
+
+A chest URL is `/chest/<code>`: factory chests use Sqids of their position in `list_chests`; legacy registry chests keep their old codes. The public input `chestId` of a factory chest's proof is the field of its contract address (the circuit is unchanged).
 
 ## Threat model
 
@@ -36,7 +41,7 @@ cp .env.example .env.local   # fill RELAYER_SECRET (+ optional RELAYER_API_KEY)
 pnpm install && pnpm dev
 ```
 
-Open http://localhost:3000 → **Abrir un cofre** → answer `8`.
+Open http://localhost:3000/explore → open the judge chest.
 
 ### Routes
 

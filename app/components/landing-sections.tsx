@@ -279,9 +279,9 @@ const SECURITY_ITEMS: { k: string; h: string; hc: string; b: string }[] = [
   },
   {
     k: "Funds",
-    h: "Next: one contract per chest",
+    h: "Each chest is its own contract",
     hc: "text-[var(--gold)]",
-    b: "Today every chest lives inside one shared contract. A factory that deploys one contract per chest, so a bug in one chest cannot reach another chest's funds, is in progress and not live in this demo.",
+    b: "A factory deploys one contract per chest and funds never pass through it, so a bug in one chest cannot reach another chest's funds.",
   },
 ];
 
