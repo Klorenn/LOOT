@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { Input } from "@/components/ui/input";
@@ -11,9 +11,11 @@ import { KV } from "@/components/kv";
 import { TEMPLATES, type ChestTemplate } from "@/lib/templates";
 import { answerToField, normalizeAnswer, randomSalt } from "@/lib/answer";
 import { poseidon2, fieldToHex } from "@/lib/zk";
-import { chestPath } from "@/lib/chest-code";
 import { useSession } from "@/lib/session";
-import { NETWORK, stroopsToXlm } from "@/lib/config";
+import { FACTORY, NETWORK, stroopsToXlm } from "@/lib/config";
+import { factoryIndexOf, quoteLocal } from "@/lib/factory";
+import { encodeRef } from "@/lib/chest-code";
+import { PrizeEditor } from "./prize-editor";
 import { balanceInfo, parseXlmAmount, SendError } from "@/lib/send";
 import { confirmMeta, createChestOnChain, reserveMeta } from "@/lib/create-chest";
 
@@ -25,21 +27,6 @@ const STEPS = [
   "Review & fund",
 ] as const;
 
-const MIN_EXPIRY_S = 5 * 60;
-const MAX_EXPIRY_S = 90 * 24 * 3600;
-
-/** Vencimiento obligatorio y futuro: con deadline 0 el cofre nunca se podría cerrar (premio bloqueado). */
-function expiryError(expires: string): string | null {
-  const t = new Date(expires).getTime();
-  const now = Date.now() / 1000;
-  const sec = Math.floor(t / 1000);
-  if (!expires || !Number.isFinite(t))
-    return "Pick an expiry date — unclaimed prize can only be recovered after it.";
-  if (sec < now + MIN_EXPIRY_S) return "Expiry must be at least 5 minutes from now.";
-  if (sec > now + MAX_EXPIRY_S) return "Expiry can be at most 90 days from now.";
-  return null;
-}
-
 export default function CreateChestPage() {
   const [step, setStep] = useState(0);
   const [tpl, setTpl] = useState<ChestTemplate>(TEMPLATES[2]);
@@ -48,15 +35,20 @@ export default function CreateChestPage() {
   const [answer, setAnswer] = useState("");
   const [hashHex, setHashHex] = useState<string | null>(null);
   const [hashOk, setHashOk] = useState(false);
-  const [prize, setPrize] = useState(String(TEMPLATES[2].prize));
+  const [prizes, setPrizes] = useState<bigint[] | null>(null);
+  const [prizeErr, setPrizeErr] = useState<string | null>(null);
+  const onPrizes = useCallback((p: bigint[] | null, e: string | null) => {
+    setPrizes(p);
+    setPrizeErr(e);
+  }, []);
+  const [days, setDays] = useState(7);
   const [difficulty, setDifficulty] = useState(2);
-  const [expires, setExpires] = useState("");
-  const [maxClaims, setMaxClaims] = useState(TEMPLATES[2].maxClaims);
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
-    chestId: number;
+    address: string;
+    code: string;
     link: string;
     explorer: string | null;
     priv: boolean;
@@ -72,18 +64,6 @@ export default function CreateChestPage() {
   const [copied, setCopied] = useState(false);
   // la sal se genera una vez por intento: un reintento reusa la misma huella (la reserva es idempotente)
   const attempt = useRef<{ salt: bigint } | null>(null);
-
-  useEffect(() => {
-    if (!expires) {
-      const d = new Date();
-      d.setDate(d.getDate() + 7);
-      // datetime-local es hora LOCAL: toISOString() daría UTC y corrido el vencimiento
-      const pad = (n: number) => String(n).padStart(2, "0");
-      setExpires(
-        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
-      );
-    }
-  }, [expires]);
 
   async function hashAnswer() {
     const n = normalizeAnswer(answer);
@@ -104,19 +84,15 @@ export default function CreateChestPage() {
     setQuestion(t.question);
     setHint(t.hint);
     setAnswer("");
-    setPrize(String(t.prize));
-    setMaxClaims(t.maxClaims);
     setHashHex(null);
     setHashOk(false);
     setResult(null);
   }
 
-  const prizeStroops = parseXlmAmount(prize);
-  const totalStroops =
-    prizeStroops && Number.isSafeInteger(maxClaims) && maxClaims >= 1
-      ? prizeStroops * BigInt(maxClaims)
-      : null;
-  const short = !!(totalStroops && bal && bal.max < totalStroops);
+  const isPasskey = player?.kind === "passkey";
+  // Passkey: el relayer paga la fee de red. Cuenta G: la paga el creador (tope estimado).
+  const quote = prizes ? quoteLocal(prizes, days, isPasskey ? BigInt(0) : undefined) : null;
+  const short = !!(quote && bal && (isPasskey ? bal.balance : bal.max) < quote.total);
 
   useEffect(() => {
     if (!player || step < 4) return;
@@ -147,13 +123,12 @@ export default function CreateChestPage() {
   function validateStep(): boolean {
     const e: Record<string, string> = {};
     if (step === 0 && !question.trim()) e.question = "Puzzle text is required.";
+    if (step === 0 && question.trim().length > FACTORY.maxQuestionLen)
+      e.question = `At most ${FACTORY.maxQuestionLen} characters (it is stored on-chain).`;
     if (step === 1 && !hashOk) e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
-    if (step === 2 && !prizeStroops) e.prize = "Enter a reward greater than 0 (up to 7 decimals).";
-    if (step === 3 && (!Number.isSafeInteger(maxClaims) || maxClaims < 1)) e.maxClaims = "At least 1 claim.";
-    if (step === 3) {
-      const ee = expiryError(expires);
-      if (ee) e.expires = ee;
-    }
+    if (step === 2 && (!prizes || prizeErr)) e.prize = prizeErr ?? "Set the prizes.";
+    if (step === 3 && (!Number.isInteger(days) || days < 1 || days > FACTORY.maxDurationDays))
+      e.days = `Pick between 1 and ${FACTORY.maxDurationDays} days.`;
     setFieldErr(e);
     return Object.keys(e).length === 0;
   }
@@ -169,7 +144,7 @@ export default function CreateChestPage() {
 
   async function onFund() {
     if (!validateStep()) return;
-    if (!player || !prizeStroops) return;
+    if (!player || !prizes || !quote) return;
     setBusy(true);
     setError(null);
     try {
@@ -178,40 +153,37 @@ export default function CreateChestPage() {
       const n = normalizeAnswer(answer);
       const fp = await poseidon2(answerToField(n), salt);
       const fingerprintHex = fieldToHex(fp);
-      const ee = expiryError(expires);
-      if (ee) {
-        setStep(3);
-        setFieldErr({ expires: ee });
-        return;
-      }
-      const deadline = Math.floor(new Date(expires).getTime() / 1000);
-      const input = { fingerprintHex, prizeStroops, maxClaims, deadline };
+      const input = { question: question.trim(), fingerprintHex, prizes: prizes!, days };
 
       setPhase("Saving chest details…");
-      await reserveMeta(player, input, {
+      await reserveMeta(player, fingerprintHex, {
         template: tpl.id,
-        question,
+        question: question.trim(),
         hint: hint || undefined,
         difficulty,
-        prize: Number(stroopsToXlm(prizeStroops)),
+        prize: Number(stroopsToXlm(quote!.prize)),
+        places: prizes!.length,
         listed,
         salt: salt.toString(),
       });
 
-      const { chestId, hash } = await createChestOnChain(player, input, (p) =>
+      const { address, hash } = await createChestOnChain(player, input, (p) =>
         setPhase(p === "signing" ? "Approve in your wallet…" : "Waiting for the network…"),
       );
 
       setPhase("Publishing…");
       let saved = true;
       try {
-        await confirmMeta(chestId, fingerprintHex, hash);
+        await confirmMeta(address, fingerprintHex, hash);
       } catch {
         saved = false;
       }
-      const base = `${window.location.origin}${chestPath(chestId)}`;
+      const index = await factoryIndexOf(address);
+      const code = index === null ? "" : encodeRef({ kind: "factory", index });
+      const base = `${window.location.origin}/chest/${code}`;
       setResult({
-        chestId,
+        address,
+        code,
         link: listed ? base : `${base}#s=${salt.toString()}`,
         explorer: `https://stellar.expert/explorer/${process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "public" : "testnet"}/tx/${hash}`,
         priv: !listed,
@@ -239,7 +211,7 @@ export default function CreateChestPage() {
     setBusy(true);
     setError(null);
     try {
-      await confirmMeta(result.chestId, result.fingerprintHex, result.hash);
+      await confirmMeta(result.address, result.fingerprintHex, result.hash);
       setResult({ ...result, saved: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -273,7 +245,7 @@ export default function CreateChestPage() {
           eyebrow="Chest created · testnet"
           title={
             <>
-              Chest #{result.chestId} is <Em tone="ok">live.</Em>
+              Your chest is <Em tone="ok">live.</Em>
             </>
           }
           lead={
@@ -317,7 +289,7 @@ export default function CreateChestPage() {
             <button type="button" onClick={() => void copyLink()} className="btn-landing btn-landing-p">
               {copied ? "Copied" : "Copy link"}
             </button>
-            <Link href={chestPath(result.chestId)} className="btn-landing btn-landing-s">
+            <Link href={`/chest/${result.code}`} className="btn-landing btn-landing-s">
               Open chest
             </Link>
             <Link href="/dashboard" className="btn-landing btn-landing-s">
@@ -348,7 +320,7 @@ export default function CreateChestPage() {
             Create a <Em>chest</Em>
           </>
         }
-        lead="Escrow a prize behind a riddle. Only the hash of the answer goes on-chain."
+        lead="Escrow a prize behind a riddle, in its own contract. The question is on-chain; only the hash of the answer is."
       />
 
       <div className="mx-auto grid max-w-[1200px] gap-12 px-6 py-10 lg:grid-cols-[220px_1fr_340px]">
@@ -420,7 +392,7 @@ export default function CreateChestPage() {
                   </div>
                   <Field
                     label="Puzzle"
-                    hint="Public: shown to everyone who opens the chest"
+                    hint="Stored on-chain: public for everyone, forever."
                     error={fieldErr.question}
                   >
                     <textarea
@@ -504,72 +476,45 @@ export default function CreateChestPage() {
 
               {step === 2 && (
                 <>
-                  <Field
-                    label="Reward per claim (XLM)"
-                    hint="Decimals allowed, e.g. 0.1. Escrowed from your account when you create the chest."
-                    error={fieldErr.prize}
-                  >
-                    <Input
-                      inputMode="decimal"
-                      value={prize}
-                      onChange={(e) => setPrize(e.target.value)}
-                      className="h-11 rounded-[10px] font-mono"
-                    />
-                  </Field>
+                  <PrizeEditor initialEach="10" initialPlaces={10} onChange={onPrizes} />
+                  {fieldErr.prize && (
+                    <p className="font-mono text-[12px] text-[var(--red)]">{fieldErr.prize}</p>
+                  )}
                   <div>
                     <p className="mb-2 font-mono text-[12px] tracking-[0.06em] text-[var(--dim)] uppercase">
                       Difficulty
                     </p>
                     <div className="inline-flex overflow-hidden rounded-[10px] border border-[var(--line)]">
-                      {(["Easy", "Medium", "Hard", "Brutal"] as const).map(
-                        (d, i) => (
-                          <button
-                            key={d}
-                            type="button"
-                            onClick={() => setDifficulty(i + 1)}
-                            className={`px-3 py-2 font-mono text-[12px] ${
-                              difficulty === i + 1
-                                ? "bg-[var(--s2)] text-[var(--text)]"
-                                : "text-[var(--muted)]"
-                            } ${i ? "border-l border-[var(--line)]" : ""}`}
-                          >
-                            {d}
-                          </button>
-                        ),
-                      )}
+                      {(["Easy", "Medium", "Hard", "Brutal"] as const).map((d, i) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setDifficulty(i + 1)}
+                          className={`px-3 py-2 font-mono text-[12px] ${
+                            difficulty === i + 1 ? "bg-[var(--s2)] text-[var(--text)]" : "text-[var(--muted)]"
+                          } ${i ? "border-l border-[var(--line)]" : ""}`}
+                        >
+                          {d}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </>
               )}
 
               {step === 3 && (
-                <>
-                  <Field
-                    label="Expires"
-                    hint="Unclaimed prize returns when you close the chest from your dashboard after it expires. The contract only allows closing after expiry."
-                    error={fieldErr.expires}
-                  >
-                    <Input
-                      type="datetime-local"
-                      value={expires}
-                      onChange={(e) => setExpires(e.target.value)}
-                      className="h-11 rounded-[10px] font-mono"
-                    />
-                  </Field>
-                  <Field
-                    label="Max claims"
-                    hint="Each proof works once, but anyone who knows the answer can claim until the slots run out."
-                    error={fieldErr.maxClaims}
-                  >
-                    <Input
-                      type="number"
-                      min={1}
-                      value={maxClaims}
-                      onChange={(e) => setMaxClaims(Math.floor(Number(e.target.value)))}
-                      className="h-11 rounded-[10px] font-mono"
-                    />
-                  </Field>
-                </>
+                <Field
+                  label="Duration (days)"
+                  hint={`1 to ${FACTORY.maxDurationDays} days. A fee of ${FACTORY.dailyFeeBps / 100}% of the prize per day is prepaid and the unused part is refunded when the chest closes. You can close it any time; anyone can close it after it expires and the refund still goes to you.`}
+                  error={fieldErr.days}
+                >
+                  <Input
+                    inputMode="numeric"
+                    value={String(days)}
+                    onChange={(e) => setDays(Math.floor(Number(e.target.value)) || 0)}
+                    className="h-11 rounded-[10px] font-mono"
+                  />
+                </Field>
               )}
 
               {step === 4 && (
@@ -584,69 +529,67 @@ export default function CreateChestPage() {
                     {previewHash}
                   </p>
                   <p>
-                    <span className="text-[var(--dim)]">Reward · </span>
-                    <span className="text-[var(--gold)]">{prize}</span>
-                  </p>
-                  <p>
                     <span className="text-[var(--dim)]">Difficulty · </span>
                     {diffLabel}
                   </p>
                   <p>
-                    <span className="text-[var(--dim)]">Expires · </span>
-                    {expires || "—"}
-                  </p>
-                  <p>
-                    <span className="text-[var(--dim)]">Max claims · </span>
-                    {maxClaims}
+                    <span className="text-[var(--dim)]">Duration · </span>
+                    {days} {days === 1 ? "day" : "days"}
                   </p>
                   <p>
                     <span className="text-[var(--dim)]">Visibility · </span>
                     {listed ? "Public, listed in Explore" : "Private link"}
                   </p>
-                  <div className="space-y-2 border-t border-[var(--line)] pt-3">
-                    <p>
-                      <span className="text-[var(--dim)]">Escrow · </span>
-                      <span className="text-[var(--gold)]">
-                        {totalStroops ? `${stroopsToXlm(totalStroops)} XLM` : "—"}
-                      </span>
-                      <span className="text-[var(--dim)]">
-                        {" "}
-                        ({prize || "0"} × {maxClaims})
-                      </span>
-                    </p>
-                    <p>
-                      <span className="text-[var(--dim)]">Your balance · </span>
-                      {bal ? `${stroopsToXlm(bal.balance)} XLM` : "…"}
-                    </p>
-                    {short && (
-                      <div className="space-y-2" role="alert">
-                        <p className="text-[var(--red)]">
-                          Not enough XLM to fund this chest.
+                  {quote && prizes ? (
+                    <div className="space-y-1.5 border-t border-[var(--line)] pt-3">
+                      <Line k={`Prizes (${prizes.length} ${prizes.length === 1 ? "place" : "places"})`} v={quote.prize} gold />
+                      <Line k="Creation fee (to Loot treasury)" v={quote.creationFee} />
+                      <Line
+                        k={`Fee reserve (${FACTORY.dailyFeeBps / 100}%/day × ${days})`}
+                        v={quote.reserve}
+                        note="Refundable: the unused part comes back when you close the chest."
+                      />
+                      {isPasskey ? (
+                        <p className="flex justify-between gap-4">
+                          <span className="text-[var(--dim)]">Network fee</span>
+                          <span>paid by the relayer</span>
                         </p>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <button
-                            type="button"
-                            disabled={faucetBusy}
-                            onClick={() => void friendbot()}
-                            className="btn-landing btn-landing-s disabled:opacity-40"
-                          >
-                            {faucetBusy ? "Requesting…" : "Fund with Friendbot"}
-                          </button>
-                          <Link
-                            href="/wallet?tab=receive"
-                            className="text-[var(--proof)] underline underline-offset-2"
-                          >
-                            Add XLM in Wallet
-                          </Link>
-                        </div>
+                      ) : (
+                        <Line k="Network fee (estimate, max)" v={quote.network} />
+                      )}
+                      <div className="flex justify-between gap-4 border-t border-[var(--line)] pt-2">
+                        <span className="text-[var(--text)]">Total from your account</span>
+                        <span className="text-[var(--gold)]">{stroopsToXlm(quote.total)} XLM</span>
                       </div>
-                    )}
-                  </div>
-                  <p className="text-[var(--dim)]">
-                    {player?.kind === "passkey"
-                      ? "The prize comes from your balance. The network fee is covered by the relayer on testnet."
-                      : "The prize and the network fee come from your account."}
-                  </p>
+                      <p className="flex justify-between gap-4">
+                        <span className="text-[var(--dim)]">Your balance</span>
+                        <span>{bal ? `${stroopsToXlm(bal.balance)} XLM` : "…"}</span>
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[var(--red)]">Go back and set the prizes.</p>
+                  )}
+                  {short && (
+                    <div className="space-y-2" role="alert">
+                      <p className="text-[var(--red)]">Not enough XLM to fund this chest.</p>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={faucetBusy}
+                          onClick={() => void friendbot()}
+                          className="btn-landing btn-landing-s disabled:opacity-40"
+                        >
+                          {faucetBusy ? "Requesting…" : "Fund with Friendbot"}
+                        </button>
+                        <Link
+                          href="/wallet?tab=receive"
+                          className="text-[var(--proof)] underline underline-offset-2"
+                        >
+                          Add XLM in Wallet
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -710,24 +653,35 @@ export default function CreateChestPage() {
                   {
                     label: "Reward",
                     value: (
-                      <span className="text-[var(--gold)]">{prize}</span>
+                      <span className="text-[var(--gold)]">
+                        {quote ? `${stroopsToXlm(quote.prize)} XLM · ${quote.prizes.length} ${quote.prizes.length === 1 ? "place" : "places"}` : "—"}
+                      </span>
                     ),
                   },
                   { label: "Hash", value: previewHash },
-                  {
-                    label: "Expires",
-                    value: expires ? expires.replace("T", " ") : "—",
-                  },
+                  { label: "Duration", value: `${days} ${days === 1 ? "day" : "days"}` },
                 ]}
               />
             </div>
             <p className="mt-4 font-mono text-[11px] leading-[1.5] text-[var(--dim)]">
-              You fund the prize from your own account.
+              You fund the prizes from your own account.
             </p>
           </div>
         </aside>
       </div>
     </main>
+  );
+}
+
+function Line({ k, v, gold, note }: { k: string; v: bigint; gold?: boolean; note?: string }) {
+  return (
+    <div>
+      <p className="flex justify-between gap-4">
+        <span className="text-[var(--dim)]">{k}</span>
+        <span className={gold ? "text-[var(--gold)]" : ""}>{stroopsToXlm(v)} XLM</span>
+      </p>
+      {note && <p className="text-[11px] leading-[1.5] text-[var(--dim)]">{note}</p>}
+    </div>
   );
 }
 

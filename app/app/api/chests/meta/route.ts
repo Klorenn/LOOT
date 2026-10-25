@@ -7,7 +7,7 @@ import {
   saveChestMeta,
   type PendingMeta,
 } from "@/lib/chest-store";
-import { readChest } from "@/lib/chain";
+import { factoryIndexOf, readFactoryChest } from "@/lib/factory";
 
 /**
  * Metadatos off-chain de un cofre, en dos pasos (reserve-then-confirm):
@@ -42,13 +42,13 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
   if (!HEX64.test(fp)) return "bad fingerprint";
   if (typeof b.creator !== "string" || !StrKey.isValidEd25519PublicKey(b.creator)
     && !StrKey.isValidContract(b.creator)) return "bad creator";
-  if (!str(b.question, 500)) return "bad question";
+  if (!str(b.question, 280)) return "bad question";
   if (b.hint !== undefined && b.hint !== "" && !str(b.hint, 200)) return "bad hint";
   if (b.template !== undefined && !str(b.template, 40)) return "bad template";
   const difficulty = b.difficulty === undefined ? undefined : Number(b.difficulty);
   if (difficulty !== undefined && ![1, 2, 3, 4].includes(difficulty)) return "bad difficulty";
   if (typeof b.prize !== "number" || !Number.isFinite(b.prize) || b.prize <= 0) return "bad prize";
-  if (!Number.isSafeInteger(b.maxClaims) || (b.maxClaims as number) < 1 || (b.maxClaims as number) > 100000)
+  if (!Number.isSafeInteger(b.maxClaims) || (b.maxClaims as number) < 1 || (b.maxClaims as number) > 50)
     return "bad maxClaims";
   const listed = b.listed !== false;
   let salt: string | undefined;
@@ -92,33 +92,41 @@ export async function POST(req: NextRequest) {
     }
 
     if (b.action === "confirm") {
-      const id = Number(b.chestId);
+      const address = typeof b.address === "string" ? b.address : "";
       const fp = typeof b.fingerprintHex === "string" ? b.fingerprintHex.toLowerCase() : "";
-      if (!Number.isSafeInteger(id) || id < 1 || !HEX64.test(fp))
+      if (!StrKey.isValidContract(address) || !HEX64.test(fp))
         return NextResponse.json({ error: "bad request" }, { status: 400 });
       const txHash = typeof b.txHash === "string" && TX.test(b.txHash) ? b.txHash.toLowerCase() : undefined;
 
       const pending = await getPending(fp);
       if (!pending) return NextResponse.json({ error: "no reservation for this fingerprint" }, { status: 404 });
 
+      // Debe ser un contrato creado por la factory (no uno falso que devuelva cualquier creador).
+      let index: number | null;
       let chest;
       try {
-        chest = await readChest(id);
+        index = await factoryIndexOf(address);
+        chest = index === null ? null : await readFactoryChest(address, index);
       } catch {
         return NextResponse.json({ error: "chest not found on-chain yet" }, { status: 409 });
       }
-      if (chest.fingerprintHex !== fp || chest.creator !== pending.creator)
+      if (!chest) return NextResponse.json({ error: "not a factory chest" }, { status: 403 });
+      if (
+        chest.fingerprintHex !== fp ||
+        chest.creator !== pending.creator ||
+        chest.question.trim() !== pending.question
+      )
         return NextResponse.json({ error: "chest does not match the reservation" }, { status: 403 });
 
       const { reservedAt: _r, ...rest } = pending;
       void _r;
       const saved = await saveChestMeta({
         ...rest,
-        id,
+        address,
         txHash,
         createdAt: new Date().toISOString(),
       });
-      return NextResponse.json({ ok: true, id: saved.id });
+      return NextResponse.json({ ok: true, address: saved.address });
     }
 
     return NextResponse.json({ error: "bad action" }, { status: 400 });

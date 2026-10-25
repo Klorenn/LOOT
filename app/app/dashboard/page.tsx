@@ -18,21 +18,23 @@ export default function DashboardPage() {
   const { address, player } = useSession();
   const [data, setData] = useState<Load>({ s: "loading" });
   const [reload, setReload] = useState(0);
-  const [closing, setClosing] = useState<number | null>(null);
+  const [closing, setClosing] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string; hash?: string } | null>(null);
 
   async function closeAndRefund(r: DashboardData["rows"][number]) {
     if (!player || closing !== null) return;
-    const back = BigInt(r.prizeStroops) * BigInt(Math.max(0, r.maxClaims - r.claims));
+    const pool = BigInt(r.poolStroops);
+    const upTo = r.refundStroops ? BigInt(r.refundStroops) : pool;
     const ok = window.confirm(
-      `Close chest ${r.code} and take back ${stroopsToXlm(back)} XLM?\n\n` +
-        `(${r.maxClaims - r.claims} unclaimed × ${r.prizeLabel}). This can't be undone.`,
+      `Close chest ${r.code}?\n\n` +
+        `Unclaimed prize: ${stroopsToXlm(pool)} XLM, plus the unused part of the prepaid fee reserve ` +
+        `(up to ${stroopsToXlm(upTo)} XLM in total) returns to your account. This can't be undone.`,
     );
     if (!ok) return;
-    setClosing(r.id);
+    setClosing(r.code);
     setNotice(null);
     try {
-      const { hash, refunded } = await closeChestOnChain(player, r.id);
+      const { hash, refunded } = await closeChestOnChain(player, r.address as string);
       setNotice({ tone: "ok", text: `Closed. ${stroopsToXlm(refunded)} XLM returned to your account.`, hash });
       setReload((n) => n + 1);
     } catch (e) {
@@ -175,7 +177,7 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {rows.map((r) => (
-                    <tr key={r.id} className="border-b border-[var(--line)]">
+                    <tr key={r.code} className="border-b border-[var(--line)]">
                       <td className="py-4">
                         <Mono className="text-[var(--dim)]">{r.code}</Mono>
                       </td>
@@ -193,14 +195,14 @@ export default function DashboardPage() {
                         {r.claims} / {r.maxClaims}
                       </td>
                       <td className="py-4 text-right whitespace-nowrap">
-                        {r.status === "expired" && (
+                        {r.address && !r.closed && (
                           <button
                             type="button"
                             disabled={closing !== null}
                             onClick={() => void closeAndRefund(r)}
                             className="btn-landing btn-landing-p btn-landing-sm mr-2 disabled:opacity-40"
                           >
-                            {closing === r.id ? "Closing…" : "Close & refund"}
+                            {closing === r.code ? "Closing…" : "Close & refund"}
                           </button>
                         )}
                         <Link href={r.href} className="btn-landing btn-landing-s btn-landing-sm">
