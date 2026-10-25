@@ -440,42 +440,46 @@ export function ChestSolve({
                 )
               }
             >
-              <p className="text-[15px] leading-[1.5] text-[var(--muted)]">
-                The proof is bound to your address: if a bot copies it and changes
-                the recipient, the contract rejects it. And each proof works only once.
-              </p>
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  disabled={busy || connected}
-                  onClick={() => void doConnect("passkey")}
-                  className="btn-landing btn-landing-p disabled:opacity-40"
-                >
-                  Continue with passkey
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || connected}
-                  onClick={() => void doConnect("wallet")}
-                  className="btn-landing btn-landing-s disabled:opacity-40"
-                >
-                  Connect a wallet
-                </button>
-              </div>
-              {!connected && (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void doConnect("demo")}
-                  className="mt-3 font-mono text-[12px] text-[var(--dim)] underline underline-offset-2 hover:text-[var(--text)]"
-                >
-                  or use a throwaway demo wallet
-                </button>
+              {connected ? (
+                <p className="text-[15px] leading-[1.5] text-[var(--muted)]">
+                  Connected. The prize goes to this address.
+                </p>
+              ) : (
+                <>
+                  <p className="text-[15px] leading-[1.5] text-[var(--muted)]">
+                    The prize goes to the address you connect.
+                  </p>
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void doConnect("passkey")}
+                      className="btn-landing btn-landing-p disabled:opacity-40"
+                    >
+                      Continue with passkey
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void doConnect("wallet")}
+                      className="btn-landing btn-landing-s disabled:opacity-40"
+                    >
+                      Connect a wallet
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void doConnect("demo")}
+                    className="mt-3 font-mono text-[12px] text-[var(--dim)] underline underline-offset-2 hover:text-[var(--text)]"
+                  >
+                    or use a throwaway demo wallet
+                  </button>
+                  <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
+                    No gas needed: the relayer pays. You need 0 {PRIZE.code}.
+                  </p>
+                </>
               )}
-              <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
-                Passkey smart account. Gas is paid by the relayer — you need 0{" "}
-                {PRIZE.code}.
-              </p>
               {connectErr && (
                 <p className="mt-3 text-[13px] text-[var(--red)]" role="alert">
                   {connectErr}
