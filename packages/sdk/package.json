@@ -1,18 +1,14 @@
 {
-  "name": "@findloot/sdk",
-  "version": "0.1.1",
-  "description": "Loot SDK — create, read, and claim puzzle chests on Stellar (XLM, ZK proofs).",
+  "name": "loot",
+  "version": "0.2.0",
+  "description": "Loot SDK — create, read, claim and close one-contract-per-chest puzzle chests on Stellar (XLM, Groth16 ZK proofs).",
   "type": "module",
   "license": "MIT",
   "author": "Loot",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Klorenn/LOOT.git",
+    "url": "https://github.com/Klorenn/LOOT",
     "directory": "packages/sdk"
-  },
-  "homepage": "https://github.com/Klorenn/LOOT",
-  "bugs": {
-    "url": "https://github.com/Klorenn/LOOT/issues"
   },
   "keywords": [
     "stellar",
@@ -20,7 +16,6 @@
     "zk",
     "groth16",
     "loot",
-    "chestzk",
     "xlm"
   ],
   "main": "./dist/index.js",
@@ -37,15 +32,19 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "node --test --import tsx test/*.test.ts",
+    "e2e": "tsx scripts/e2e.ts",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@stellar/stellar-sdk": "^16.0.1",
-    "@findloot/chest": "^0.1.0",
-    "circomlibjs": "^0.1.7"
+    "@stellar/stellar-sdk": "16.3.0",
+    "circomlibjs": "^0.1.7",
+    "snarkjs": "^0.7.6"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/snarkjs": "^0.7.9",
+    "tsx": "^4.19.0",
     "typescript": "^5.6.2"
   },
   "engines": {

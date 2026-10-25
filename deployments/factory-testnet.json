@@ -1,0 +1,18 @@
+{
+  "network": "testnet",
+  "passphrase": "Test SDF Network ; September 2015",
+  "factory": "CBKH5Z25DDQRGMJDXQWUADOND4DUM5CN4CVZOX7M3OFH2HL7KYFONRRV",
+  "chestWasmHash": "8cb9e4576c16967f57196944fb577eeb1ab379d6b1cad5a926e3654584f972cc",
+  "factoryWasmHash": "190e88735535e59b381883e60a7a9f81652f001f66a8bd1ea0cf930736d5a52a",
+  "verifier": "CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE",
+  "token": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+  "admin": "GBX2JXUC3GWGUGBA4HOTPWVGRA2PD3JNN65AIWHY3XM5DRUZ4NSU6NSN",
+  "treasury": "GBTDED5SE2QAKFQ3Y6NY75QGCKQTQ3Z6H3ZYM4PWUX3X36QMOKEEJFPQ",
+  "fees": { "creationFeeStroops": "50000000", "dailyFeeBps": 10, "maxDurationDays": 30 },
+  "identities": {
+    "chestzk-admin": "GBX2JXUC3GWGUGBA4HOTPWVGRA2PD3JNN65AIWHY3XM5DRUZ4NSU6NSN",
+    "chestzk-e2e-creator": "GCSGSB4TTVCPAYBRWEEWGF67MO726B37YQWNA7ZMV6JHTNZ5MFLEGTPT",
+    "chestzk-e2e-player": "GDLXK3I3T2I64OUNLDDMQP2A5AWKHCH6XMI67QUXTD4TNZPIM7OBTSYR"
+  },
+  "notes": "Registry contract CCOIK76O... (chests #2-#4) is untouched. Chest id public input = field(chest contract address). Salt = derived from question (see SDK saltFromQuestion)."
+}

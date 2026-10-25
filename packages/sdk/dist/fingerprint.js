@@ -1,4 +1,4 @@
-import { hash } from "@stellar/stellar-sdk";
+import { Address, hash } from "@stellar/stellar-sdk";
 import { buildPoseidon } from "circomlibjs";
 import { normalizeAnswer } from "./normalize.js";
 let poseidonPromise = null;
@@ -12,8 +12,7 @@ export function answerToField(answer) {
     const trimmed = answer.trim();
     if (/^\d+$/.test(trimmed))
         return BigInt(trimmed);
-    const digest = hash(Buffer.from(trimmed, "utf8"));
-    const arr = Buffer.from(digest);
+    const arr = Buffer.from(hash(Buffer.from(trimmed, "utf8")));
     arr[0] = 0;
     return BigInt("0x" + arr.toString("hex"));
 }
@@ -25,8 +24,31 @@ export function fieldToHex(fe) {
     return BigInt(fe).toString(16).padStart(64, "0");
 }
 /**
+ * Field element of a Stellar address (G… or C…):
+ * sha256(xdr(ScVal Address)) with byte[0]=0. Matches `field_from_address` in the
+ * contracts. Used for both the `recipient` and the `chestId` public inputs
+ * (for a per-chest contract, chestId = field of the chest contract address).
+ */
+export function addressField(address) {
+    const bytes = new Address(address).toScVal().toXDR();
+    const arr = Buffer.from(hash(bytes));
+    arr[0] = 0;
+    const hex = arr.toString("hex");
+    return { hex, decimal: BigInt("0x" + hex).toString() };
+}
+/**
+ * Salt of a factory chest. The factory's create_chest has no salt parameter, so the
+ * salt is derived from the (public, on-chain) question: sha256(utf8) with byte[0]=0.
+ * Legacy registry chests used a random salt kept off-chain; pass it explicitly there.
+ */
+export function saltFromQuestion(question) {
+    const arr = Buffer.from(hash(Buffer.from(question, "utf8")));
+    arr[0] = 0;
+    return BigInt("0x" + arr.toString("hex"));
+}
+/**
  * Fingerprint = Poseidon(answerField, salt).
- * Normalizes the answer first (trim, lower, no accents/spaces).
+ * Normalizes the answer first (trim, lower, strip accents and spaces).
  */
 export async function fingerprintAnswer(answer, salt) {
     const normalized = normalizeAnswer(answer);
