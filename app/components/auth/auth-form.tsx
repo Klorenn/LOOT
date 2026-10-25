@@ -54,6 +54,20 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [derived, setDerived] = useState<string | null>(null);
   const [doneAddr, setDoneAddr] = useState<string | null>(null);
   const [doneHandle, setDoneHandle] = useState<string>("");
+  const [wallets, setWallets] = useState<KitWallet[] | null>(null);
+
+  // El kit solo carga en el cliente; instaladas primero.
+  useEffect(() => {
+    let alive = true;
+    listWallets()
+      .then((ws) => {
+        if (alive) setWallets([...ws].sort((a, b) => +b.isAvailable - +a.isAvailable));
+      })
+      .catch(() => alive && setWallets([]));
+    return () => {
+      alive = false;
+    };
+  }, []);
   const token = useRef(0);
 
   // Con sesión ya activa al entrar no tiene sentido mostrar el formulario. Solo se mira una vez
@@ -147,14 +161,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
     }
   }
 
-  async function withWallet(kind: "freighter" | "xbull") {
+  async function withWallet(walletId: string) {
     const mine = ++token.current;
     setFailDetail("");
     const h = isLogin ? null : validHandle();
     if (h === false) return;
     setHandleErr(null);
     try {
-      const player = await connect(kind);
+      const player = await connect(`wallet:${walletId}`);
       if (mine !== token.current) return void disconnect();
       if (isLogin) return void (await finishLogin());
       if (h) setHandle(player.publicKey, h);
@@ -436,22 +450,40 @@ export function AuthForm({ mode }: { mode: Mode }) {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => void withWallet("freighter")}
-                className="btn-landing btn-landing-s gap-2"
-              >
-                <Tile letter="F" color="var(--gold)" />
-                Freighter
-              </button>
-              <button
-                type="button"
-                onClick={() => void withWallet("xbull")}
-                className="btn-landing btn-landing-s gap-2"
-              >
-                <Tile letter="x" color="var(--proof)" />
-                xBull
-              </button>
+              {wallets === null
+                ? [0, 1].map((i) => (
+                    <span
+                      key={i}
+                      aria-hidden
+                      className="btn-landing btn-landing-s animate-pulse opacity-40"
+                    />
+                  ))
+                : wallets.map((w) =>
+                    w.isAvailable ? (
+                      <button
+                        key={w.id}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void withWallet(w.id)}
+                        className="btn-landing btn-landing-s gap-2 disabled:opacity-50"
+                      >
+                        <WalletIcon wallet={w} />
+                        {w.name}
+                      </button>
+                    ) : (
+                      <a
+                        key={w.id}
+                        href={w.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-landing btn-landing-s gap-2 opacity-60"
+                      >
+                        <WalletIcon wallet={w} />
+                        {w.name}
+                        <span className="font-mono text-[11px] text-[var(--dim)]">Install</span>
+                      </a>
+                    ),
+                  )}
             </div>
             <p className="text-center text-[13px] text-[var(--dim)]">
               Connect wallet via Stellar Wallets Kit · uses your G… address
@@ -487,14 +519,18 @@ export function AuthForm({ mode }: { mode: Mode }) {
   );
 }
 
-function Tile({ letter, color }: { letter: string; color: string }) {
+/** Glifo oficial de Freighter (las dos rutas de la llave de logos-stack/freighter.svg), currentColor. */
+function FreighterGlyph() {
   return (
-    <span
-      aria-hidden
-      className="inline-flex size-5 items-center justify-center rounded-[5px] font-mono text-[11px] font-semibold text-[var(--bg)]"
-      style={{ background: color }}
-    >
-      {letter}
-    </span>
+    <svg aria-hidden viewBox="6.5 9 15 13" fill="none" className="h-[18px] w-auto">
+      <path d="M14.0617 10C13.6916 8.56231 12.3865 7.5 10.8333 7.5C8.99238 7.5 7.5 8.99238 7.5 10.8333C7.5 12.6743 8.99238 14.1667 10.8333 14.1667C12.3865 14.1667 13.6916 13.1044 14.0617 11.6667H16.9444V14.4444H18.6111V11.6667H19.7222V14.4444H21.3889V11.6667H22.5V10H14.0617ZM12.5 10.8333C12.5 11.7538 11.7538 12.5 10.8333 12.5C9.91286 12.5 9.16667 11.7538 9.16667 10.8333C9.16667 9.91286 9.91286 9.16667 10.8333 9.16667C11.7538 9.16667 12.5 9.91286 12.5 10.8333Z" fill="currentColor" />
+      <path d="M15.9383 20C16.3084 21.4377 17.6135 22.5 19.1667 22.5C21.0076 22.5 22.5 21.0076 22.5 19.1667C22.5 17.3257 21.0076 15.8333 19.1667 15.8333C17.6135 15.8333 16.3084 16.8956 15.9383 18.3333H13.0556V15.5556H11.3889L11.3889 18.3333H10.2778L10.2778 15.5556H8.61111L8.61111 18.3333H7.5L7.5 20H15.9383ZM17.5 19.1667C17.5 18.2462 18.2462 17.5 19.1667 17.5C20.0871 17.5 20.8333 18.2462 20.8333 19.1667C20.8333 20.0871 20.0871 20.8333 19.1667 20.8333C18.2462 20.8333 17.5 20.0871 17.5 19.1667Z" fill="currentColor" />
+    </svg>
   );
+}
+
+function WalletIcon({ wallet }: { wallet: KitWallet }) {
+  if (wallet.id === "freighter") return <FreighterGlyph />;
+  // eslint-disable-next-line @next/next/no-img-element -- íconos remotos/data URI del kit
+  return <img src={wallet.icon} alt="" aria-hidden className="size-5 rounded-[5px]" />;
 }
