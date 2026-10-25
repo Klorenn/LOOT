@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { getPasskeyKit } from "./passkey-client";
@@ -28,13 +29,15 @@ import {
   disconnectGWallet,
   restoreGWallet,
 } from "./wallets-kit";
+import { WalletPicker } from "@/components/wallet-picker";
 
 export type ConnectMethod =
   | "passkey" // reconecta o crea la passkey
   | "passkey-existing" // solo reconecta una passkey ya existente
   | "passkey-new" // registro: crea siempre una passkey nueva
   | "xbull" // Stellar Wallets Kit, directo a xBull
-  | "wallet" // Stellar Wallets Kit (selector)
+  | "wallet" // selector de wallets de Loot (WalletPicker)
+  | `wallet:${string}` // wallet concreta del kit, sin selector
   | "freighter" // Freighter directo, sin selector
   | "demo"; // G… efímera en este navegador
 
@@ -100,6 +103,32 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, player?.publicKey]);
 
+  // Selector de wallets propio: connect("wallet") lo abre y resuelve cuando se conecta una.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pending = useRef<{ res: (p: Player) => void; rej: (e: Error) => void } | null>(null);
+  const openPicker = useCallback(
+    () =>
+      new Promise<Player>((res, rej) => {
+        pending.current = { res, rej };
+        setPickerOpen(true);
+      }),
+    [],
+  );
+  const pickWallet = useCallback(async (id: string) => {
+    const { address, walletId } = await connectGWallet(id);
+    const p = enrollWalletAccount(address, walletId);
+    pending.current?.res(p);
+    pending.current = null;
+    setPickerOpen(false);
+  }, []);
+  const closePicker = useCallback(() => {
+    pending.current?.rej(
+      Object.assign(new Error("Wallet picker closed"), { name: "WalletPickerClosed" }),
+    );
+    pending.current = null;
+    setPickerOpen(false);
+  }, []);
+
   const connect = useCallback(
     async (
       method: ConnectMethod,
@@ -110,13 +139,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (method === "passkey-existing") return reconnectPasskey();
     // enrollClassic reemplaza la sesión solo si termina bien (no se borra antes).
     if (method === "demo") return enrollClassic();
+    if (method === "wallet") return openPicker();
+    if (method.startsWith("wallet:")) {
+      const { address, walletId } = await connectGWallet(method.slice(7));
+      return enrollWalletAccount(address, walletId);
+    }
     const { address, walletId } =
       method === "freighter"
         ? await connectFreighter()
         : await connectGWallet(method === "xbull" ? "xbull" : undefined);
     return enrollWalletAccount(address, walletId);
   },
-    [],
+    [openPicker],
   );
 
   const disconnect = useCallback(async () => {
@@ -138,7 +172,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     [ready, player, connect, disconnect],
   );
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      <WalletPicker open={pickerOpen} onClose={closePicker} onSelect={pickWallet} />
+    </Ctx.Provider>
+  );
 }
 
 export function useSession(): SessionValue {

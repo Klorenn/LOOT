@@ -12,17 +12,34 @@ let loading: Promise<Kit> | null = null;
 function loadKit(): Promise<Kit> {
   if (!loading) {
     loading = (async () => {
-      const [{ StellarWalletsKit }, { Networks }, freighter, xbull, albedo, lobstr, hana, rabet] =
-        await Promise.all([
-          import("@creit.tech/stellar-wallets-kit/sdk"),
-          import("@creit.tech/stellar-wallets-kit/types"),
-          import("@creit.tech/stellar-wallets-kit/modules/freighter"),
-          import("@creit.tech/stellar-wallets-kit/modules/xbull"),
-          import("@creit.tech/stellar-wallets-kit/modules/albedo"),
-          import("@creit.tech/stellar-wallets-kit/modules/lobstr"),
-          import("@creit.tech/stellar-wallets-kit/modules/hana"),
-          import("@creit.tech/stellar-wallets-kit/modules/rabet"),
-        ]);
+      // Sin WalletConnect (pide projectId) ni Ledger/Trezor (flujo hardware por USB).
+      const [
+        { StellarWalletsKit },
+        { Networks },
+        freighter,
+        xbull,
+        albedo,
+        lobstr,
+        hana,
+        rabet,
+        hot,
+        scopuly,
+        onekey,
+        bitget,
+      ] = await Promise.all([
+        import("@creit.tech/stellar-wallets-kit/sdk"),
+        import("@creit.tech/stellar-wallets-kit/types"),
+        import("@creit.tech/stellar-wallets-kit/modules/freighter"),
+        import("@creit.tech/stellar-wallets-kit/modules/xbull"),
+        import("@creit.tech/stellar-wallets-kit/modules/albedo"),
+        import("@creit.tech/stellar-wallets-kit/modules/lobstr"),
+        import("@creit.tech/stellar-wallets-kit/modules/hana"),
+        import("@creit.tech/stellar-wallets-kit/modules/rabet"),
+        import("@creit.tech/stellar-wallets-kit/modules/hotwallet"),
+        import("@creit.tech/stellar-wallets-kit/modules/scopuly"),
+        import("@creit.tech/stellar-wallets-kit/modules/onekey"),
+        import("@creit.tech/stellar-wallets-kit/modules/bitget"),
+      ]);
       StellarWalletsKit.init({
         modules: [
           new freighter.FreighterModule(),
@@ -31,8 +48,32 @@ function loadKit(): Promise<Kit> {
           new lobstr.LobstrModule(),
           new hana.HanaModule(),
           new rabet.RabetModule(),
+          new hot.HotWalletModule(),
+          new scopuly.ScopulyModule(),
+          new onekey.OneKeyModule(),
+          new bitget.BitgetModule(),
         ],
         network: Networks.TESTNET,
+        // Fallback: si algún flujo abre el modal por defecto del kit, que sea oscuro y de Loot.
+        theme: {
+          background: "#14131A",
+          "background-secondary": "#1B1A23",
+          "foreground-strong": "#F5F2EC",
+          foreground: "#A6A1B0",
+          "foreground-secondary": "#6F6A7A",
+          primary: "#8A8CFF",
+          "primary-foreground": "#0C0B10",
+          transparent: "rgba(12,11,16,0)",
+          lighter: "#1B1A23",
+          light: "#2A2833",
+          "light-gray": "#6F6A7A",
+          gray: "#A6A1B0",
+          danger: "#FF5C61",
+          border: "#2A2833",
+          shadow: "none",
+          "border-radius": "10px",
+          "font-family": "Geist, ui-sans-serif, system-ui, sans-serif",
+        },
       });
       return StellarWalletsKit;
     })().catch((e) => {
@@ -41,6 +82,29 @@ function loadKit(): Promise<Kit> {
     });
   }
   return loading;
+}
+
+export type WalletOption = {
+  id: string;
+  name: string;
+  icon: string;
+  url: string;
+  isAvailable: boolean;
+  type: string;
+};
+
+/** Wallets soportadas por el kit con su estado de detección (para nuestro selector). */
+export async function listWallets(): Promise<WalletOption[]> {
+  const kit = await loadKit();
+  const list = await kit.refreshSupportedWallets();
+  return list.map((w) => ({
+    id: w.id,
+    name: w.name,
+    icon: w.icon,
+    url: w.url,
+    isAvailable: w.isAvailable,
+    type: w.type,
+  }));
 }
 
 /** Abre el selector de wallets y devuelve la cuenta G… elegida y el id del módulo. */
@@ -60,7 +124,7 @@ export async function connectGWallet(
 
 export class FreighterUnavailableError extends Error {
   constructor() {
-    super("Freighter no está instalada o está deshabilitada en este navegador.");
+    super("Freighter isn't installed or is disabled in this browser. Get it at freighter.app.");
     this.name = "FreighterUnavailableError";
   }
 }

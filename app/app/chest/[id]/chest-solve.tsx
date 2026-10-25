@@ -154,6 +154,7 @@ export function ChestSolve({ badge }: { badge?: React.ReactNode }) {
     try {
       await connect(method);
     } catch (e) {
+      if ((e as { name?: string })?.name === "WalletPickerClosed") return;
       setConnectErr(
         e instanceof PasskeyUnavailableError
           ? "WebAuthn unavailable — connect a Stellar wallet or use a demo wallet."
