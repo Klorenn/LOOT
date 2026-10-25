@@ -48,6 +48,8 @@ Horas en hora de Lisboa.
 
 - [x] Passkey-kit real (C… smart wallet) + `/api/passkey/send` (OZ Channels o fee-bump) — **13:25**
 - [x] Panel close on-chain + GitHub Actions CI
+- [ ] Dual entry: Passkey (primary) + Stellar Wallets Kit (Freighter/xBull/…) — Connect wallet sin reemplazar Face ID
+- [x] Landing BUILT ON logo marquee (Stellar mark oficial; sin Wallets Kit en la franja)
 
 - [x] Bot + modo ataque + crear cofre + panel — **12:30**: `/attack` (split + log), `bot/attack.mjs` confirma InvalidProof (#6) al copiar prueba, `/create` plantillas+QR, `/panel`.
 - [x] Fix demo jueces — **12:55**: cofre #2 on-chain con Poseidon(8,7); UX InvalidProof = “respuesta incorrecta”; README con IDs.

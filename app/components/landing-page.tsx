@@ -8,6 +8,7 @@ import { BrandMark, LogoChest } from "@/components/logo-chest";
 import { CellsBackground } from "@/components/cells-background";
 import { ScrollProgress } from "@/components/scroll-progress";
 import { SmoothScroll } from "@/components/smooth-scroll";
+import { StackMarquee } from "@/components/stack-marquee";
 
 const SHORT = `${CONTRACTS.chest.slice(0, 8)}…${CONTRACTS.chest.slice(-4)}`;
 
@@ -136,32 +137,7 @@ export function LandingPage() {
             </div>
           </header>
 
-          {/* Stack */}
-          <div
-            data-fade
-            className="border-b border-[var(--line)] py-9"
-          >
-            <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4 px-6 font-mono">
-              <span className="text-[12px] tracking-[0.08em] text-[var(--dim)]">
-                BUILT ON
-              </span>
-              {[
-                "Stellar",
-                "Soroban",
-                "Circom",
-                "snarkjs",
-                "OpenZeppelin",
-                "Freighter",
-              ].map((t) => (
-                <span
-                  key={t}
-                  className="text-[18px] font-semibold text-[var(--muted)] md:text-[21px]"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
+          <StackMarquee />
 
           {/* How */}
           <section
@@ -209,7 +185,7 @@ export function LandingPage() {
                   {
                     n: "03",
                     t: "Claim the prize",
-                    b: "Soroban checks the proof and the sender in one call, then pays out.",
+                    b: "Soroban checks the proof against the recipient in one call, then pays out.",
                     d: "+100 CHEST",
                     c: "text-[var(--gold)]",
                   },
@@ -272,9 +248,11 @@ export function LandingPage() {
                   data-fade
                   className="mt-5 text-[18px] leading-[1.55] text-[var(--muted)]"
                 >
-                  Front-running bots resend winning transactions with a higher
-                  fee. On ChestZK the copy fails, because the proof only verifies
-                  for the address that made it.
+                  On a normal chest the answer travels in plain text. Anyone who
+                  sees your transaction (the relayer, a validator, an explorer)
+                  can copy it, and after the first claim it sits on the ledger
+                  for every remaining slot. On ChestZK the copy fails, because
+                  the proof only pays the address sealed inside it.
                 </p>
                 <Link
                   href="/attack"
@@ -290,7 +268,7 @@ export function LandingPage() {
                 className="overflow-x-auto rounded-[14px] border border-[var(--line)] bg-[var(--s1)] p-6 font-mono text-[13px] leading-[2.1] text-[var(--muted)] md:text-[14px] md:p-7"
               >
                 <span data-term-line className="block">
-                  $ watch mempool --chest 0421
+                  $ watch ledger --chest 0421
                 </span>
                 <span data-term-line className="block">
                   00.00{" "}
@@ -298,20 +276,20 @@ export function LandingPage() {
                   sealed to GA7Q…X4ZK
                 </span>
                 <span data-term-line className="block">
-                  00.41 <span className="text-[var(--red)]">bot</span> copy π,
-                  resend from GBOT…7Q1, fee ×12
+                  00.41 <span className="text-[var(--red)]">bot</span> copy π
+                  from your tx, resend to GBOT…7Q1
                 </span>
                 <span data-term-line className="block">
-                  00.80 chain verify(π, sender=GBOT…7Q1)
+                  00.80 chain verify(π, recipient=GBOT…7Q1)
                 </span>
                 <span
                   data-term-line="rejected"
                   className="block text-[var(--red)]"
                 >
-                  REJECTED sender ≠ prover · proof bound to GA7Q…X4ZK
+                  REJECTED recipient ≠ proof · bound to GA7Q…X4ZK
                 </span>
                 <span data-term-line className="block">
-                  01.20 chain verify(π, sender=GA7Q…X4ZK)
+                  01.20 chain verify(π, recipient=GA7Q…X4ZK)
                 </span>
                 <span data-term-line className="block">
                   <span className="text-[var(--ok)]">VERIFIED</span> prize
@@ -356,7 +334,7 @@ export function LandingPage() {
                     k: "Replay",
                     h: "Nullifiers",
                     hc: "",
-                    b: "One claim per chest, ever.",
+                    b: "A proof can't be spent twice.",
                   },
                   {
                     k: "Settlement",
