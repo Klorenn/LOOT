@@ -196,15 +196,15 @@ fn close_returns_remainder_to_creator() {
 }
 
 #[test]
-fn recipient_field_is_deterministic_and_in_field() {
+fn field_from_address_is_deterministic_and_in_field() {
     let s = setup();
     let p = Address::generate(&s.env);
-    let f1 = s.chest.recipient_field(&p);
-    let f2 = s.chest.recipient_field(&p);
+    let f1 = ChestZk::field_from_address(&s.env, &p);
+    let f2 = ChestZk::field_from_address(&s.env, &p);
     assert_eq!(f1, f2);
     assert_eq!(f1.to_array()[0], 0);
     let q = Address::generate(&s.env);
-    assert_ne!(s.chest.recipient_field(&q), f1);
+    assert_ne!(ChestZk::field_from_address(&s.env, &q), f1);
 }
 
 #[test]

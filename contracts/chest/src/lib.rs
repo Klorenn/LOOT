@@ -239,11 +239,10 @@ impl ChestZk {
             .ok_or(Error::ChestNotFound)
     }
 
-    pub fn recipient_field(env: Env, recipient: Address) -> BytesN<32> {
-        Self::field_from_address(&env, &recipient)
-    }
-
-    fn field_from_address(env: &Env, addr: &Address) -> BytesN<32> {
+    /// Field element del Address para el circuito.
+    /// Spec para el cliente JS: sha256(xdr(Address)) con byte[0]=0.
+    /// No es entrypoint (Kuyfi marcaba el export como UNAUTHORIZED_ADDR_CALL).
+    pub(crate) fn field_from_address(env: &Env, addr: &Address) -> BytesN<32> {
         let xdr: Bytes = addr.clone().to_xdr(env);
         let hash: BytesN<32> = env.crypto().sha256(&xdr).to_bytes();
         let mut arr = hash.to_array();
