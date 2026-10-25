@@ -31,8 +31,15 @@ function credentialAddresses(op: { auth?: xdr.SorobanAuthorizationEntry[] }): st
   const out: string[] = [];
   for (const entry of op.auth ?? []) {
     const c = entry.credentials();
-    if (c.switch().name !== "sorobanCredentialsAddress") bad("source-account auth");
-    out.push(Address.fromScAddress(c.address().address()).toString());
+    const kind = c.switch().name;
+    // Protocolo 29 firma con credenciales de dirección V2; las de cuenta fuente o con delegados no se aceptan.
+    if (kind === "sorobanCredentialsAddress") {
+      out.push(Address.fromScAddress(c.address().address()).toString());
+    } else if (kind === "sorobanCredentialsAddressV2") {
+      out.push(Address.fromScAddress(c.addressV2().address()).toString());
+    } else {
+      bad("auth credentials not allowed");
+    }
   }
   return out;
 }
