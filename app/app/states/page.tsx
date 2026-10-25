@@ -1,75 +1,99 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
-import { StateBlock } from "@/components/app/state-block";
 import { InlineAlert } from "@/components/app/inline-alert";
+import { ExampleTag } from "@/components/app/example-tag";
+import { StateBlock } from "@/components/state-block";
+import { DEMO_CHEST } from "@/lib/config";
+
+const FP = `0x${DEMO_CHEST.fingerprintHex.slice(0, 4)}…${DEMO_CHEST.fingerprintHex.slice(-4)}`;
+
+function Divider() {
+  return <div className="border-t border-[var(--line)]" />;
+}
 
 export default function StatesPage() {
   return (
     <main>
       <PageHeader
-        eyebrow="Design system · error & empty"
-        title="States"
-        lead="Reusable blocks for wrong answer, claimed, proof failed, wallet, empty, and inline alerts."
+        tint="red"
+        eyebrow="States"
+        title="Errors & empty states"
+        lead="Every failure says what happened, why, and the one next step. Color carries the meaning: red = rejected, gold = needs action, proof = system."
       />
 
-      <div className="mx-auto max-w-[960px] space-y-16 px-6 py-14">
+      <div className="mx-auto max-w-[960px] space-y-12 px-6 py-14">
         <StateBlock
           tone="red"
           label="Wrong answer"
-          title="That answer doesn't open this chest."
-          body="Hash mismatch — nothing was sent on-chain. No attempt was used."
-          chest="closed"
+          title="That answer doesn’t open this chest."
+          body={`The proof can’t be generated because your answer’s hash doesn’t match ${FP}. Nothing was sent on-chain and no attempt was used.`}
           actions={[
-            { href: "#", label: "Try again", primary: true },
+            { href: `/chest/${DEMO_CHEST.id}`, label: "Try again", primary: true },
             { href: "/explore", label: "Back to chests" },
           ]}
         />
-
+        <Divider />
         <StateBlock
           tone="proof"
-          label="Already claimed"
-          title="Someone opened this chest first."
-          body="Claimed by another address. Replays revert — the nullifier is spent."
+          label="Proof already used"
+          title="This proof was already spent."
+          body="The nullifier is already stored on this chest, so replaying the same proof reverts. Each proof works once and only pays the address it was made for."
           chest="open"
           actions={[
             { href: "/explore", label: "Find an open chest", primary: true },
-            { href: "/explore", label: "View claim tx" },
+            { href: "/wallet", label: "My claimed chests" },
           ]}
         />
-
+        <Divider />
         <StateBlock
           tone="red"
           label="Proof failed"
-          title="Your browser couldn't finish the proof."
-          body="The answer stayed on this device. Retry or copy the error log."
-          chest="none"
+          title="Your browser couldn’t finish the proof."
+          body="The proof stopped before it was sent (for example out of memory). Close other tabs and retry, or switch to a desktop browser. Your answer is still only on this device."
+          visual={
+            <div className="w-[190px] rounded-[10px] border border-[var(--line)] bg-[var(--s1)] p-3 font-mono text-[11px] leading-[1.7] text-[var(--dim)]">
+              <p className="text-[var(--red)]">ERR witness</p>
+              <p>step c · 2/4</p>
+              <p>RangeError: OOM</p>
+              <p className="mt-1">
+                <ExampleTag>example log</ExampleTag>
+              </p>
+            </div>
+          }
           actions={[
-            { href: "#", label: "Retry proof", primary: true },
+            { href: `/chest/${DEMO_CHEST.id}`, label: "Retry proof", primary: true },
             { href: "#", label: "Copy error log" },
           ]}
         />
-
+        <Divider />
         <StateBlock
           tone="gold"
-          label="Wallet"
+          label="Wallet not connected"
           title="Connect to seal the proof to you."
-          body="Your address becomes a public input. Only it can claim."
-          chest="closed"
+          body="The proof needs your address as a public input. Without it, anyone could copy it. Use a passkey (no extension) or a Stellar wallet such as Freighter."
           actions={[
-            { href: "/enter", label: "Continue with passkey", primary: true },
+            { href: "/login", label: "Continue with passkey", primary: true },
+            { href: "/login", label: "Use Freighter" },
           ]}
         />
-
+        <Divider />
         <StateBlock
           tone="dim"
           label="Empty"
           title="No chests match these filters."
-          body="Clear filters or create a new chest for solvers to find."
-          chest="none"
+          body="Try clearing the difficulty filter, or be the first to hide a prize."
+          visual={
+            <div
+              className="h-[84px] w-[110px] rounded-[10px] border border-dashed border-[var(--line)]"
+              aria-hidden
+            />
+          }
           actions={[
-            { href: "/explore", label: "Clear filters", primary: true },
-            { href: "/create", label: "Create a chest" },
+            { href: "/explore", label: "Clear filters" },
+            { href: "/create", label: "Create a chest", primary: true },
           ]}
         />
+        <Divider />
 
         <div className="space-y-4">
           <p className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)] uppercase">
@@ -78,19 +102,26 @@ export default function StatesPage() {
           <InlineAlert
             tone="red"
             title="Transaction reverted"
-            body="Soroban rejected the claim. Check nullifier and sender == prover."
+            body="Soroban rejected the claim. The contract error is shown in the technical details."
           />
           <InlineAlert
             tone="gold"
             title="Relayer unavailable"
-            body="Pay gas with your wallet, or try again in a moment."
+            body="Fees are paid by the relayer and it did not respond. Try again in a moment."
           />
           <InlineAlert
             tone="dim"
             title="Chest expired"
-            body="Unclaimed prize returned to the creator."
+            body="Unclaimed prize can be withdrawn by the creator."
           />
         </div>
+
+        <p className="font-mono text-[13px] text-[var(--dim)]">
+          404 →{" "}
+          <Link href="/this-chest-does-not-exist" className="text-[var(--text)] underline">
+            see 404 page
+          </Link>
+        </p>
       </div>
     </main>
   );

@@ -30,6 +30,7 @@ async function onChain(id: number) {
     claims: chest.claims,
     closed: chest.closed,
     deadline: chest.deadline,
+    creator: chest.creator,
     fingerprintHex: chest.fingerprintHex,
   };
 }

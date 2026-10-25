@@ -16,6 +16,8 @@ export type ProveInput = {
   playerSecret: string;
   chestId: string;
   recipientField: string; // decimal field element
+  /** Etapas para la UI: "witness" al empezar, "prove" antes de snarkjs. */
+  onStage?: (stage: "witness" | "prove") => void;
 };
 
 export type ProveResult = {
@@ -61,6 +63,7 @@ export function snarkToContractProof(proof: snarkjs.Groth16Proof): ChestProof {
 
 export async function proveChest(input: ProveInput): Promise<ProveResult> {
   const { answerToField, normalizeAnswer } = await import("./answer");
+  input.onStage?.("witness");
   const t0 = performance.now();
   const answer = answerToField(normalizeAnswer(input.answer));
   const salt = BigInt(input.salt);
@@ -72,6 +75,7 @@ export async function proveChest(input: ProveInput): Promise<ProveResult> {
   const nullifier = await poseidon2(playerSecret, chestId);
   const calcMs = performance.now() - t0;
 
+  input.onStage?.("prove");
   const t1 = performance.now();
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(
     {

@@ -21,12 +21,18 @@ import {
   type Player,
   type SessionKind,
 } from "./wallet";
-import { connectGWallet, disconnectGWallet, restoreGWallet } from "./wallets-kit";
+import {
+  connectFreighter,
+  connectGWallet,
+  disconnectGWallet,
+  restoreGWallet,
+} from "./wallets-kit";
 
 export type ConnectMethod =
   | "passkey" // reconecta o crea la passkey
   | "passkey-existing" // solo reconecta una passkey ya existente
   | "wallet" // Stellar Wallets Kit (selector)
+  | "freighter" // Freighter directo, sin selector
   | "demo"; // G… efímera en este navegador
 
 type SessionValue = {
@@ -93,7 +99,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (method === "passkey-existing") return reconnectPasskey();
     // enrollClassic reemplaza la sesión solo si termina bien (no se borra antes).
     if (method === "demo") return enrollClassic();
-    const { address, walletId } = await connectGWallet();
+    const { address, walletId } =
+      method === "freighter" ? await connectFreighter() : await connectGWallet();
     return enrollWalletAccount(address, walletId);
   }, []);
 

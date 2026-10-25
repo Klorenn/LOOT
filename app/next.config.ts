@@ -14,11 +14,10 @@ const nextConfig: NextConfig = {
       { source: "/ataque", destination: "/attack", permanent: true },
       { source: "/crear", destination: "/create", permanent: true },
       { source: "/cofre/:id", destination: "/chest/:id", permanent: true },
-      {
-        source: "/cofre/:id/probando",
-        destination: "/chest/:id/proving",
-        permanent: true,
-      },
+      { source: "/cofre/:id/probando", destination: "/chest/:id", permanent: true },
+      // La prueba ahora corre inline en /chest/:id (panel 03).
+      { source: "/chest/:id/proving", destination: "/chest/:id", permanent: true },
+      { source: "/chest/:id/error", destination: "/chest/:id", permanent: true },
       {
         source: "/cofre/:id/abierto",
         destination: "/chest/:id/claimed",
@@ -29,11 +28,7 @@ const nextConfig: NextConfig = {
         destination: "/chest/:id/claimed",
         permanent: true,
       },
-      {
-        source: "/cofre/:id/error",
-        destination: "/chest/:id/error",
-        permanent: true,
-      },
+      { source: "/cofre/:id/error", destination: "/chest/:id", permanent: true },
       { source: "/panel", destination: "/dashboard", permanent: true },
       // Temporal hasta P4 (/login, /register, /profile, /qr, /claimed-chests como rutas propias).
       { source: "/login", destination: "/enter", permanent: false },

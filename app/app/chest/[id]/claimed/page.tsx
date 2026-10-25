@@ -224,11 +224,11 @@ export default function ClaimedPage() {
             </p>
             <p>
               <span className="text-[var(--dim)]">03</span>{" "}
-              relayer.submit(claim(π, nullifier))
+              relayer.submit(claim(π, nullifier, recipient))
             </p>
             <p>
               <span className="text-[var(--dim)]">04</span> soroban bn254 pairing
-              check · sender == prover
+              check · recipient sealed in π
             </p>
             <p className="mt-1 text-[var(--ok)]">
               VERIFIED nullifier stored · {prizeLabel || "prize"} → {prover}

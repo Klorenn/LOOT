@@ -50,6 +50,25 @@ export async function connectGWallet(): Promise<{ address: string; walletId: str
   return { address, walletId: kit.selectedModule.productId };
 }
 
+export class FreighterUnavailableError extends Error {
+  constructor() {
+    super("Freighter no está instalada o está deshabilitada en este navegador.");
+    this.name = "FreighterUnavailableError";
+  }
+}
+
+/** Conecta Freighter directo, sin selector. La extensión pide permiso si hace falta. */
+export async function connectFreighter(): Promise<{ address: string; walletId: string }> {
+  const [kit, { FREIGHTER_ID }] = await Promise.all([
+    loadKit(),
+    import("@creit.tech/stellar-wallets-kit/modules/freighter"),
+  ]);
+  kit.setWallet(FREIGHTER_ID);
+  if (!(await kit.selectedModule.isAvailable())) throw new FreighterUnavailableError();
+  const { address } = await kit.fetchAddress();
+  return { address, walletId: FREIGHTER_ID };
+}
+
 /**
  * Vuelve a enlazar la wallet recordada sin abrir el selector. Devuelve la
  * dirección que la wallet reporta ahora, o null si no se pudo consultar en

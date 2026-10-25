@@ -12,6 +12,10 @@ import { proveChest } from "@/lib/zk";
 type Side = "you" | "bot" | "sys";
 type LogLine = { t: string; msg: string; side: Side };
 
+/** Cuenta que hace de bot (la del relayer en testnet): destino al que se re-apunta la prueba copiada. */
+const BOT_ADDR = "GAVLW5IKB7VFBRJ3EHBE4BRZ5OX3AOW3ICMLMB6KVKCQDO6WJ2SPHDN3";
+const BOT_SHORT = `${BOT_ADDR.slice(0, 4)}…${BOT_ADDR.slice(-4)}`;
+
 const EXPLORER_TX = "https://stellar.expert/explorer/testnet/tx/";
 
 export function AttackClient({
@@ -90,16 +94,15 @@ export function AttackClient({
           push(String(line).replace(/^\[[^\]]+\]\s*/, ""), "bot");
         }
         if (nres.ok && !ndata.error) {
-          push("classic chest: prize stolen (fee ×12)", "bot");
+          push("classic chest: prize stolen", "bot");
         }
       } catch {
         /* non-fatal for ZK half */
       }
 
-      push("bot copies π, sender := GBOT…7Q1", "bot");
+      push(`bot copies π and re-points it to ${BOT_SHORT}`, "bot");
       setBotStatus("resubmitting…");
-      const botRecipient =
-        "GAVLW5IKB7VFBRJ3EHBE4BRZ5OX3AOW3ICMLMB6KVKCQDO6WJ2SPHDN3";
+      const botRecipient = BOT_ADDR;
 
       const res = await fetch("/api/attack", {
         method: "POST",
@@ -117,8 +120,8 @@ export function AttackClient({
       }
 
       if (data.rejected === true) {
-        push("REJECTED sender ≠ prover", "bot");
-        push("reverted · fee lost", "bot");
+        push(`REJECTED proof bound to ${short}, not ${BOT_SHORT}`, "bot");
+        push("reverted · nothing was paid out", "bot");
         setBotStatus("rejected");
         setBotBorder("red");
         // La demo no envía ningún claim del jugador: solo prueba que el cambio de receptor falla.
@@ -160,7 +163,7 @@ export function AttackClient({
             Copy the proof. <Em tone="red">Lose anyway.</Em>
           </>
         }
-        lead="Front-running bots copy π and bump the fee. On Loot the proof only verifies for the address that made it."
+        lead="A bot watches the mempool, copies your proof and resends it with a higher fee. Watch both sides: the contract only pays the address sealed inside the proof."
         right={
           <div className="flex flex-wrap gap-2">
             <button
@@ -195,7 +198,7 @@ export function AttackClient({
           <Terminal
             tone="red"
             borderTone={botBorder}
-            label="Bot · GBOT…7Q1"
+            label={`Bot · ${BOT_SHORT}`}
             status={botStatus}
             lines={botLines}
           />
@@ -219,7 +222,7 @@ export function AttackClient({
             },
             {
               k: "Nullifier",
-              v: "Spent once · replays revert",
+              v: "Each proof works once · replays revert",
               c: "text-[var(--red)]",
             },
             {
@@ -229,7 +232,7 @@ export function AttackClient({
             },
             {
               k: "Prize",
-              v: "Released only to the prover",
+              v: "Paid only to the address inside the proof",
               c: "text-[var(--gold)]",
             },
           ].map((cell, i) => (
@@ -249,7 +252,7 @@ export function AttackClient({
           ))}
         </div>
         <div className="mt-4">
-          <ExampleTag>timings and fee multiplier are illustrative</ExampleTag>
+          <ExampleTag>scripted bot account · real testnet calls</ExampleTag>
         </div>
         <p className="mt-6 font-mono text-[12px] text-[var(--dim)]">
           Live txs →{" "}

@@ -2,14 +2,15 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { KeyRound, ScanFace } from "lucide-react";
+import { KeyRound, ScanFace, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DEMO_CHEST } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { useSession, type ConnectMethod } from "@/lib/session";
 import { PasskeyUnavailableError } from "@/lib/wallet";
+import { FreighterUnavailableError } from "@/lib/wallets-kit";
 
-type EnterMethod = Extract<ConnectMethod, "passkey" | "passkey-existing">;
+type EnterMethod = Extract<ConnectMethod, "passkey" | "passkey-existing" | "freighter">;
 
 function EnterInner() {
   const router = useRouter();
@@ -29,6 +30,10 @@ function EnterInner() {
       if (e instanceof PasskeyUnavailableError) {
         setError(
           "Este dispositivo no tiene WebAuthn / Face ID. Probá en otro browser o dispositivo con passkeys.",
+        );
+      } else if (e instanceof FreighterUnavailableError) {
+        setError(
+          "No encontramos Freighter. Instalá la extensión (freighter.app), desbloqueala y probá de nuevo.",
         );
       } else {
         setError(
@@ -75,14 +80,25 @@ function EnterInner() {
             : "Crear wallet con Face ID / passkey"}
       </Button>
 
-      {player?.kind === "passkey" && (
+      <Button
+        size="lg"
+        variant="outline"
+        disabled={!!busy}
+        onClick={() => void go("freighter")}
+        className="h-12 w-full rounded-full text-base font-semibold"
+      >
+        <Wallet className="mr-2 size-5" aria-hidden />
+        {busy === "freighter" ? "Esperando Freighter…" : "Entrar con Freighter"}
+      </Button>
+
+      {(player?.kind === "passkey" || player?.kind === "wallet") && (
         <Button
           variant="secondary"
           disabled={!!busy}
           onClick={goContinue}
           className="h-12 w-full rounded-full border border-border"
         >
-          Continuar · C… {shortAddr(player.publicKey)}
+          Continuar · {shortAddr(player.publicKey)}
         </Button>
       )}
 
