@@ -82,3 +82,15 @@ export function withRpc<T>(
 ): Promise<T> {
   return withRpcUrl((url) => fn(new rpc.Server(url)), opts);
 }
+
+/**
+ * Elige una vez un RPC que responde (getHealth, con el timeout de lectura) para flujos largos
+ * con efectos secundarios que no se pueden reintentar a mitad de camino (envío passkey, demo
+ * del cofre normal). No hace failover durante el flujo: solo evita arrancarlo contra un RPC caído.
+ */
+export function pickRpcUrl(): Promise<string> {
+  return withRpcUrl(async (url) => {
+    await new rpc.Server(url).getHealth();
+    return url;
+  });
+}

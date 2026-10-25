@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { pickRpcUrl } from "@/lib/rpc";
 import { CONTRACTS, NETWORK, NORMAL_CHEST } from "@/lib/config";
 import { runNormalChestFlow } from "@/lib/normal-chest";
 
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const r = await runNormalChestFlow({
-      rpcUrl: NETWORK.rpcUrl,
+      rpcUrl: await pickRpcUrl(),
       passphrase: NETWORK.passphrase,
       contractId: NORMAL_CHEST.contract,
       chestId: NORMAL_CHEST.id,

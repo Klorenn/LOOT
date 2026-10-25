@@ -8,6 +8,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { Api, Server } from "@stellar/stellar-sdk/rpc";
 import { NETWORK } from "@/lib/config";
+import { pickRpcUrl } from "@/lib/rpc";
 
 type Body = { xdr: string };
 
@@ -107,7 +108,8 @@ async function submitAsChannel(
     op?.type === "invokeHostFunction" &&
     !hasSourceAccountAuth(parsed);
 
-  const rpc = new Server(NETWORK.rpcUrl, { allowHttp: true });
+  const rpcUrl = await pickRpcUrl();
+  const rpc = new Server(rpcUrl, { allowHttp: true });
 
   if (canRebuild) {
     const invokeOp = op as Operation.InvokeHostFunction;
@@ -197,7 +199,7 @@ export async function POST(req: NextRequest) {
       const { PasskeyServer } = await import("passkey-kit/server");
       const server = new PasskeyServer({
         networkPassphrase: NETWORK.passphrase,
-        rpcUrl: NETWORK.rpcUrl,
+        rpcUrl: await pickRpcUrl(),
         relayer: { baseUrl, apiKey },
       });
       const result = await server.send(body.xdr);
