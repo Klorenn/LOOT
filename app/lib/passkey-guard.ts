@@ -80,6 +80,7 @@ export async function assertAllowedPasskeyTx(xdrStr: string): Promise<Transactio
       const contract = Address.fromScAddress(inv.contractAddress()).toString();
       const name = fnName(inv.functionName() as unknown as Buffer | string);
       const args = inv.args();
+      if (args.length < 1) bad("missing args");
       if (contract === FACTORY.contract && name === "create_chest") {
         if (argAddress(args[0]) !== signer) bad("creator is not the signer");
       } else if (contract === FACTORY.contract && name === "close") {

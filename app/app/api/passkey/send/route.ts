@@ -9,148 +9,80 @@ import {
 import { Api, Server } from "@stellar/stellar-sdk/rpc";
 import { NETWORK } from "@/lib/config";
 import { pickRpcUrl } from "@/lib/rpc";
-import { GuardError, assertAllowedPasskeyTx, assertResourceCap } from "@/lib/passkey-guard";
+import { GuardError, MAX_RESOURCE_FEE, assertAllowedPasskeyTx, assertResourceCap } from "@/lib/passkey-guard";
 import { routeLimited } from "@/lib/rate-limit";
 
 type Body = { xdr: string };
 
-const UINT32_MAX = 0xffffffff;
 const INCLUSION = 100;
 
-/** Auth entry uses the envelope source account (needs fee-bump, not rebuild). */
-function hasSourceAccountAuth(tx: Transaction): boolean {
-  for (const op of tx.operations) {
-    if (op.type !== "invokeHostFunction") continue;
-    for (const entry of op.auth ?? []) {
-      if (
-        entry.credentials().switch().name === "sorobanCredentialsSourceAccount"
-      ) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 /**
- * Assemble + sign a Soroban deploy. When resourceFee alone exceeds uint32
- * (Protocol 29 rent for smart-wallet create), mirror stellar-cli:
- *   inner.fee = 0, full resourceFee in sorobanData, wrap FeeBump (int64).
- * CAP-46: fee-bump cannot raise resourceFee, but outer fee CAN cover it when
- * inner.fee is 0 (feeBump.fee = resourceFee + inclusion*2).
+ * Arma la tx FINAL que paga el relayer: costo de recursos de la simulación hecha con el relayer
+ * como fuente (la que manda para la tx), acotado por MAX_RESOURCE_FEE. Sin fee-bump: una auth de
+ * cuenta personalizada (`__check_auth`) puede encarecer esta segunda simulación, por eso el tope
+ * se aplica acá y no solo sobre la tx original.
  */
-function assembleDeployTx(
+function assembleTx(
   raw: Transaction,
   sim: Api.SimulateTransactionSuccessResponse,
   kp: Keypair,
 ): Transaction {
-  const minRf = BigInt(sim.minResourceFee);
-  const needsBump = minRf + BigInt(INCLUSION) > BigInt(UINT32_MAX);
-
-  // First build under uint32 so TransactionBuilder accepts the envelope.
-  const buildRf = needsBump
-    ? BigInt(UINT32_MAX - INCLUSION)
-    : minRf;
   const sorobanData = sim.transactionData.build();
-  sorobanData.resourceFee(xdr.Int64.fromString(buildRf.toString()));
-
-  let inner = TransactionBuilder.cloneFrom(raw, {
+  const resourceFee = BigInt(sorobanData.resourceFee().toString());
+  if (BigInt(sim.minResourceFee) > MAX_RESOURCE_FEE || resourceFee > MAX_RESOURCE_FEE) {
+    throw new GuardError("resource fee above cap");
+  }
+  const tx = TransactionBuilder.cloneFrom(raw, {
     fee: String(INCLUSION),
     sorobanData,
     networkPassphrase: NETWORK.passphrase,
   }).build();
-
-  if (!needsBump) {
-    inner.sign(kp);
-    return inner;
+  // Última barrera: fee total (inclusión + recursos) sobre la tx que se firma.
+  if (BigInt(tx.fee) > MAX_RESOURCE_FEE + BigInt(INCLUSION) * BigInt(2)) {
+    throw new GuardError("transaction fee above cap");
   }
-
-  // stellar-cli assembled.rs: tx.fee = 0; keep full min_resource_fee in data.
-  const env = inner.toEnvelope();
-  const v1 = env.v1();
-  v1.tx().fee(0);
-  v1.tx().ext().sorobanData().resourceFee(
-    xdr.Int64.fromString(minRf.toString()),
-  );
-  v1.signatures([]);
-  inner = new Transaction(
-    xdr.TransactionEnvelope.envelopeTypeTx(v1),
-    NETWORK.passphrase,
-  );
-  inner.sign(kp);
-
-  const bump = TransactionBuilder.buildFeeBumpTransaction(
-    kp,
-    String(INCLUSION),
-    inner,
-    NETWORK.passphrase,
-  );
-  bump.sign(kp);
-  return bump as unknown as Transaction;
+  tx.sign(kp);
+  return tx;
 }
 
 /**
- * Shared-deployer CreateContractV2 txs are sign-only: auth carries the deployer
- * signature; envelope source must be a funded account. OZ Channels does this via
- * `{func,auth}`. Locally we rebuild with RELAYER_SECRET.
+ * Soroban tx de passkey (ya validada por assertAllowedPasskeyTx: una op, auth de dirección): se
+ * reconstruye con la cuenta del relayer como fuente y pagadora, copiando solo `{func, auth}`.
  */
 async function submitAsChannel(
   signedXdr: string,
   secret: string,
 ): Promise<{ hash: string; via: string; pending?: boolean }> {
   const kp = Keypair.fromSecret(secret);
-  const parsed = TransactionBuilder.fromXDR(
-    signedXdr,
-    NETWORK.passphrase,
-  ) as Transaction;
-
+  const parsed = TransactionBuilder.fromXDR(signedXdr, NETWORK.passphrase) as Transaction;
   const op = parsed.operations[0];
-  const canRebuild =
-    parsed.operations.length === 1 &&
-    op?.type === "invokeHostFunction" &&
-    !hasSourceAccountAuth(parsed);
+  if (parsed.operations.length !== 1 || op?.type !== "invokeHostFunction") {
+    throw new GuardError("unsupported transaction shape");
+  }
 
   const rpcUrl = await pickRpcUrl();
   const rpc = new Server(rpcUrl, { allowHttp: true });
+  const invokeOp = op as Operation.InvokeHostFunction;
+  const account = await rpc.getAccount(kp.publicKey());
+  const built = new TransactionBuilder(account, {
+    fee: String(INCLUSION),
+    networkPassphrase: NETWORK.passphrase,
+  })
+    .addOperation(Operation.invokeHostFunction({ func: invokeOp.func, auth: invokeOp.auth ?? [] }))
+    .setTimeout(30)
+    .build();
 
-  if (canRebuild) {
-    const invokeOp = op as Operation.InvokeHostFunction;
-    const account = await rpc.getAccount(kp.publicKey());
-    const built = new TransactionBuilder(account, {
-      fee: String(INCLUSION),
-      networkPassphrase: NETWORK.passphrase,
-    })
-      .addOperation(
-        Operation.invokeHostFunction({
-          func: invokeOp.func,
-          auth: invokeOp.auth ?? [],
-        }),
-      )
-      .setTimeout(30)
-      .build();
+  const sim = await rpc.simulateTransaction(built);
+  if (Api.isSimulationError(sim)) throw new GuardError("simulation failed");
+  if (Api.isSimulationRestore(sim)) throw new GuardError("needs restore");
 
-    const sim = await rpc.simulateTransaction(built);
-    if (Api.isSimulationError(sim)) {
-      throw new Error(`simulate deploy failed: ${sim.error}`);
-    }
-    if (Api.isSimulationRestore(sim)) {
-      throw new Error(
-        "deploy simulation requires restore — fund restoreSource / retry",
-      );
-    }
-
-    console.info("[passkey/send] minResourceFee", sim.minResourceFee);
-
-    const signed = assembleDeployTx(built, sim, kp);
-    const sent = await rpc.sendTransaction(signed);
-    if (sent.status === "ERROR") {
-      throw new Error(`send ERROR: ${JSON.stringify(sent)}`);
-    }
-    return waitForHash(rpc, sent.hash, "local-channel");
+  console.info("[passkey/send] minResourceFee", sim.minResourceFee);
+  const signed = assembleTx(built, sim, kp);
+  const sent = await rpc.sendTransaction(signed);
+  if (sent.status === "ERROR") {
+    throw new Error(`send ERROR: ${JSON.stringify(sent)}`);
   }
-
-  // assertAllowedPasskeyTx ya garantiza esta forma; nunca se hace fee-bump de ops clásicas.
-  throw new Error("unsupported transaction shape");
+  return waitForHash(rpc, sent.hash, "local-channel");
 }
 
 async function waitForHash(
@@ -202,6 +134,9 @@ export async function POST(req: NextRequest) {
       "https://channels.openzeppelin.com/testnet";
 
     if (apiKey) {
+      // OZ Channels paga la fee: el tope de recursos solo se verificó con la simulación de arriba
+      // (la API de Channels no expone una opción de fee máxima en passkey-kit 0.19). Riesgo residual:
+      // una cuenta personalizada podría costar más al re-simularse del lado de Channels.
       const { PasskeyServer } = await import("passkey-kit/server");
       const server = new PasskeyServer({
         networkPassphrase: NETWORK.passphrase,
@@ -213,8 +148,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             ok: false,
-            error: result.error?.message || "relayer failed",
-            code: result.error?.code,
+            error: "relay failed",
             via: "openzeppelin-channels",
           },
           { status: 502 },
@@ -230,10 +164,7 @@ export async function POST(req: NextRequest) {
     const secret = process.env.RELAYER_SECRET;
     if (!secret) {
       return NextResponse.json(
-        {
-          error:
-            "Set RELAYER_API_KEY (OZ Channels) or RELAYER_SECRET for local channel",
-        },
+        { error: "relay not configured" },
         { status: 500 },
       );
     }
@@ -241,8 +172,12 @@ export async function POST(req: NextRequest) {
     const out = await submitAsChannel(body.xdr, secret);
     return NextResponse.json({ ok: true, ...out });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    if (e instanceof GuardError) {
+      console.warn("passkey/send rejected:", e.message);
+      return NextResponse.json({ error: "bad request" }, { status: 400 });
+    }
+    // el detalle queda en el log del servidor, nunca en la respuesta
     console.error("passkey/send", e);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "relay failed" }, { status: 500 });
   }
 }

@@ -29,6 +29,7 @@ function limited(ip: string): boolean {
   const h = hits.get(ip);
   if (!h || now - h.at > 60_000) {
     hits.set(ip, { n: 1, at: now });
+    if (hits.size > 2_000) for (const [k, v] of hits) if (now - v.at > 60_000) hits.delete(k);
     return false;
   }
   h.n += 1;
@@ -72,12 +73,24 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
   };
 }
 
-/** ¿Ya hay en la factory un cofre con esta huella? (lectura fresca de la lista y de cada cofre reciente) */
+const OVERWRITE_WINDOW_MS = 10 * 60_000;
+
+/**
+ * ¿Hay en la factory (TODA la lista) un cofre con esta huella? Falla CERRADO: ante cualquier error
+ * de RPC se responde que sí existe y la sobrescritura se rechaza.
+ */
 async function chestExistsWithFingerprint(fp: string): Promise<boolean> {
-  const addrs = await allFactoryAddresses(true);
-  const recent = addrs.slice(-40);
-  const infos = await Promise.all(recent.map((a) => readFactoryChest(a).catch(() => null)));
-  return infos.some((c) => c?.fingerprintHex === fp);
+  try {
+    const addrs = await allFactoryAddresses(true);
+    const CHUNK = 6;
+    for (let i = 0; i < addrs.length; i += CHUNK) {
+      const infos = await Promise.all(addrs.slice(i, i + CHUNK).map((a) => readFactoryChest(a)));
+      if (infos.some((c) => c.fingerprintHex === fp)) return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -98,10 +111,12 @@ export async function POST(req: NextRequest) {
         const same = (a: PendingMeta, c: PendingMeta) =>
           JSON.stringify({ ...a, reservedAt: 0 }) === JSON.stringify({ ...c, reservedAt: 0 });
         if (!same(cur, p)) {
-          // Reintento con otros datos: solo se sobrescribe si el cofre con esa huella todavía no existe.
-          if (await chestExistsWithFingerprint(p.fingerprintHex))
+          // Reintento con otros datos: solo dentro de 10 min de la reserva y si el cofre con esa
+          // huella no existe todavía (el creador es un string sin firma: no se confía más allá).
+          const age = Date.now() - Date.parse(cur.reservedAt);
+          if (!(age >= 0 && age <= OVERWRITE_WINDOW_MS) || (await chestExistsWithFingerprint(p.fingerprintHex)))
             return NextResponse.json({ error: "fingerprint already reserved" }, { status: 409 });
-          await replacePendingMeta(p);
+          await replacePendingMeta({ ...p, reservedAt: cur.reservedAt }); // la ventana de 10 min no se renueva
         }
       }
       return NextResponse.json({ ok: true });

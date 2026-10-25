@@ -558,6 +558,12 @@ export function ChestSolve({
               <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
                 Normalized on this device. Never sent to any server.
               </p>
+              {!needsInvite && !fragSalt && meta?.saltDerivable && (
+                <p className="mt-3 text-[13px] text-[var(--gold)]">
+                  No details were published for this chest. If it was shared as a private link, open the
+                  full invite link (it ends in #s=…); otherwise a correct answer may show as wrong.
+                </p>
+              )}
               {needsInvite && (
                 <p className="mt-3 text-[13px] text-[var(--gold)]" role="alert">
                   This chest needs its full invite link. Ask the creator for the link that ends in
