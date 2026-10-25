@@ -1,5 +1,18 @@
 import { hash } from "@stellar/stellar-sdk";
 
+/**
+ * Normaliza la respuesta antes de hashear: trim, minúsculas, sin acentos ni espacios.
+ * Misma regla al crear el cofre y al resolverlo (si no, "Lisboa" y "lisboa" darían huellas distintas).
+ */
+export function normalizeAnswer(answer: string): string {
+  return answer
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/\s+/g, "");
+}
+
 /** Codifica la respuesta (texto o número) a field element BN254. */
 export function answerToField(answer: string): bigint {
   const trimmed = answer.trim();

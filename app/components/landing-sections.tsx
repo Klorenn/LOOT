@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { LogoChest, type ChestTint } from "@/components/logo-chest";
+import { DEMO_CHEST, PRIZE } from "@/lib/config";
 
-type Stats = { paid: number; rejected: number; settle: number };
+/** Valores reales de /api/stats (eventos on-chain); "—" mientras carga o si el RPC falla. */
+export type Stats = { paid: string; claims: string; created: string };
 
 export function HeroStats({ stats }: { stats: Stats }) {
   return (
@@ -13,32 +15,28 @@ export function HeroStats({ stats }: { stats: Stats }) {
     >
       <div>
         <b className="font-mono text-[22px] font-medium tracking-[-0.03em]">
-          <span data-count={stats.paid}>{stats.paid}</span>{" "}
-          <span className="text-[14px] text-[var(--gold)]">USDC</span>
+          <span>{stats.paid}</span>{" "}
+          <span className="text-[14px] text-[var(--gold)]">{PRIZE.code}</span>
         </b>
         <div className="mt-0.5 text-[12px] text-[var(--dim)]">
-          paid to solvers
+          paid to solvers · last 7 days
         </div>
       </div>
       <div>
-        <b className="font-mono text-[22px] font-medium tracking-[-0.03em] text-[var(--red)]">
-          <span data-count={stats.rejected}>{stats.rejected}</span>
+        <b className="font-mono text-[22px] font-medium tracking-[-0.03em] text-[var(--ok)]">
+          <span>{stats.claims}</span>
         </b>
         <div className="mt-0.5 text-[12px] text-[var(--dim)]">
-          bot copies rejected
+          verified claims · last 7 days
         </div>
       </div>
       <div>
         <b className="font-mono text-[22px] font-medium tracking-[-0.03em]">
-          <span
-            data-count={stats.settle}
-            data-prefix="~"
-            data-suffix=" s"
-          >
-            ~{stats.settle} s
-          </span>
+          <span>{stats.created}</span>
         </b>
-        <div className="mt-0.5 text-[12px] text-[var(--dim)]">to settle</div>
+        <div className="mt-0.5 text-[12px] text-[var(--dim)]">
+          chests created · last 7 days
+        </div>
       </div>
     </div>
   );
@@ -59,7 +57,7 @@ const AUDIENCE: {
     color: "var(--ok)",
     h: "Bots can’t steal your win.",
     b: "Solve, prove, get paid. Anyone watching your transaction can copy the proof, but it only pays your address.",
-    href: "/chest/2",
+    href: `/chest/${DEMO_CHEST.id}`,
     cta: "Browse open chests →",
   },
   {
@@ -174,7 +172,7 @@ function StepSeal() {
   prover: `}
       <span className="text-[var(--proof)]">GA7Q…X4ZK</span>
       {`
-}) → π 192 bytes`}
+}) → π`}
     </pre>
   );
 }
@@ -187,11 +185,11 @@ function StepClaim() {
           <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden />
           Proof verified
         </span>
-        <span className="text-[var(--dim)]">212 ms</span>
+        <span className="text-[var(--dim)]">on-chain</span>
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-[var(--line)] pt-3">
         <span className="text-[var(--muted)]">Prize sent</span>
-        <span className="font-medium text-[var(--gold)]">+1 USDC</span>
+        <span className="font-medium text-[var(--gold)]">+{PRIZE.perSlot} {PRIZE.code}</span>
       </div>
     </div>
   );
@@ -205,7 +203,7 @@ function StepSpent() {
           <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden />
           nullifier 0x3f9e… spent
         </span>
-        <span className="shrink-0 text-[var(--dim)]">ledger 51,204</span>
+        <span className="shrink-0 text-[var(--dim)]">ledger</span>
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-[var(--line)] pt-3">
         <span className="text-[var(--muted)]">Replay 0x3f9e…</span>
@@ -412,7 +410,7 @@ export function AttackSection() {
               className="mt-1 flex flex-wrap items-center justify-between gap-2 rounded-[8px] border border-[rgba(75,227,160,.35)] bg-[rgba(75,227,160,.1)] px-3 py-2 text-[var(--ok)]"
             >
               <span>VERIFIED prize released to GA7Q…X4ZK</span>
-              <span className="text-[var(--gold)]">1 USDC</span>
+              <span className="text-[var(--gold)]">{PRIZE.perSlot} {PRIZE.code}</span>
             </span>
             <span data-term-line className="mt-2 block">
               $ <span className="cursor-blink">▌</span>
@@ -452,7 +450,7 @@ export function CtaSection() {
               className="mt-10 flex flex-wrap justify-center gap-3"
             >
               <Link
-                href="/enter?next=/chest/2"
+                href={`/enter?next=/chest/${DEMO_CHEST.id}`}
                 className="btn-landing btn-landing-p"
               >
                 Open a chest →
@@ -461,6 +459,113 @@ export function CtaSection() {
                 Create a chest
               </Link>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const KUYFI_URL = "https://kuyfi.vercel.app/";
+/** Placeholder until the public repo URL is provided. */
+const REPORTS_URL = "#";
+
+const SECURITY_ITEMS: { k: string; h: string; hc: string; b: string }[] = [
+  {
+    k: "Recipient",
+    h: "Proof sealed to you",
+    hc: "text-[var(--proof)]",
+    b: "Your address is a public input of the proof. A copied proof fails for any other address.",
+  },
+  {
+    k: "Replay",
+    h: "One nullifier per player",
+    hc: "",
+    b: "Every claim spends a nullifier on-chain. Replaying the same proof reverts.",
+  },
+  {
+    k: "Funds",
+    h: "Next: one contract per chest",
+    hc: "text-[var(--gold)]",
+    b: "Today every chest lives inside one shared contract. A factory that deploys one contract per chest, so a bug in one chest cannot reach another chest's funds, is in progress and not live in this demo.",
+  },
+];
+
+export function SecuritySection({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
+  return (
+    <section
+      id="security"
+      aria-labelledby="security-h"
+      className="border-b border-[var(--line)] py-32"
+    >
+      <div className="mx-auto max-w-[1200px] px-6">
+        <p
+          data-fade
+          className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)]"
+        >
+          04 — Security
+        </p>
+        <h2
+          id="security-h"
+          data-reveal-h2
+          className="mt-4 text-[clamp(36px,4.5vw,56px)] leading-[1.02] font-semibold tracking-[-0.04em]"
+        >
+          What protects a chest.
+        </h2>
+        <div className="mt-16 grid grid-cols-1 border-t border-[var(--line)] md:grid-cols-3">
+          {SECURITY_ITEMS.map((s, i) => (
+            <div
+              key={s.k}
+              data-fade
+              className={`pt-8 ${i ? "border-[var(--line)] md:border-l md:pl-7" : ""} ${i < 2 ? "md:pr-7" : ""}`}
+            >
+              <div className="font-mono text-[12px] text-[var(--dim)]">{s.k}</div>
+              <h3
+                className={`mt-3 text-[22px] font-semibold tracking-[-0.02em] ${s.hc}`}
+              >
+                {s.h}
+              </h3>
+              <p className="mt-3 text-[15px] leading-[1.55] text-[var(--muted)]">
+                {s.b}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div
+          data-fade
+          className="mt-14 flex flex-col gap-5 border-t border-[var(--line)] pt-8"
+        >
+          <div className="flex flex-wrap items-center gap-4">
+            <h3 className="text-[22px] font-semibold tracking-[-0.02em]">
+              Contracts scanned with{" "}
+              <a
+                href={KUYFI_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="focus-landing text-[var(--proof)] underline underline-offset-4"
+              >
+                Kuyfi
+              </a>
+            </h3>
+            {kuyfiBadge}
+          </div>
+          <p className="max-w-[44rem] text-[15px] leading-[1.55] text-[var(--muted)]">
+            Black-box scan, not a full audit. Full audit planned via SCF Audit
+            Bank before mainnet.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href={KUYFI_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-landing btn-landing-s btn-landing-sm"
+            >
+              About Kuyfi ↗
+            </a>
+            <a href={REPORTS_URL} className="btn-landing btn-landing-s btn-landing-sm">
+              Scan reports on GitHub
+            </a>
           </div>
         </div>
       </div>

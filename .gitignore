@@ -18,3 +18,7 @@ app/.next/
 circuits/node_modules/
 contracts/*/target/
 .playwright-mcp/
+
+# local agent worktrees / scratch
+.claude/
+favicon-chestzk.zip

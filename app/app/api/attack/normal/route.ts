@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CONTRACTS, DEMO_CHEST, NETWORK, NORMAL_CHEST } from "@/lib/config";
+import { CONTRACTS, NETWORK, NORMAL_CHEST } from "@/lib/config";
 import { runNormalChestFlow } from "@/lib/normal-chest";
 
 export const maxDuration = 120;
 
 // Cada corrida gasta ~4 XLM del relayer y 2 cupos del cofre: límite en memoria
-// (por instancia; suficiente para el demo, no sustituye un limiter compartido).
+// (por instancia; suficiente para el demo, no sustituye un limiter compartido). La IP sale de
+// x-forwarded-for, que un cliente puede falsear si no hay proxy de confianza delante: este
+// límite frena uso accidental, no abuso deliberado.
 const PER_IP_WINDOW_MS = 60_000;
 const GLOBAL_WINDOW_MS = 3_600_000;
 const GLOBAL_MAX_PER_HOUR = 6;
@@ -60,10 +62,8 @@ export async function POST(req: NextRequest) {
       contractId: NORMAL_CHEST.contract,
       chestId: NORMAL_CHEST.id,
       tokenId: CONTRACTS.token,
-      assetCode: NORMAL_CHEST.assetCode,
-      assetIssuer: NORMAL_CHEST.assetIssuer,
       relayerSecret: secret,
-      playerAnswer: DEMO_CHEST.answer,
+      playerAnswer: NORMAL_CHEST.answer,
       log: push,
     });
     return NextResponse.json({
@@ -75,8 +75,8 @@ export async function POST(req: NextRequest) {
       logs,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    push(`falló: ${message}`);
-    return NextResponse.json({ error: message, logs }, { status: 502 });
+    console.error("attack/normal", e);
+    push("falló el robo de demo");
+    return NextResponse.json({ error: "attack demo failed", logs }, { status: 502 });
   }
 }

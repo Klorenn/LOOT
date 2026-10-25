@@ -6,7 +6,6 @@ import { ChestVisual } from "@/components/chest-visual";
 import { DEMO_CHEST } from "@/lib/config";
 import { recipientField } from "@/lib/recipient";
 import { proveChest } from "@/lib/zk";
-import { ensureTrustline } from "@/lib/trust";
 import { loadPlayer } from "@/lib/wallet";
 
 type Step = "calc" | "prove" | "send" | "done" | "error";
@@ -68,11 +67,6 @@ export default function ProvingPage() {
           salt = meta.salt || DEMO_CHEST.salt;
         }
 
-        if (player.kind === "classic" && player.secretKey) {
-          setDetail("Verificando trustline USDC…");
-          await ensureTrustline(player.secretKey);
-        }
-
         const { decimal: recipient } = recipientField(player.publicKey);
         setStep("calc");
         setDetail("Poseidon(respuesta, sal)…");
@@ -112,8 +106,15 @@ export default function ProvingPage() {
         setStep("done");
         sessionStorage.setItem(
           `chestzk.claim.${id}`,
-          JSON.stringify({ hash: data.hash, explorer: data.explorer }),
+          JSON.stringify({
+            hash: data.hash,
+            explorer: data.explorer,
+            nullifierHex: result.nullifierHex,
+            ledger: data.ledger,
+          }),
         );
+        // la wallet (si está abierta) refresca saldo e historial
+        window.dispatchEvent(new Event("chestzk:claimed"));
         router.replace(`/chest/${id}/claimed`);
       } catch (e) {
         goError(router, id, e instanceof Error ? e.message : String(e));

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { initLandingMotion } from "@/lib/landing-motion";
 import { BrandMark, LogoChest } from "@/components/logo-chest";
 import { CellsBackground } from "@/components/cells-background";
@@ -11,21 +11,49 @@ import {
   CtaSection,
   HeroStats,
   HowSection,
+  SecuritySection,
   WhoSection,
+  type Stats,
 } from "@/components/landing-sections";
 import { ScrollProgress } from "@/components/scroll-progress";
 import { SmoothScroll } from "@/components/smooth-scroll";
 import { StackMarquee } from "@/components/stack-marquee";
+import { DEMO_CHEST, PRIZE, stroopsToXlm } from "@/lib/config";
+import { shortAddr } from "@/lib/format";
+import { useSession } from "@/lib/session";
 
-/** Honest testnet stats from our own demo (not invented XLM). */
-const STATS = {
-  paid: 5,
-  rejected: 1,
-  settle: 5,
-};
+/** Docs / GitHub: placeholder until the public repo URL is provided. */
+const DOCS_URL = "#";
 
-export function LandingPage() {
+const NO_STATS: Stats = { paid: "—", claims: "—", created: "—" };
+
+/** Real counters from on-chain events (/api/stats); never invented. */
+function useStats(): Stats {
+  const [stats, setStats] = useState<Stats>(NO_STATS);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/stats")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!live || !j || j.error) return;
+        setStats({
+          paid: stroopsToXlm(j.paidStroops),
+          claims: String(j.claims),
+          created: String(j.created),
+        });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  return stats;
+}
+
+export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
+  const stats = useStats();
+  const { ready, address } = useSession();
 
   useEffect(() => {
     if (!root.current) return;
@@ -53,8 +81,8 @@ export function LandingPage() {
               {[
                 ["/explore", "Explore"],
                 ["#how", "How it works"],
-                ["/attack", "Security"],
-                ["https://github.com/Klorenn/ChestZK", "Docs"],
+                ["#security", "Security"],
+                [DOCS_URL, "Docs"],
               ].map(([href, label]) => (
                 <a
                   key={label}
@@ -66,11 +94,20 @@ export function LandingPage() {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <Link href="/enter" className="btn-landing btn-landing-s btn-landing-sm">
-                Sign in
-              </Link>
+              {ready && address ? (
+                <Link
+                  href="/wallet"
+                  className="btn-landing btn-landing-s btn-landing-sm font-mono"
+                >
+                  Mi wallet · {shortAddr(address)}
+                </Link>
+              ) : (
+                <Link href="/enter" className="btn-landing btn-landing-s btn-landing-sm">
+                  Sign in
+                </Link>
+              )}
               <Link
-                href="/enter?next=/chest/2"
+                href={`/enter?next=/chest/${DEMO_CHEST.id}`}
                 className="btn-landing btn-landing-p btn-landing-sm"
               >
                 Launch app →
@@ -117,7 +154,7 @@ export function LandingPage() {
                 </p>
                 <div data-hero-fade className="mt-8 flex flex-wrap gap-3">
                   <Link
-                    href="/enter?next=/chest/2"
+                    href={`/enter?next=/chest/${DEMO_CHEST.id}`}
                     className="btn-landing btn-landing-p"
                   >
                     Open a chest →
@@ -129,7 +166,7 @@ export function LandingPage() {
                     See the theft live →
                   </Link>
                 </div>
-                <HeroStats stats={STATS} />
+                <HeroStats stats={stats} />
               </div>
               <div
                 data-chest-wrap
@@ -189,15 +226,15 @@ export function LandingPage() {
                   },
                   {
                     k: "Settlement",
-                    h: "~5 s",
+                    h: "One ledger",
                     hc: "text-[var(--ok)]",
-                    b: "One Stellar ledger.",
+                    b: "Final once the claim lands in a Stellar ledger.",
                   },
                   {
-                    k: "Fee",
-                    h: "< $0.001",
+                    k: "Prize",
+                    h: `Native ${PRIZE.code}`,
                     hc: "text-[var(--gold)]",
-                    b: "Per verified claim.",
+                    b: "Paid through the Stellar asset contract. No trustline needed.",
                   },
                 ].map((s, i) => (
                   <div
@@ -222,24 +259,13 @@ export function LandingPage() {
               <div className="mt-14 grid grid-cols-1 border-t border-[var(--line)] sm:grid-cols-3">
                 <div data-fade className="pt-8">
                   <b className="font-mono text-[44px] font-medium tracking-[-0.03em]">
-                    <span data-count={STATS.paid}>{STATS.paid}</span>{" "}
+                    <span>{stats.paid}</span>{" "}
                     <small className="text-[20px] text-[var(--gold)]">
-                      USDC
+                      {PRIZE.code}
                     </small>
                   </b>
                   <div className="mt-2 text-[15px] text-[var(--muted)]">
-                    paid to solvers (testnet)
-                  </div>
-                </div>
-                <div
-                  data-fade
-                  className="border-[var(--line)] pt-8 sm:border-l sm:pl-7"
-                >
-                  <b className="font-mono text-[44px] font-medium tracking-[-0.03em] text-[var(--red)]">
-                    <span data-count={STATS.rejected}>{STATS.rejected}</span>
-                  </b>
-                  <div className="mt-2 text-[15px] text-[var(--muted)]">
-                    bot copies rejected
+                    paid to solvers (testnet, last 7 days)
                   </div>
                 </div>
                 <div
@@ -247,21 +273,31 @@ export function LandingPage() {
                   className="border-[var(--line)] pt-8 sm:border-l sm:pl-7"
                 >
                   <b className="font-mono text-[44px] font-medium tracking-[-0.03em] text-[var(--ok)]">
-                    <span
-                      data-count={STATS.settle}
-                      data-prefix="~"
-                      data-suffix=" s"
-                    >
-                      ~{STATS.settle} s
-                    </span>
+                    <span>{stats.claims}</span>
                   </b>
                   <div className="mt-2 text-[15px] text-[var(--muted)]">
-                    median settlement
+                    verified claims (last 7 days)
+                  </div>
+                </div>
+                <div
+                  data-fade
+                  className="border-[var(--line)] pt-8 sm:border-l sm:pl-7"
+                >
+                  <b className="font-mono text-[44px] font-medium tracking-[-0.03em]">
+                    <span>{stats.created}</span>
+                  </b>
+                  <div className="mt-2 text-[15px] text-[var(--muted)]">
+                    chests created (last 7 days)
                   </div>
                 </div>
               </div>
+              <p className="mt-6 font-mono text-[12px] text-[var(--dim)]">
+                Counted from on-chain events; the testnet RPC keeps about 7 days.
+              </p>
             </div>
           </section>
+
+          <SecuritySection kuyfiBadge={kuyfiBadge} />
 
           <CtaSection />
         </main>

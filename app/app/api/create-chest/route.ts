@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client, networks } from "chestzk-chest";
-import { CONTRACTS, NETWORK, usdcToStroops } from "@/lib/config";
+import { CONTRACTS, NETWORK, xlmToStroops } from "@/lib/config";
 import { saveChestMeta } from "@/lib/chest-store";
 import { requireAdmin } from "@/lib/admin-auth";
 
@@ -19,8 +19,33 @@ type Body = {
   };
 };
 
+/** Valida TODO el body antes de firmar nada: una tx con parámetros inválidos igual cuesta fee. */
+function validBody(b: Partial<Body> | null): b is Body {
+  if (!b) return false;
+  const m = b.meta;
+  return (
+    typeof b.fingerprintHex === "string" &&
+    /^[0-9a-fA-F]{64}$/.test(b.fingerprintHex) &&
+    typeof b.salt === "string" &&
+    /^\d{1,80}$/.test(b.salt) &&
+    typeof b.prize === "number" &&
+    Number.isFinite(b.prize) &&
+    b.prize > 0 &&
+    Number.isSafeInteger(b.maxClaims) &&
+    (b.maxClaims as number) >= 1 &&
+    (b.deadline === undefined ||
+      (Number.isSafeInteger(b.deadline) && (b.deadline as number) >= 0)) &&
+    !!m &&
+    typeof m.template === "string" &&
+    m.template.length > 0 &&
+    typeof m.question === "string" &&
+    m.question.trim().length > 0 &&
+    (m.hint === undefined || typeof m.hint === "string")
+  );
+}
+
 /**
- * Crea un cofre on-chain firmando como CREATOR (tiene USDC + trustline; prize viene en USDC y se convierte a stroops).
+ * Crea un cofre on-chain firmando como CREATOR (premio en XLM nativo vía SAC; prize viene en XLM y se convierte a stroops).
  * La metadata (pregunta) se guarda off-chain en el response; el contrato
  * solo guarda la huella.
  */
@@ -33,7 +58,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "CREATOR_SECRET missing" }, { status: 500 });
     }
 
-    const body = (await req.json()) as Body;
+    const parsed = (await req.json().catch(() => null)) as Partial<Body> | null;
+    if (!validBody(parsed)) {
+      return NextResponse.json({ error: "bad request" }, { status: 400 });
+    }
+    const body = parsed;
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
 
@@ -50,7 +79,7 @@ export async function POST(req: NextRequest) {
         creator: kp.publicKey(),
         fingerprint: Buffer.from(body.fingerprintHex, "hex"),
         token: CONTRACTS.token,
-        prize: usdcToStroops(body.prize),
+        prize: xlmToStroops(body.prize),
         max_claims: body.maxClaims,
         deadline: BigInt(body.deadline ?? 0),
       },
@@ -79,17 +108,24 @@ export async function POST(req: NextRequest) {
       (sent as { hash?: string }).hash ||
       "";
 
-    await saveChestMeta({
-      id: chestId,
-      template: body.meta.template,
-      question: body.meta.question,
-      hint: body.meta.hint,
-      salt: body.salt,
-      fingerprintHex: body.fingerprintHex,
-      prize: body.prize,
-      maxClaims: body.maxClaims,
-      createdAt: new Date().toISOString(),
-    });
+    // El cofre ya existe on-chain: si falla guardar la metadata se devuelve el id igual.
+    let metaError: string | undefined;
+    try {
+      await saveChestMeta({
+        id: chestId,
+        template: body.meta.template,
+        question: body.meta.question,
+        hint: body.meta.hint,
+        salt: body.salt,
+        fingerprintHex: body.fingerprintHex,
+        prize: body.prize,
+        maxClaims: body.maxClaims,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error("create-chest: saveChestMeta failed", err);
+      metaError = "chest created but metadata was not saved";
+    }
 
     const origin = req.headers.get("origin") || "http://localhost:3000";
     const link = `${origin}/chest/${chestId}`;
@@ -103,11 +139,11 @@ export async function POST(req: NextRequest) {
         ? `https://stellar.expert/explorer/testnet/tx/${hash}`
         : null,
       meta: body.meta,
+      ...(metaError ? { metaError } : {}),
       widget: `<script src="${origin}/widget.js" data-chest="${chestId}"></script>`,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
     console.error("create-chest", e);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "create chest failed" }, { status: 500 });
   }
 }

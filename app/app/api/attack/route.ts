@@ -17,6 +17,24 @@ function hexToBuf(hex: string): Buffer {
   return Buffer.from(hex.replace(/^0x/, ""), "hex");
 }
 
+const isHex = (v: unknown, bytes: number): v is string =>
+  typeof v === "string" && new RegExp(`^(0x)?[0-9a-fA-F]{${bytes * 2}}$`).test(v);
+
+function validBody(b: Partial<Body> | null): b is Body {
+  return (
+    !!b &&
+    Number.isSafeInteger(b.chestId) &&
+    (b.chestId as number) >= 0 &&
+    typeof b.botRecipient === "string" &&
+    /^[GC][A-Z2-7]{55}$/.test(b.botRecipient) &&
+    isHex(b.nullifierHex, 32) &&
+    !!b.proof &&
+    isHex(b.proof.a, 64) &&
+    isHex(b.proof.b, 128) &&
+    isHex(b.proof.c, 64)
+  );
+}
+
 /**
  * Intenta reclamar con una prueba robada y receptor cambiado.
  * Debe fallar con InvalidProof — eso ES el demo del modo ataque.
@@ -30,10 +48,15 @@ export async function POST(req: NextRequest) {
   try {
     const secret = process.env.RELAYER_SECRET;
     if (!secret) {
-      return NextResponse.json({ error: "RELAYER_SECRET missing", logs }, { status: 500 });
+      console.error("attack: RELAYER_SECRET missing");
+      return NextResponse.json({ error: "server not configured", logs }, { status: 500 });
     }
 
-    const body = (await req.json()) as Body;
+    const parsed = (await req.json().catch(() => null)) as Partial<Body> | null;
+    if (!validBody(parsed)) {
+      return NextResponse.json({ error: "bad request", logs }, { status: 400 });
+    }
+    const body = parsed;
     push(`bot apunta a ${body.botRecipient.slice(0, 8)}…`);
     push("copia proof + nullifier de la víctima");
     push("cambia recipient → cuenta del bot");
@@ -79,13 +102,15 @@ export async function POST(req: NextRequest) {
           logs,
         });
       }
-      const envError = message.replace(/\s+/g, " ").slice(0, 160);
+      console.error("attack: unexpected simulation error", message);
+      const envError = /Error\(Contract,\s*#(\d+)\)/.test(message)
+        ? `contract error #${message.match(/Error\(Contract,\s*#(\d+)\)/)![1]}`
+        : "unexpected error";
       push(`error de entorno: ${envError}`);
       return NextResponse.json({ rejected: false, envError, logs });
     }
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    push(message);
-    return NextResponse.json({ error: message, logs }, { status: 500 });
+    console.error("attack error", e);
+    return NextResponse.json({ error: "internal error", logs }, { status: 500 });
   }
 }

@@ -10,7 +10,8 @@ export default function OpenedPage() {
   const { id } = useParams<{ id: string }>();
   const [explorer, setExplorer] = useState<string | null>(null);
   const [amount, setAmount] = useState(0);
-  const [label, setLabel] = useState("USDC");
+  const [label, setLabel] = useState("");
+  const [known, setKnown] = useState(false);
   const [state, setState] = useState<"loading" | "ok" | "missing">("loading");
 
   useEffect(() => {
@@ -40,14 +41,15 @@ export default function OpenedPage() {
           return;
         }
         const target = Number(meta.prize) || 0;
-        const unit = String(meta.prizeLabel || "").replace(/^[\d.,\s]+/, "") || "USDC";
+        const unit = String(meta.prizeLabel || "").replace(/^[\d.,\s]+/, "");
         setLabel(unit);
+        setKnown(Boolean(meta.prizeLabel));
         setState("ok");
         const start = performance.now();
         const dur = 600;
         const tick = (t: number) => {
           const p = Math.min(1, (t - start) / dur);
-          setAmount(Math.round(target * p));
+          setAmount(target * p);
           if (p < 1) raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
@@ -92,7 +94,11 @@ export default function OpenedPage() {
         </span>
       </div>
 
-      <p className="font-mono text-5xl font-semibold text-gold">{amount} {label}</p>
+      <p className="font-mono text-5xl font-semibold text-gold">
+        {known
+          ? `${Number.isInteger(amount) ? amount : amount.toFixed(2)} ${label}`
+          : "Premio enviado"}
+      </p>
 
       {explorer && (
         <a

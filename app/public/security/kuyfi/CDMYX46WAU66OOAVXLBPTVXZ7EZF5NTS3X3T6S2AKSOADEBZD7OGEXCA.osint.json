@@ -1,0 +1,140 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "kyf-osint-20261025T155842Z",
+  "generatedAt": "2026-10-25T15:58:42.734Z",
+  "mode": "osint",
+  "tool": {
+    "name": "kuyfi",
+    "version": "0.1.0"
+  },
+  "target": {
+    "contractId": "CDMYX46WAU66OOAVXLBPTVXZ7EZF5NTS3X3T6S2AKSOADEBZD7OGEXCA",
+    "network": "testnet",
+    "rpcUrl": "https://soroban-testnet.stellar.org",
+    "bytecodeSize": 7407
+  },
+  "scan": {
+    "totalFunctions": 4,
+    "functions": [
+      {
+        "name": "init",
+        "parameters": [
+          {
+            "name": "admin",
+            "type": "Address"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "claim",
+        "parameters": [
+          {
+            "name": "chest_id",
+            "type": "U32"
+          },
+          {
+            "name": "recipient",
+            "type": "Address"
+          },
+          {
+            "name": "answer",
+            "type": "String"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "get_chest",
+        "parameters": [
+          {
+            "name": "chest_id",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "create_chest",
+        "parameters": [
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "prize",
+            "type": "I128"
+          },
+          {
+            "name": "max_claims",
+            "type": "U32"
+          },
+          {
+            "name": "answer_hash",
+            "type": "BytesN<32>"
+          }
+        ],
+        "hasReturn": true
+      }
+    ],
+    "udts": [
+      {
+        "kind": "struct",
+        "name": "Chest",
+        "fields": [
+          {
+            "name": "answer_hash",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "claims",
+            "type": "U32"
+          },
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "max_claims",
+            "type": "U32"
+          },
+          {
+            "name": "prize",
+            "type": "I128"
+          }
+        ]
+      },
+      {
+        "kind": "union",
+        "name": "DataKey",
+        "cases": [
+          {
+            "name": "Token",
+            "valueTypes": []
+          },
+          {
+            "name": "NextId",
+            "valueTypes": []
+          },
+          {
+            "name": "Chest",
+            "valueTypes": [
+              "U32"
+            ]
+          },
+          {
+            "name": "Claimed",
+            "valueTypes": [
+              "U32",
+              "Address"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

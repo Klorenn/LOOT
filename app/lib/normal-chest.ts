@@ -1,6 +1,5 @@
 import {
   Address,
-  Asset,
   BASE_FEE,
   Contract,
   Keypair,
@@ -18,8 +17,6 @@ export type NormalChestOpts = {
   contractId: string;
   chestId: number;
   tokenId: string;
-  assetCode: string;
-  assetIssuer: string;
   /** Firma y paga fees de todo el flujo (jugador y bot no tienen fondos). */
   relayerSecret: string;
   /** Respuesta que usa el jugador legítimo (el bot NO la recibe). */
@@ -158,10 +155,9 @@ export async function runNormalChestFlow(o: NormalChestOpts): Promise<NormalChes
   const relayer = Keypair.fromSecret(o.relayerSecret);
   const player = Keypair.random();
   const bot = Keypair.random();
-  const asset = new Asset(o.assetCode, o.assetIssuer);
 
-  // Las cuentas G… necesitan trustline a USDC para recibir el premio.
-  log("preparando cuentas frescas (jugador y bot) con trustline USDC…");
+  // El premio es XLM nativo: las cuentas frescas no necesitan trustline.
+  log("preparando cuentas frescas (jugador y bot)…");
   await submit(
     server,
     relayer,
@@ -169,11 +165,10 @@ export async function runNormalChestFlow(o: NormalChestOpts): Promise<NormalChes
       const b = new TransactionBuilder(acc, { fee: "10000", networkPassphrase: o.passphrase });
       for (const kp of [player, bot]) {
         b.addOperation(Operation.createAccount({ destination: kp.publicKey(), startingBalance: "2" }));
-        b.addOperation(Operation.changeTrust({ asset, source: kp.publicKey() }));
       }
       return b.setTimeout(120).build();
     },
-    [player, bot],
+    [],
     false,
   );
 

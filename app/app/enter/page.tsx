@@ -2,87 +2,46 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { ScanFace, Wallet } from "lucide-react";
+import { KeyRound, ScanFace, Wallet, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DEMO_CHEST } from "@/lib/config";
-import {
-  clearPlayer,
-  enrollClassic,
-  enrollWithPasskey,
-  loadPlayer,
-  PasskeyUnavailableError,
-  type Player,
-} from "@/lib/wallet";
-
-function shortAddr(a: string) {
-  return `${a.slice(0, 4)}…${a.slice(-4)}`;
-}
+import { shortAddr } from "@/lib/format";
+import { useSession, type ConnectMethod } from "@/lib/session";
+import { PasskeyUnavailableError } from "@/lib/wallet";
 
 function EnterInner() {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || `/chest/${DEMO_CHEST.id}`;
-  const [busy, setBusy] = useState<"passkey" | "classic" | "continue" | null>(
-    null,
-  );
+  const { player, connect } = useSession();
+  const [busy, setBusy] = useState<ConnectMethod | "continue" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [player, setPlayer] = useState<Player | null>(() =>
-    typeof window !== "undefined" ? loadPlayer() : null,
-  );
 
-  async function goPasskey() {
-    setBusy("passkey");
+  async function go(method: ConnectMethod) {
+    setBusy(method);
     setError(null);
     try {
-      clearPlayer();
-      const p = await enrollWithPasskey();
-      setPlayer(p);
+      await connect(method);
       router.push(next);
     } catch (e) {
       if (e instanceof PasskeyUnavailableError) {
         setError(
-          "Este dispositivo no tiene WebAuthn / Face ID. Usá “Demo sin passkey”.",
+          "Este dispositivo no tiene WebAuthn / Face ID. Conectá una wallet Stellar o usá “Demo sin passkey”.",
         );
       } else {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(
+          e instanceof Error
+            ? e.message
+            : (e as { message?: string })?.message || String(e),
+        );
       }
       setBusy(null);
     }
   }
 
-  async function goClassic() {
-    setBusy("classic");
-    setError(null);
-    try {
-      clearPlayer();
-      const p = await enrollClassic();
-      setPlayer(p);
-      router.push(next);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setBusy(null);
-    }
-  }
-
-  async function goContinue() {
-    setBusy("continue");
-    setError(null);
-    try {
-      const existing = loadPlayer();
-      if (!existing) {
-        await goPasskey();
-        return;
-      }
-      // Re-verify passkey wallets (prompts biometric when needed)
-      if (existing.kind === "passkey") {
-        const p = await enrollWithPasskey();
-        setPlayer(p);
-      }
-      router.push(next);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setBusy(null);
-    }
+  // La sesión guardada ya trae keyId / walletId: no hay nada que volver a crear.
+  function goContinue() {
+    router.push(next);
   }
 
   return (
@@ -104,13 +63,15 @@ function EnterInner() {
       <Button
         size="lg"
         disabled={!!busy}
-        onClick={goPasskey}
+        onClick={() => void go("passkey")}
         className="h-12 w-full rounded-full bg-primary text-base font-semibold text-primary-foreground"
       >
         <ScanFace className="mr-2 size-5" aria-hidden />
         {busy === "passkey"
-          ? "Creando smart wallet…"
-          : "Abrir con Face ID / passkey"}
+          ? "Esperando passkey…"
+          : player?.kind === "passkey"
+            ? "Abrir con Face ID / passkey"
+            : "Crear wallet con Face ID / passkey"}
       </Button>
 
       {player && (
@@ -126,15 +87,33 @@ function EnterInner() {
       )}
 
       <Button
+        variant="secondary"
+        disabled={!!busy}
+        onClick={() => void go("wallet")}
+        className="h-12 w-full rounded-full border border-border"
+      >
+        <WalletCards className="mr-2 size-5" aria-hidden />
+        {busy === "wallet" ? "Esperando wallet…" : "Conectar wallet Stellar (G…)"}
+      </Button>
+
+      <Button
         variant="ghost"
         disabled={!!busy}
-        onClick={goClassic}
+        onClick={() => void go("passkey-existing")}
+        className="h-11 w-full text-muted-foreground"
+      >
+        <KeyRound className="mr-2 size-4" aria-hidden />
+        {busy === "passkey-existing" ? "Buscando passkey…" : "Ya tengo una passkey de ChestZK"}
+      </Button>
+
+      <Button
+        variant="ghost"
+        disabled={!!busy}
+        onClick={() => void go("demo")}
         className="h-11 w-full text-muted-foreground"
       >
         <Wallet className="mr-2 size-4" aria-hidden />
-        {busy === "classic"
-          ? "Fondeando cuenta demo…"
-          : "Demo sin passkey (G…)"}
+        {busy === "demo" ? "Fondeando cuenta demo…" : "Demo sin passkey (G…)"}
       </Button>
 
       {error && (

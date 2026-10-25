@@ -10,50 +10,84 @@ export const NETWORK = {
 export const CONTRACTS = {
   chest: "CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ",
   verifier: "CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE",
-  /** SAC del USDC de Circle en testnet (Asset("USDC", USDC.issuer).contractId). */
-  token: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
-  /** Token de prueba CHEST (cofre #2, fallback). */
-  chestToken: "CD3RI5RAQX4CB62IVD5XD6HIE5TZWJ55VF7GKAT23NPBVW3JLP6TP4AA",
+  /** SAC del XLM nativo en testnet: token del premio. No requiere trustline. */
+  token: "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
 } as const;
 
-export const USDC = {
-  code: "USDC",
-  issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+/** SAC del XLM nativo (testnet). */
+export const XLM_SAC = CONTRACTS.token;
+
+export const PRIZE = {
+  code: "XLM",
   decimals: 7,
-  /** Premio por cupo en USDC (unidades enteras). */
-  prize: 1,
+  /** Premio por cupo en XLM (unidades enteras). */
+  perSlot: 10,
+  perSlotStroops: BigInt(10) * BigInt(10) ** BigInt(7),
 } as const;
 
-/** USDC → stroops (7 decimales), sin errores de coma flotante. */
-export function usdcToStroops(amount: number): bigint {
-  return BigInt(Math.round(amount * 10 ** USDC.decimals));
+/** XLM → stroops (7 decimales), sin errores de coma flotante. */
+export function xlmToStroops(amount: number): bigint {
+  return BigInt(Math.round(amount * 10 ** PRIZE.decimals));
+}
+
+/** Decimales del token del premio (XLM = 7). */
+export function tokenDecimals(_tokenId: string): number {
+  return PRIZE.decimals;
+}
+
+/** unidades mínimas → "10" / "10.5" (sin ceros de más). */
+export function stroopsToXlm(
+  stroops: bigint | number | string,
+  decimals: number = PRIZE.decimals,
+): string {
+  const v = BigInt(stroops);
+  const unit = BigInt(10) ** BigInt(decimals);
+  const whole = v / unit;
+  const frac = decimals
+    ? (v % unit).toString().padStart(decimals, "0").replace(/0+$/, "")
+    : "";
+  return frac ? `${whole}.${frac}` : `${whole}`;
 }
 
 /**
- * Cofre demo para jueces / demo en vivo.
- * Pregunta = bits de un byte → respuesta 8 · sal 7.
- * (El cofre #1 quedó con huella de "42" por error de demo; no usarlo.)
+ * Cofre demo para jueces / demo en vivo (pregunta sobre Stellar).
  */
 export const DEMO_CHEST = {
-  // Temporal: #2 (CHEST). El #3 on-chain es otro cofre (pregunta Meridian, huella 18e45b94…).
-  // El próximo cofre demo (XLM o USDC) saldrá con id 5.
-  id: 2,
-  question: "¿Cuántos bits tiene un byte?",
-  hint: "Potencia de dos, entre 4 y 16",
-  prize: 100,
-  prizeLabel: "100 CHEST",
-  slots: 5,
-  salt: "7",
-  /** Solo en demo — en producción la sal no sale del creador. */
-  answer: "8",
+  // #6: premio XLM nativo, 10 XLM × 10 slots (creado con bot/setup-xlm-chests.mjs).
+  // La respuesta NO está en el repo: solo la sal y la huella (públicas).
+  // Fallbacks desactivados: #5 (misma config XLM, pregunta anterior; ya sin uso)
+  // y #2 (token CHEST, ver bloque comentado más abajo).
+  id: 6,
+  question:
+    "¿Cuál es el apellido del creador del Stellar Consensus Protocol (SCP)?",
+  hint: "Apellido francés; con o sin tilde vale igual",
+  /** Valor con el que se creó el cofre; la UI de premio lee el real de la cadena. */
+  prize: PRIZE.perSlot,
+  prizeLabel: `${PRIZE.perSlot} ${PRIZE.code}`,
+  slots: 10,
+  salt: "205785768760272112960586331553946098354073419676685343877020392339824122894",
   fingerprintHex:
-    "180d69653b073abf4b382cda712b8f25406392ca623915fcc3f25679030c78de",
+    "2df98e7f97c0c16bfeac31ca35d2f9b234ab3f7b9d442d1d3b9ac45643eaab19",
 } as const;
 
-/** Fallback documentado: cofre #2 paga CHEST (token de prueba), misma pregunta y huella. */
-export const DEMO_CHEST_FALLBACK = {
-  id: 2,
-  prizeLabel: "100 CHEST",
+// Fallback #2 (desactivado): misma pregunta y huella, premio en el token de prueba CHEST.
+// #2 uses CHEST token, 0 decimals — restore chestToken if reactivating:
+//   CONTRACTS.chestToken = "CD3RI5RAQX4CB62IVD5XD6HIE5TZWJ55VF7GKAT23NPBVW3JLP6TP4AA"
+//   tokenDecimals/tokenLabel must return 0 / "CHEST" for it; DEMO_CHEST.id = 2.
+
+/**
+ * Cofre dedicado al modo ataque (#7: 100 cupos × 0.1 XLM). La respuesta es PÚBLICA a propósito:
+ * solo sirve para armar una prueba válida que el bot copia y el contrato rechaza.
+ * OJO: `claim` revisa cerrado / vencido / agotado / nullifier usado ANTES de verificar la prueba,
+ * así que si alguien cobra todos los cupos la demo fallaría con SoldOut en vez de InvalidProof.
+ * Por eso el premio es mínimo (vaciarlo no vale nada) y hay muchos cupos. Si se agota, crear otro
+ * con: ANSWER=<respuesta> SALT=7 SLOTS=100 PRIZE_STROOPS=1000000 bot/setup-xlm-chests.mjs zk
+ * El premio real vive en DEMO_CHEST, cuya respuesta no está en el repo.
+ */
+export const ATTACK_CHEST = {
+  id: 7,
+  salt: "7",
+  answer: "8",
 } as const;
 
 /** Cofre #1 (huella Poseidon(42,7)) — útil solo para demos de replay viejas. */
@@ -72,15 +106,21 @@ export const ZK_ASSETS = {
 
 /**
  * Cofre NORMAL (sin ZK) para el modo ataque: la respuesta viaja en claro.
- * Mismo premio (USDC) y misma pregunta que DEMO_CHEST; cada demo gasta 2 cupos.
+ * Mismo premio (XLM) y misma pregunta que DEMO_CHEST; cada demo gasta 2 cupos.
+ * Instancia nueva de normal-chest con token = XLM SAC (el token se fija en init).
  */
 export const NORMAL_CHEST = {
-  // Temporal: contrato con CHEST (fondeado). El de USDC (CAAHCYL5…B4HSV) aún no tiene cofre.
-  contract: "CCDYM5LN63JCXX42VIXMIDPRKVN6IPAUF6SE6S77PZ3FFLYWDDIQA5KH",
+  contract: "CDMYX46WAU66OOAVXLBPTVXZ7EZF5NTS3X3T6S2AKSOADEBZD7OGEXCA",
   id: 1,
-  slots: 50,
-  prize: 100,
-  assetCode: "CHEST",
-  assetIssuer: "GAVLW5IKB7VFBRJ3EHBE4BRZ5OX3AOW3ICMLMB6KVKCQDO6WJ2SPHDN3",
+  slots: 30,
+  prize: PRIZE.perSlot,
+  /** Respuesta en claro a propósito: es el punto de la demo (el bot la lee del ledger). */
+  answer: "8",
+  /** Instancia previa (USDC/CHEST), sin uso: CAAHCYL5…B4HSV / CCDYM5LN…A5KH */
 } as const;
 
+/** Nombre legible del token de premio según su SAC. */
+export function tokenLabel(tokenId: string): string {
+  if (tokenId === CONTRACTS.token) return PRIZE.code;
+  return "tokens";
+}

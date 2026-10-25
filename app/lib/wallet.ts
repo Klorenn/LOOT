@@ -3,21 +3,65 @@
 import { hash, Keypair } from "@stellar/stellar-sdk";
 import { NETWORK } from "./config";
 import { getPasskeyKit } from "./passkey-client";
-import { ensureTrustline } from "./trust";
 
 const STORAGE_KEY = "chestzk.player";
+/** playerSecret por dirección: el nullifier debe ser estable aunque se cierre sesión. */
+const SECRETS_KEY = "chestzk.secrets";
+/** Evento de ventana que avisa a la sesión (header, wallet) que el storage cambió. */
+export const SESSION_EVENT = "chestzk:session";
 
 export type Player = {
-  /** C… smart wallet or G… classic fallback */
+  /** C… smart wallet or G… (classic demo keypair / Stellar Wallets Kit) */
   publicKey: string;
   /** Field element for ZK nullifier (stable per passkey / keypair) */
   playerSecret: string;
-  kind: "passkey" | "classic";
+  /** passkey = C…; classic = G… demo keypair in this browser; wallet = G… via Stellar Wallets Kit */
+  kind: "passkey" | "classic" | "wallet";
   /** Classic only — never set for passkey wallets */
   secretKey?: string;
   /** Passkey credential id (base64url) */
   keyId?: string;
+  /** Stellar Wallets Kit module id (freighter, xbull, …) — wallet only */
+  walletId?: string;
 };
+
+/** Vista pública de la sesión: passkey (C…) o cuenta G (demo o wallet externa). */
+export type SessionKind = "passkey" | "g";
+export function sessionKind(p: Pick<Player, "kind">): SessionKind {
+  return p.kind === "passkey" ? "passkey" : "g";
+}
+
+function readSecrets(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(SECRETS_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+/** Secret estable por dirección; se crea la primera vez que la dirección entra. */
+export function playerSecretFor(address: string, derived?: string): string {
+  const all = readSecrets();
+  if (all[address]) return all[address];
+  const secret = derived ?? randomFieldElement();
+  try {
+    localStorage.setItem(SECRETS_KEY, JSON.stringify({ ...all, [address]: secret }));
+  } catch {
+    /* storage lleno o bloqueado: el secret vive solo en la sesión */
+  }
+  return secret;
+}
+
+function randomFieldElement(): string {
+  const rnd = crypto.getRandomValues(new Uint8Array(31));
+  return BigInt(
+    "0x" + [...rnd].map((b) => b.toString(16).padStart(2, "0")).join(""),
+  ).toString();
+}
+
+function notifySession() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(SESSION_EVENT));
+}
 
 export class PasskeyUnavailableError extends Error {
   constructor(message = "WebAuthn unavailable on this device") {
@@ -44,10 +88,12 @@ export function loadPlayer(): Player | null {
 
 export function savePlayer(p: Player) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+  notifySession();
 }
 
 export function clearPlayer() {
   localStorage.removeItem(STORAGE_KEY);
+  notifySession();
 }
 
 function secretFromBytes(label: string): string {
@@ -112,7 +158,10 @@ async function enrollSmartWallet(): Promise<Player> {
           kind: "passkey",
           publicKey: connected.contractId,
           keyId: connected.keyIdBase64,
-          playerSecret: secretFromBytes(`pk:${connected.keyIdBase64}`),
+          playerSecret: playerSecretFor(
+            connected.contractId,
+            secretFromBytes(`pk:${connected.keyIdBase64}`),
+          ),
         };
         savePlayer(player);
         return player;
@@ -154,27 +203,63 @@ async function enrollSmartWallet(): Promise<Player> {
     kind: "passkey",
     publicKey: created.contractId,
     keyId: created.keyIdBase64,
-    playerSecret: secretFromBytes(`pk:${created.keyIdBase64}`),
+    playerSecret: playerSecretFor(
+      created.contractId,
+      secretFromBytes(`pk:${created.keyIdBase64}`),
+    ),
   };
   savePlayer(player);
   return player;
 }
 
-/** Classic G… + Friendbot + USDC trustline (demo / no biometrics). */
+/**
+ * Reconecta una passkey ya existente sin crear wallet: con keyId guardado no
+ * pide biometría; sin él, el navegador deja elegir entre sus passkeys.
+ */
+export async function reconnectPasskey(): Promise<Player> {
+  if (typeof window === "undefined" || !window.PublicKeyCredential) {
+    throw new PasskeyUnavailableError();
+  }
+  const existing = loadPlayer();
+  const kit = getPasskeyKit();
+  const connected = await kit.connectWallet(
+    existing?.kind === "passkey" && existing.keyId ? { keyId: existing.keyId } : undefined,
+  );
+  if (!connected?.contractId) throw new Error("No encontramos una passkey de ChestZK en este dispositivo.");
+  const player: Player = {
+    kind: "passkey",
+    publicKey: connected.contractId,
+    keyId: connected.keyIdBase64,
+    playerSecret: playerSecretFor(
+      connected.contractId,
+      secretFromBytes(`pk:${connected.keyIdBase64}`),
+    ),
+  };
+  savePlayer(player);
+  return player;
+}
+
+/** Cuenta G… de una wallet externa (Stellar Wallets Kit). La prueba no necesita firmarla. */
+export function enrollWalletAccount(address: string, walletId: string): Player {
+  const player: Player = {
+    kind: "wallet",
+    publicKey: address,
+    walletId,
+    playerSecret: playerSecretFor(address),
+  };
+  savePlayer(player);
+  return player;
+}
+
+/** Classic G… + Friendbot (demo / no biometrics). El premio es XLM: sin trustline. */
 export async function enrollClassic(): Promise<Player> {
   const kp = Keypair.random();
-  const rnd = crypto.getRandomValues(new Uint8Array(31));
-  const playerSecret = BigInt(
-    "0x" + [...rnd].map((b) => b.toString(16).padStart(2, "0")).join(""),
-  ).toString();
+  const playerSecret = playerSecretFor(kp.publicKey());
 
   const fund = await fetch(
     `${NETWORK.friendbotUrl}?addr=${encodeURIComponent(kp.publicKey())}`,
   );
   if (!fund.ok) throw new Error("Friendbot no pudo fondear la cuenta");
-
-  await new Promise((r) => setTimeout(r, 2000));
-  await ensureTrustline(kp.secret());
 
   const player: Player = {
     kind: "classic",

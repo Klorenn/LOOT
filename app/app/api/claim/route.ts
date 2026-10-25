@@ -15,17 +15,37 @@ function hexToBuf(hex: string): Buffer {
   return Buffer.from(hex.replace(/^0x/, ""), "hex");
 }
 
+const isHex = (v: unknown, bytes: number): v is string =>
+  typeof v === "string" && new RegExp(`^(0x)?[0-9a-fA-F]{${bytes * 2}}$`).test(v);
+
+function validBody(b: Partial<Body> | null): b is Body {
+  return (
+    !!b &&
+    Number.isSafeInteger(b.chestId) &&
+    (b.chestId as number) >= 0 &&
+    typeof b.recipient === "string" &&
+    /^[GC][A-Z2-7]{55}$/.test(b.recipient) &&
+    isHex(b.nullifierHex, 32) &&
+    !!b.proof &&
+    isHex(b.proof.a, 64) &&
+    isHex(b.proof.b, 128) &&
+    isHex(b.proof.c, 64)
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
     const secret = process.env.RELAYER_SECRET;
     if (!secret) {
-      return NextResponse.json(
-        { error: "RELAYER_SECRET no configurado" },
-        { status: 500 },
-      );
+      console.error("claim: RELAYER_SECRET missing");
+      return NextResponse.json({ error: "server not configured" }, { status: 500 });
     }
 
-    const body = (await req.json()) as Body;
+    const parsed = (await req.json().catch(() => null)) as Partial<Body> | null;
+    if (!validBody(parsed)) {
+      return NextResponse.json({ error: "bad request" }, { status: 400 });
+    }
+    const body = parsed;
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
 
@@ -69,9 +89,14 @@ export async function POST(req: NextRequest) {
       (sent as { hash?: string }).hash ||
       "";
 
+    const ledger =
+      (sent as { getTransactionResponse?: { ledger?: number } }).getTransactionResponse
+        ?.ledger ?? null;
+
     return NextResponse.json({
       ok: true,
       hash,
+      ledger,
       explorer: hash
         ? `https://stellar.expert/explorer/testnet/tx/${hash}`
         : null,
@@ -80,6 +105,12 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("claim error", e);
-    return NextResponse.json({ error: message }, { status: 500 });
+    // El cliente clasifica por código de contrato (#5 usado, #6 prueba inválida…): se devuelve
+    // solo ese código, nunca el log de simulación.
+    const code = message.match(/Error\(Contract,\s*#(\d+)\)/)?.[1];
+    return NextResponse.json(
+      { error: code ? `Error(Contract, #${code})` : "claim failed" },
+      { status: 500 },
+    );
   }
 }

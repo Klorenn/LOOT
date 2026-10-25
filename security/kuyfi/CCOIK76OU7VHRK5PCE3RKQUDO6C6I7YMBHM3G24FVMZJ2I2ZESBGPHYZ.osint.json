@@ -1,0 +1,191 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "kyf-osint-20261025T155839Z",
+  "generatedAt": "2026-10-25T15:58:39.630Z",
+  "mode": "osint",
+  "tool": {
+    "name": "kuyfi",
+    "version": "0.1.0"
+  },
+  "target": {
+    "contractId": "CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ",
+    "network": "testnet",
+    "rpcUrl": "https://soroban-testnet.stellar.org",
+    "bytecodeSize": 7905
+  },
+  "scan": {
+    "totalFunctions": 5,
+    "functions": [
+      {
+        "name": "init",
+        "parameters": [
+          {
+            "name": "admin",
+            "type": "Address"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "claim",
+        "parameters": [
+          {
+            "name": "chest_id",
+            "type": "U64"
+          },
+          {
+            "name": "recipient",
+            "type": "Address"
+          },
+          {
+            "name": "nullifier",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "proof",
+            "type": "Proof"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "get_chest",
+        "parameters": [
+          {
+            "name": "chest_id",
+            "type": "U64"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "close_chest",
+        "parameters": [
+          {
+            "name": "chest_id",
+            "type": "U64"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "create_chest",
+        "parameters": [
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "prize",
+            "type": "I128"
+          },
+          {
+            "name": "max_claims",
+            "type": "U32"
+          },
+          {
+            "name": "deadline",
+            "type": "U64"
+          }
+        ],
+        "hasReturn": true
+      }
+    ],
+    "udts": [
+      {
+        "kind": "struct",
+        "name": "Chest",
+        "fields": [
+          {
+            "name": "claims",
+            "type": "U32"
+          },
+          {
+            "name": "closed",
+            "type": "Bool"
+          },
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "deadline",
+            "type": "U64"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "max_claims",
+            "type": "U32"
+          },
+          {
+            "name": "prize",
+            "type": "I128"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          }
+        ]
+      },
+      {
+        "kind": "struct",
+        "name": "Proof",
+        "fields": [
+          {
+            "name": "a",
+            "type": "BytesN<64>"
+          },
+          {
+            "name": "b",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "c",
+            "type": "BytesN<64>"
+          }
+        ]
+      },
+      {
+        "kind": "union",
+        "name": "DataKey",
+        "cases": [
+          {
+            "name": "Verifier",
+            "valueTypes": []
+          },
+          {
+            "name": "NextId",
+            "valueTypes": []
+          },
+          {
+            "name": "Chest",
+            "valueTypes": [
+              "U64"
+            ]
+          },
+          {
+            "name": "Nullifier",
+            "valueTypes": [
+              "BytesN<32>"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

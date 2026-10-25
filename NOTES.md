@@ -16,10 +16,10 @@ Handoff for the other person. Lisboa time context: freeze ~dom 25 afternoon (ade
 |---|---|
 | Chest | `CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ` |
 | Verifier | `CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE` |
-| Prize token | testnet USDC SAC `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA` (issuer `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`) |
+| Prize token | native XLM SAC `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` (10 XLM per slot, no trustline) |
 | Test token CHEST (fallback) | `CD3RI5RAQX4CB62IVD5XD6HIE5TZWJ55VF7GKAT23NPBVW3JLP6TP4AA` |
-| Judge chest | **#3** (USDC, 1 USDC × 5 slots; create with `bot/setup-usdc-chests.mjs`) · salt `7` · answer `8` · fp `180d6965…0c78de`. **Fallback #2** (CHEST token, same question/fp): smoke claim [tx](https://stellar.expert/explorer/testnet/tx/fca835b7a46bb4dead2340b368eca34cf832c65b936808bb5dfd725548cf4fe3) |
-| Normal chest (USDC) | `CAAHCYL56HSHLD7CYX7ESJXRLZG47HVJZ7QTL4MUD4L5H2A5PR4B4HSV` · chest #1 · 15 slots · 1 USDC each (old CHEST instance: `CCDYM5LN…A5KH`) · answer `8` in plain text (attack demo left side) |
+| Judge chest | **#6** (XLM, 10 XLM × 10 slots; create with `bot/setup-xlm-chests.mjs`, answer via `ANSWER=` env, never committed) · fp `2df98e7f…eaab19`. Attack-demo chest **#7** (100 × 0.1 XLM, public answer, see `ATTACK_CHEST`); #5 and #2 are retired fallbacks |
+| Normal chest (XLM) | `CDMYX46WAU66OOAVXLBPTVXZ7EZF5NTS3X3T6S2AKSOADEBZD7OGEXCA` · chest #1 · 30 slots · 10 XLM each · answer `8` in plain text (attack demo left side) |
 | Legacy #1 | answer was `42` — do not use for judges |
 
 ## Local
@@ -34,14 +34,14 @@ ES paths 301 → EN.
 
 ## Gotchas
 
-- USDC: C… wallets need no trustline; classic G… need one (`lib/trust.ts`, auto before claim). Faucet: faucet.circle.com → deployer. `/api/attack/normal` is rate-limited (1/IP/60s, 6/h)
+- Prize is native XLM: no trustline for any account. `/api/attack/normal` is rate-limited (1/IP/60s, 6/h)
 - Claim needs `--instructions 100000000` (BN254 verify)
 - `create_chest` SDK result is a `Result` → `.unwrap()`
 - Recipient field = `sha256(ScVal Address XDR)` with byte[0]=0
 - Proof G2 limbs swapped (ethereum uncompressed)
 - No Docker → deployer/relayer pays fees (plan B)
 - Passkey = **passkey-kit** smart wallet (C…). `/api/passkey/send` prefers OZ Channels; else **local-channel**: rebuild envelope from `{func,auth}`, and when Protocol‑29 rent `resourceFee > uint32` set `inner.fee=0` + FeeBump (stellar-cli pattern). Client clamps carrier build fees (`passkey-fee-clamp.ts`). Classic G… only via UI “Demo sin passkey”, not silent fallback.
-- `data/` chests meta is gitignored; demo #3 is hardcoded in `lib/config.ts`
+- `data/` chests meta is gitignored; demo #6 is hardcoded in `lib/config.ts`
 
 ## Bug list (known / non-blocking)
 

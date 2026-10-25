@@ -4,19 +4,28 @@ export type ChestTemplate = {
   blurb: string;
   question: string;
   hint: string;
-  answer: string;
+  /** Solo orientación para quien crea; NO se pre-llena: el creador escribe su propia respuesta. */
+  answerPlaceholder: string;
   prize: number;
   maxClaims: number;
 };
 
+/**
+ * Las preguntas se pueden verificar en developers.stellar.org:
+ *  airdrop → /docs/learn/fundamentals
+ *  evento  → /docs/build/smart-contracts/overview
+ *  bounty  → /docs/learn/fundamentals/stellar-consensus-protocol
+ *  curso   → /docs/build/apps/zk
+ * Las respuestas no se guardan acá: un template sin tocar no debe crear un cofre trivial.
+ */
 export const TEMPLATES: ChestTemplate[] = [
   {
     id: "airdrop",
     name: "Airdrop",
     blurb: "Solo cobra quien sabe, no el bot.",
-    question: "¿Cuál es el ticker del dólar en Stellar?",
-    hint: "Tres letras, estable",
-    answer: "USDC",
+    question: "¿Cuál es el ticker del activo nativo de Stellar?",
+    hint: "Tres letras",
+    answerPlaceholder: "Ticker de 3 letras",
     prize: 1,
     maxClaims: 100,
   },
@@ -24,9 +33,9 @@ export const TEMPLATES: ChestTemplate[] = [
     id: "evento",
     name: "Evento",
     blurb: "Cofre en el venue: escaneá y respondé.",
-    question: "¿En qué ciudad es Meridian 2026?",
-    hint: "Capital de Portugal",
-    answer: "Lisboa",
+    question: "¿Cómo se llama la plataforma de contratos inteligentes de Stellar?",
+    hint: "Empieza con S",
+    answerPlaceholder: "Una palabra, el nombre de la plataforma",
     prize: 1,
     maxClaims: 50,
   },
@@ -34,9 +43,9 @@ export const TEMPLATES: ChestTemplate[] = [
     id: "bounty",
     name: "Bounty / CTF",
     blurb: "Flag onchain sin filtrar la solución.",
-    question: "¿Cuántos bits tiene un byte?",
-    hint: "Potencia de dos, entre 4 y 16",
-    answer: "8",
+    question: "¿Qué siglas tiene el protocolo de consenso de Stellar?",
+    hint: "Tres letras",
+    answerPlaceholder: "Una sigla de 3 letras",
     prize: 1,
     maxClaims: 5,
   },
@@ -44,9 +53,9 @@ export const TEMPLATES: ChestTemplate[] = [
     id: "curso",
     name: "Curso",
     blurb: "Recompensa por aprender, no por copiar.",
-    question: "¿Qué prueba Stellar nativo en Protocol 25/26?",
+    question: "¿Qué curva elíptica incorporó Protocol 25 para pruebas ZK?",
     hint: "Curva BN…",
-    answer: "BN254",
+    answerPlaceholder: "Nombre de una curva elíptica",
     prize: 1,
     maxClaims: 200,
   },

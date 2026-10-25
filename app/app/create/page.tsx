@@ -9,7 +9,7 @@ import { LogoChest } from "@/components/logo-chest";
 import { ExampleTag } from "@/components/app/example-tag";
 import { KV } from "@/components/app/kv";
 import { TEMPLATES, type ChestTemplate } from "@/lib/templates";
-import { answerToField, randomSalt } from "@/lib/answer";
+import { answerToField, normalizeAnswer, randomSalt } from "@/lib/answer";
 import { poseidon2, fieldToHex } from "@/lib/zk";
 
 const STEPS = [
@@ -20,16 +20,12 @@ const STEPS = [
   "Review & fund",
 ] as const;
 
-function normalizeAnswer(a: string) {
-  return a.trim().toLowerCase().replace(/\s+/g, "");
-}
-
 export default function CreateChestPage() {
   const [step, setStep] = useState(0);
   const [tpl, setTpl] = useState<ChestTemplate>(TEMPLATES[2]);
   const [question, setQuestion] = useState(TEMPLATES[2].question);
   const [hint, setHint] = useState(TEMPLATES[2].hint);
-  const [answer, setAnswer] = useState(TEMPLATES[2].answer);
+  const [answer, setAnswer] = useState("");
   const [hashHex, setHashHex] = useState<string | null>(null);
   const [hashOk, setHashOk] = useState(false);
   const [prize, setPrize] = useState(TEMPLATES[2].prize);
@@ -72,7 +68,7 @@ export default function CreateChestPage() {
     setTpl(t);
     setQuestion(t.question);
     setHint(t.hint);
-    setAnswer(t.answer);
+    setAnswer("");
     setPrize(t.prize);
     setMaxClaims(t.maxClaims);
     setHashHex(null);
@@ -314,6 +310,7 @@ export default function CreateChestPage() {
                 >
                   <Input
                     type="password"
+                    placeholder={tpl.answerPlaceholder}
                     value={answer}
                     onChange={(e) => {
                       setAnswer(e.target.value);

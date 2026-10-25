@@ -12,10 +12,11 @@ Native BN254 verification + cheap claims → knowledge-gated airdrops/events tha
 |---|---|
 | Chest | `CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ` |
 | Verifier | `CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE` |
-| Prize token (testnet USDC SAC) | `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA` |
+| Prize token (native XLM SAC) | `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` |
 | Test token CHEST (fallback chest #2) | `CD3RI5RAQX4CB62IVD5XD6HIE5TZWJ55VF7GKAT23NPBVW3JLP6TP4AA` |
-| Judge chest | **#3** (1 USDC) — “How many bits in a byte?” → **`8`** |
-| Normal chest (attack demo, no ZK) | `CAAHCYL56HSHLD7CYX7ESJXRLZG47HVJZ7QTL4MUD4L5H2A5PR4B4HSV` · chest **#1** · 15 slots · USDC · answer in plain text |
+| Judge chest | **#6** (10 XLM × 10 slots) — Stellar question about the creator of SCP; answer not published |
+| Attack-demo chest | **#7** (100 × 0.1 XLM, public answer on purpose; only used to build a proof the contract rejects) |
+| Normal chest (attack demo, no ZK) | `CDMYX46WAU66OOAVXLBPTVXZ7EZF5NTS3X3T6S2AKSOADEBZD7OGEXCA` · chest **#1** · 30 slots · XLM · answer in plain text |
 
 ## Threat model
 
@@ -78,6 +79,6 @@ node --env-file app/.env.local bot/steal-normal.mjs
 - `circuits/` Circom + snarkjs Groth16  
 - `contracts/chest` · `contracts/verifier`  
 - `app/` Next 16 · passkey-kit · Glass Noir  
-- Audits: `audits/` (Kuyfi 0 findings)
+- Scans: `audits/` (scanned with Kuyfi, 0 findings; black-box scan, not an audit)
 
 Tag: `mvp` · See `NOTES.md` / `BUGS.md` / `ROADMAP.md`.

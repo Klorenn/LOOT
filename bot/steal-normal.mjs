@@ -11,6 +11,7 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { runNormalChestFlow } from "../app/lib/normal-chest.ts";
+import { CONTRACTS, NORMAL_CHEST } from "../app/lib/config.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EXPLORER = "https://stellar.expert/explorer/testnet/tx/";
@@ -30,11 +31,9 @@ try {
   const r = await runNormalChestFlow({
     rpcUrl: "https://soroban-testnet.stellar.org",
     passphrase: "Test SDF Network ; September 2015",
-    contractId: "CAAHCYL56HSHLD7CYX7ESJXRLZG47HVJZ7QTL4MUD4L5H2A5PR4B4HSV",
-    chestId: 1,
-    tokenId: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
-    assetCode: "USDC",
-    assetIssuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+    contractId: NORMAL_CHEST.contract,
+    chestId: NORMAL_CHEST.id,
+    tokenId: CONTRACTS.token,
     relayerSecret: secret,
     playerAnswer: "8",
     log,

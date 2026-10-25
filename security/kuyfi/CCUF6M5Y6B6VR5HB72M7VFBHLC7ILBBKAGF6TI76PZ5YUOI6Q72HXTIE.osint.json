@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "kyf-osint-20261025T155840Z",
+  "generatedAt": "2026-10-25T15:58:40.668Z",
+  "mode": "osint",
+  "tool": {
+    "name": "kuyfi",
+    "version": "0.1.0"
+  },
+  "target": {
+    "contractId": "CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE",
+    "network": "testnet",
+    "rpcUrl": "https://soroban-testnet.stellar.org",
+    "bytecodeSize": 18090
+  },
+  "scan": {
+    "totalFunctions": 2,
+    "functions": [
+      {
+        "name": "verify_proof",
+        "parameters": [
+          {
+            "name": "proof",
+            "type": "Proof"
+          },
+          {
+            "name": "public_inputs",
+            "type": "Vec<BytesN<32>>"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "vk_fingerprint",
+        "parameters": [],
+        "hasReturn": true
+      }
+    ],
+    "udts": [
+      {
+        "kind": "struct",
+        "name": "Proof",
+        "fields": [
+          {
+            "name": "a",
+            "type": "BytesN<64>"
+          },
+          {
+            "name": "b",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "c",
+            "type": "BytesN<64>"
+          }
+        ]
+      },
+      {
+        "kind": "struct",
+        "name": "VerificationKey",
+        "fields": [
+          {
+            "name": "alpha",
+            "type": "BytesN<64>"
+          },
+          {
+            "name": "beta",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "delta",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "gamma",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "ic",
+            "type": "Vec<BytesN<64>>"
+          }
+        ]
+      }
+    ]
+  }
+}

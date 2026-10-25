@@ -123,7 +123,7 @@ export default function PanelPage() {
                   {r.question}
                 </td>
                 <td className="px-4 py-3 font-mono text-gold">
-                  {r.prize} USDC
+                  {r.prize} XLM
                   {r.onchain === false && (
                     <span className="ml-2 text-xs text-muted-foreground">
                       no creado
