@@ -42,13 +42,13 @@ ES paths 301 → EN.
 
 ## Bug list (known / non-blocking)
 
-- [ ] Passkey-kit / smart account full (still local keypair)
-- [ ] OpenZeppelin relayer in Docker (using API signer)
-- [ ] Creator panel is list-only (no close/top-up UI)
+- [x] Passkey-kit smart wallet (C…) + classic fallback
+- [x] OZ Channels hosted (no Docker) + fee-bump fallback
+- [x] Creator panel close on-chain
 - [ ] Home counters are static
-- [ ] Attack “normal chest” side is simulated (not a real unprotected contract)
-- [ ] Widget is a link stub, not iframe
-- [ ] CI not wired yet
+- [ ] Attack “normal chest” side is simulated
+- [ ] Widget is a link stub
+- [x] CI (GitHub Actions)
 
 ## Do not touch for freeze
 
