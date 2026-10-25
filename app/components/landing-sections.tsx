@@ -90,7 +90,7 @@ export function HowSection() {
           data-fade
           className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)]"
         >
-          01 — How it works
+          01 How it works
         </p>
         <h2
           id="how-h"
@@ -145,7 +145,7 @@ export function AttackSection() {
             data-fade
             className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)]"
           >
-            02 — Attack demo
+            02 Attack demo
           </p>
           <h2
             id="attack-h"
@@ -257,6 +257,8 @@ export function CtaSection() {
 }
 
 const KUYFI_URL = "https://kuyfi.vercel.app/";
+const KUYFI_REPO = "https://github.com/alex0tico/kuyfi";
+const KUYFI_ACCENT = "#C98CC7";
 /** Placeholder until the public repo URL is provided. */
 const REPORTS_URL = "#";
 
@@ -293,7 +295,7 @@ export function SecuritySection({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }
           data-fade
           className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)]"
         >
-          04 — Security
+          04 Security
         </p>
         <h2
           id="security-h"
@@ -322,40 +324,78 @@ export function SecuritySection({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }
           ))}
         </div>
 
-        <div
-          data-fade
-          className="mt-14 flex flex-col gap-5 border-t border-[var(--line)] pt-8"
-        >
-          <div className="flex flex-wrap items-center gap-4">
-            <h3 className="text-[22px] font-semibold tracking-[-0.02em]">
-              Contracts scanned with{" "}
+        <div className="mt-14 grid grid-cols-1 items-center gap-12 border-t border-[var(--line)] pt-12 lg:grid-cols-2 lg:gap-16">
+          <div>
+            {/* viewBox del SVG ya recortado al contorno del logo: se muestra entero. */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- SVG estático */}
+            <img
+              data-fade
+              src="/brand/kuyfi.svg"
+              alt="Kuyfi, Before the Breach."
+              width={1319}
+              height={603}
+              className="block h-auto w-[260px] max-w-full"
+            />
+            <h3
+              data-fade
+              className="mt-6 text-[32px] leading-[1.1] font-semibold tracking-[-0.03em]"
+            >
+              Before the breach.
+            </h3>
+            <p data-fade className="mt-4 text-[17px] leading-[1.6] text-[var(--muted)]">
+              Kuyfi is an open-source, black-box security scanner for deployed
+              Soroban contracts. It reads a contract straight from on-chain
+              bytecode, no source code required, and tests it like an attacker
+              would.
+            </p>
+            <a
+              data-fade
+              href={KUYFI_REPO}
+              target="_blank"
+              rel="noreferrer"
+              className="focus-landing mt-4 inline-block text-[15px] underline-offset-4 hover:underline"
+              style={{ color: KUYFI_ACCENT }}
+            >
+              View Kuyfi on GitHub →
+            </a>
+          </div>
+
+          <div
+            data-fade
+            className="flex flex-col gap-5 rounded-[14px] border border-[var(--line)] bg-[var(--s1)] p-6 sm:p-8"
+          >
+            <div className="flex flex-wrap items-center gap-4">
+              <h3 className="text-[22px] font-semibold tracking-[-0.02em]">
+                Contracts scanned with{" "}
+                <a
+                  href={KUYFI_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="focus-landing underline underline-offset-4"
+                  style={{ color: KUYFI_ACCENT }}
+                >
+                  Kuyfi
+                </a>
+              </h3>
+              {kuyfiBadge}
+            </div>
+            <p className="text-[15px] leading-[1.55] text-[var(--muted)]">
+              Black-box scan, not a full audit. Full audit planned via SCF Audit
+              Bank before mainnet.
+            </p>
+            <div className="flex flex-wrap gap-3">
               <a
                 href={KUYFI_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="focus-landing text-[var(--proof)] underline underline-offset-4"
+                className="btn-landing btn-landing-s btn-landing-sm"
               >
-                Kuyfi
+                About Kuyfi ↗
               </a>
-            </h3>
-            {kuyfiBadge}
-          </div>
-          <p className="max-w-[44rem] text-[15px] leading-[1.55] text-[var(--muted)]">
-            Black-box scan, not a full audit. Full audit planned via SCF Audit
-            Bank before mainnet.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <a
-              href={KUYFI_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-landing btn-landing-s btn-landing-sm"
-            >
-              About Kuyfi ↗
-            </a>
-            <a href={REPORTS_URL} className="btn-landing btn-landing-s btn-landing-sm">
-              Scan reports on GitHub
-            </a>
+              <a href={REPORTS_URL} className="btn-landing btn-landing-s btn-landing-sm">
+                Scan reports on GitHub
+              </a>
+            </div>
           </div>
         </div>
       </div>

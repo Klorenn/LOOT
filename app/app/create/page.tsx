@@ -79,7 +79,7 @@ export default function CreateChestPage() {
   function validateStep(): boolean {
     const e: Record<string, string> = {};
     if (step === 0 && !question.trim()) e.question = "Puzzle text is required.";
-    if (step === 1 && !hashOk) e.answer = "Enter an answer and blur to hash locally.";
+    if (step === 1 && !hashOk) e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
     if (step === 2 && prize < 1) e.prize = "Reward must be ≥ 1.";
     if (step === 3 && !expires) e.expires = "Pick an expiry.";
     setFieldErr(e);

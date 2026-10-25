@@ -157,6 +157,32 @@
   outline-offset: 3px;
 }
 
+/* Cards "Who it is for": la moneda flota y la pila baja al pasar el mouse. */
+.audience-card .stack {
+  transition: transform 0.3s;
+}
+.audience-card:hover .coin {
+  animation: audience-bob 1.6s ease-in-out infinite;
+}
+.audience-card:hover .stack {
+  transform: translateY(3px);
+}
+@keyframes audience-bob {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .audience-card .coin,
+  .audience-card .stack,
+  .audience-card:hover .coin,
+  .audience-card:hover .stack {
+    animation: none;
+    transition: none;
+    transform: none;
+  }
+}
+
 /* Subtle graph-paper panel (Attack + CTA) */
 .landing-panel-grid {
   background-color: var(--s1);

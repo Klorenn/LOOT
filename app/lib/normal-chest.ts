@@ -19,7 +19,7 @@ export type NormalChestOpts = {
   tokenId: string;
   /** Firma y paga fees de todo el flujo (jugador y bot no tienen fondos). */
   relayerSecret: string;
-  /** Respuesta que usa el jugador legítimo (el bot NO la recibe). */
+  /** Answer used by the legitimate player (the bot is NOT given it). */
   playerAnswer: string;
   log?: (msg: string) => void;
 };
@@ -40,11 +40,11 @@ export async function waitTx(server: rpc.Server, hash: string) {
     const res = await server.getTransaction(hash);
     if (res.status === rpc.Api.GetTransactionStatus.SUCCESS) return res;
     if (res.status === rpc.Api.GetTransactionStatus.FAILED) {
-      throw new Error(`tx ${hash} FAILED en el ledger`);
+      throw new Error(`tx ${hash} failed on the ledger`);
     }
     await sleep(1000);
   }
-  throw new Error(`tx ${hash} no confirmó a tiempo`);
+  throw new Error(`tx ${hash} was not confirmed in time`);
 }
 
 /** Firma, envía y espera confirmación. Reintenta si la secuencia colisionó. */
@@ -73,7 +73,7 @@ export async function submit(
       await sleep(1500);
       continue;
     }
-    if (sent.status === "TRY_AGAIN_LATER") throw new Error("RPC saturado (TRY_AGAIN_LATER)");
+    if (sent.status === "TRY_AGAIN_LATER") throw new Error("RPC is overloaded (TRY_AGAIN_LATER)");
     await waitTx(server, sent.hash);
     return sent.hash;
   }
@@ -111,23 +111,23 @@ export async function readAnswerFromTx(
 ): Promise<string> {
   const res = await server.getTransaction(hash);
   if (res.status !== rpc.Api.GetTransactionStatus.SUCCESS) {
-    throw new Error(`tx ${hash} no está confirmada (${res.status})`);
+    throw new Error(`tx ${hash} is not confirmed (${res.status})`);
   }
   const parsed = TransactionBuilder.fromXDR(res.envelopeXdr, passphrase);
   const tx = "innerTransaction" in parsed ? parsed.innerTransaction : parsed;
   const op = tx.operations[0];
   if (!op || op.type !== "invokeHostFunction") {
-    throw new Error("la tx no es un invokeHostFunction");
+    throw new Error("the tx is not an invokeHostFunction");
   }
   if (op.func.switch() !== xdr.HostFunctionType.hostFunctionTypeInvokeContract()) {
-    throw new Error("la tx no invoca un contrato");
+    throw new Error("the tx does not invoke a contract");
   }
   const ic = op.func.invokeContract();
   if (Address.fromScAddress(ic.contractAddress()).toString() !== contractId) {
-    throw new Error("la tx no es del cofre normal");
+    throw new Error("the tx is not for the plain chest");
   }
   if (ic.functionName().toString() !== "claim") {
-    throw new Error("la tx no es un claim");
+    throw new Error("the tx is not a claim");
   }
   return String(scValToNative(ic.args()[2]));
 }
@@ -140,7 +140,7 @@ async function tokenBalance(server: rpc.Server, o: NormalChestOpts, who: string,
     .build();
   const sim = await server.simulateTransaction(tx);
   if (!rpc.Api.isSimulationSuccess(sim) || !sim.result) {
-    throw new Error("no se pudo leer el balance del bot");
+    throw new Error("could not read the bot's balance");
   }
   return String(scValToNative(sim.result.retval));
 }

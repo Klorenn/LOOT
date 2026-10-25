@@ -17,13 +17,14 @@ import {
 import { ScrollProgress } from "@/components/scroll-progress";
 import { SmoothScroll } from "@/components/smooth-scroll";
 import { StackMarquee } from "@/components/stack-marquee";
+import { AudienceSection } from "@/components/landing/audience-section";
 import { DEMO_CHEST, PRIZE, stroopsToXlm } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";
 
 const DOCS_URL = "https://github.com/Klorenn/LOOT";
 
-const NO_STATS: Stats = { paid: "—", claims: "—", created: "—" };
+const NO_STATS: Stats = { paid: "…", claims: "…", created: "…" };
 
 /** Real counters from on-chain events (/api/stats); never invented. */
 function useStats(): Stats {
@@ -97,11 +98,11 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                   href="/profile"
                   className="btn-landing btn-landing-s btn-landing-sm font-mono"
                 >
-                  Mi wallet · {shortAddr(address)}
+                  Profile · {shortAddr(address)}
                 </Link>
               ) : (
                 <Link href="/login" className="btn-landing btn-landing-s btn-landing-sm">
-                  Sign in
+                  Log in
                 </Link>
               )}
               <Link
@@ -146,7 +147,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                   className="mt-6 max-w-[36rem] text-[18px] leading-[1.55] text-[var(--muted)]"
                 >
                   Solve it, prove it in zero knowledge, claim the prize. Every
-                  proof is sealed to the solver’s address, so a copied answer is
+                  proof is sealed to the solver’s address, so a copied proof is
                   worth nothing.
                 </p>
                 <div data-hero-fade className="mt-8 flex flex-wrap gap-3">
@@ -183,6 +184,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
 
           <HowSection />
           <AttackSection />
+          <AudienceSection docsUrl={DOCS_URL} />
 
           {/* Stellar × ZK */}
           <section
@@ -194,7 +196,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 data-fade
                 className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)]"
               >
-                03 — Stellar × ZK
+                03 Stellar × ZK
               </p>
               <h2
                 id="sxzk-h"

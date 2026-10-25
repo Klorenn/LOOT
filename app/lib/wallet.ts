@@ -314,7 +314,7 @@ export async function enrollClassic(): Promise<Player> {
   const fund = await fetch(
     `${NETWORK.friendbotUrl}?addr=${encodeURIComponent(kp.publicKey())}`,
   );
-  if (!fund.ok) throw new Error("Friendbot no pudo fondear la cuenta");
+  if (!fund.ok) throw new Error("Friendbot couldn't fund the account.");
 
   const player: Player = {
     kind: "classic",

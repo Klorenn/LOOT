@@ -23,11 +23,7 @@ const nextConfig: NextConfig = {
         destination: "/chest/:id/claimed",
         permanent: true,
       },
-      {
-        source: "/chest/:id/opened",
-        destination: "/chest/:id/claimed",
-        permanent: true,
-      },
+      { source: "/chest/:id/opened", destination: "/chest/:id", permanent: true },
       { source: "/cofre/:id/error", destination: "/chest/:id", permanent: true },
       { source: "/panel", destination: "/dashboard", permanent: true },
       { source: "/enter", destination: "/login", permanent: false },

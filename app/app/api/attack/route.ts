@@ -52,14 +52,14 @@ export async function POST(req: NextRequest) {
     if (!secret) {
       console.error("attack: RELAYER_SECRET missing");
       return NextResponse.json(
-        { error: "server not configured", logs },
+        { error: "Demo temporarily unavailable.", logs },
         { status: 500 },
       );
     }
 
     const parsed = (await req.json().catch(() => null)) as Partial<Body> | null;
     if (!validBody(parsed)) {
-      return NextResponse.json({ error: "bad request", logs }, { status: 400 });
+      return NextResponse.json({ error: "Demo temporarily unavailable.", logs }, { status: 400 });
     }
     const body = parsed;
     push(`bot targets ${body.botRecipient.slice(0, 8)}…`);
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     console.error("attack error", e);
     return NextResponse.json(
-      { error: "internal error", logs },
+      { error: "Demo temporarily unavailable.", logs },
       { status: 500 },
     );
   }

@@ -49,7 +49,7 @@ export default function PanelPage() {
   }, []);
 
   async function closeChest(id: number) {
-    if (!confirm(`¿Cerrar cofre #${id} y retirar remanente?`)) return;
+    if (!confirm(`Close chest #${id} and withdraw the remaining prize?`)) return;
     setBusyId(id);
     setError(null);
     try {
@@ -58,9 +58,9 @@ export default function PanelPage() {
         headers: { "x-admin-key": adminKey },
       });
       const data = await res.json().catch(() => ({}));
-      if (res.status === 403) throw new Error("Clave de admin inválida o ausente (403)");
+      if (res.status === 403) throw new Error("Admin key invalid or missing (403)");
       if (!res.ok) throw new Error(data.error || "close failed");
-      alert(`Cerrado. Refund ${data.refunded} · ${data.hash?.slice(0, 12)}…`);
+      alert(`Closed. Refunded ${data.refunded} · ${data.hash?.slice(0, 12)}…`);
       reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

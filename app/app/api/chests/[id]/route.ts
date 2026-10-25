@@ -50,7 +50,7 @@ export async function GET(
     return NextResponse.json({
       id: 1,
       question: `Legacy chest (demo v0) — use /chest/${DEMO_CHEST.id}`,
-      hint: "Respuesta histórica: 42",
+      hint: "Legacy answer: 42",
       salt: "7",
       fingerprintHex:
         "06c2f5aaf2800f039ea9ab82643ef44b84609fdb5bdad06653d147c7aff34bd5",

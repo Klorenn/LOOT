@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Wallet as WalletIcon } from "lucide-react";
 import { CopyField } from "@/components/copy-field";
 import { IconSmartAccountKit as PasskeyGlyph } from "@/components/stack-logos";
 import { InlineAlert } from "@/components/inline-alert";
@@ -54,20 +54,6 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [derived, setDerived] = useState<string | null>(null);
   const [doneAddr, setDoneAddr] = useState<string | null>(null);
   const [doneHandle, setDoneHandle] = useState<string>("");
-  const [wallets, setWallets] = useState<KitWallet[] | null>(null);
-
-  // El kit solo carga en el cliente; instaladas primero.
-  useEffect(() => {
-    let alive = true;
-    listWallets()
-      .then((ws) => {
-        if (alive) setWallets([...ws].sort((a, b) => +b.isAvailable - +a.isAvailable));
-      })
-      .catch(() => alive && setWallets([]));
-    return () => {
-      alive = false;
-    };
-  }, []);
   const token = useRef(0);
 
   // Con sesión ya activa al entrar no tiene sentido mostrar el formulario. Solo se mira una vez
@@ -161,14 +147,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
     }
   }
 
-  async function withWallet(walletId: string) {
+  /** "freighter": directo; "wallet": selector de Stellar Wallets Kit. */
+  async function withWallet(method: "freighter" | "wallet") {
     const mine = ++token.current;
     setFailDetail("");
     const h = isLogin ? null : validHandle();
     if (h === false) return;
     setHandleErr(null);
     try {
-      const player = await connect(`wallet:${walletId}`);
+      const player = await connect(method);
       if (mine !== token.current) return void disconnect();
       if (isLogin) return void (await finishLogin());
       if (h) setHandle(player.publicKey, h);
@@ -207,7 +194,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           ? "Your smart account is live on testnet. Balance 0 XLM, and that’s fine: fees are covered."
           : isLogin
             ? "Use the passkey saved on this device. No password, no seed phrase."
-            : "One passkey creates a passkey smart account on Stellar. Gas is on us — you need 0 XLM.";
+            : "One passkey creates a passkey smart account on Stellar. Fees are paid by the relayer, so you need 0 XLM.";
 
   const busy = view === "wait" || view === "deploy";
 
@@ -257,7 +244,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         {view === "fail" && failKind === "passkey" && (
           <InlineAlert
             tone="red"
-            title={isLogin ? "Passkey sign-in failed" : "Passkey not created"}
+            title={isLogin ? "Passkey login failed" : "Passkey not created"}
             body={
               isLogin
                 ? "The prompt was cancelled or timed out. Nothing was signed."
@@ -450,40 +437,24 @@ export function AuthForm({ mode }: { mode: Mode }) {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              {wallets === null
-                ? [0, 1].map((i) => (
-                    <span
-                      key={i}
-                      aria-hidden
-                      className="btn-landing btn-landing-s animate-pulse opacity-40"
-                    />
-                  ))
-                : wallets.map((w) =>
-                    w.isAvailable ? (
-                      <button
-                        key={w.id}
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void withWallet(w.id)}
-                        className="btn-landing btn-landing-s gap-2 disabled:opacity-50"
-                      >
-                        <WalletIcon wallet={w} />
-                        {w.name}
-                      </button>
-                    ) : (
-                      <a
-                        key={w.id}
-                        href={w.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-landing btn-landing-s gap-2 opacity-60"
-                      >
-                        <WalletIcon wallet={w} />
-                        {w.name}
-                        <span className="font-mono text-[11px] text-[var(--dim)]">Install</span>
-                      </a>
-                    ),
-                  )}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void withWallet("freighter")}
+                className="btn-landing btn-landing-s gap-2 disabled:opacity-50"
+              >
+                <FreighterGlyph />
+                Freighter
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void withWallet("wallet")}
+                className="btn-landing btn-landing-s gap-2 disabled:opacity-50"
+              >
+                <WalletIcon aria-hidden className="size-[18px]" />
+                Other wallet
+              </button>
             </div>
             <p className="text-center text-[13px] text-[var(--dim)]">
               Connect wallet via Stellar Wallets Kit · uses your G… address
@@ -529,8 +500,3 @@ function FreighterGlyph() {
   );
 }
 
-function WalletIcon({ wallet }: { wallet: KitWallet }) {
-  if (wallet.id === "freighter") return <FreighterGlyph />;
-  // eslint-disable-next-line @next/next/no-img-element -- íconos remotos/data URI del kit
-  return <img src={wallet.icon} alt="" aria-hidden className="size-5 rounded-[5px]" />;
-}

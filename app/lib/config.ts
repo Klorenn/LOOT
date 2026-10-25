@@ -66,8 +66,8 @@ export const DEMO_CHEST = {
   // y #2 (token CHEST, ver bloque comentado más abajo).
   id: 6,
   question:
-    "¿Cuál es el apellido del creador del Stellar Consensus Protocol (SCP)?",
-  hint: "Apellido francés; con o sin tilde vale igual",
+    "What is the surname of the creator of the Stellar Consensus Protocol (SCP)?",
+  hint: "French surname; accents don't matter.",
   /** Valor con el que se creó el cofre; la UI de premio lee el real de la cadena. */
   prize: PRIZE.perSlot,
   prizeLabel: `${PRIZE.perSlot} ${PRIZE.code}`,

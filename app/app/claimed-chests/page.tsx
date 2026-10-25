@@ -14,7 +14,8 @@ import { useSession } from "@/lib/session";
 
 type Load = { s: "loading" } | { s: "ok"; v: WonChestsResult } | { s: "error"; msg: string };
 
-const stamp = (iso: string) => iso.replace("T", " ").slice(0, 16) + " UTC";
+const stamp = (iso: string) =>
+  `${new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC`;
 
 export default function ClaimedChestsPage() {
   const { address } = useSession();

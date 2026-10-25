@@ -277,7 +277,6 @@ export function ChestSolve({ badge }: { badge?: React.ReactNode }) {
           body="This chest id is not on the catalogue."
           actions={[
             { href: `/chest/${DEMO_CHEST.id}`, label: "Open the demo chest", primary: true },
-            { href: `/chest/${DEMO_CHEST.id}`, label: "Open demo chest" },
           ]}
         />
       </main>
@@ -419,7 +418,7 @@ export function ChestSolve({ badge }: { badge?: React.ReactNode }) {
             >
               <p className="text-[15px] leading-[1.5] text-[var(--muted)]">
                 The proof is bound to your address: if a bot copies it and changes
-                the recipient, the contract rejects it. Each proof works only once.
+                the recipient, the contract rejects it. And each proof works only once.
               </p>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <button

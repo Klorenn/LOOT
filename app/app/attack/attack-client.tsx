@@ -86,7 +86,7 @@ export function AttackClient({
       push("submit via relayer…", "you");
 
       // Normal chest front-run (real testnet) — shown on bot side as context
-      push("bot sees plaintext answer on classic chest…", "bot");
+      push("bot sees plain-text answer on the plain chest…", "bot");
       try {
         const nres = await fetch("/api/attack/normal", { method: "POST" });
         const ndata = await nres.json();
@@ -94,7 +94,7 @@ export function AttackClient({
           push(String(line).replace(/^\[[^\]]+\]\s*/, ""), "bot");
         }
         if (nres.ok && !ndata.error) {
-          push("classic chest: prize stolen", "bot");
+          push("plain chest: prize stolen", "bot");
         }
       } catch {
         /* non-fatal for ZK half */

@@ -82,7 +82,7 @@ export default function ClaimedPage() {
           prize for chest #{chestId}. Your wallet lists every chest you won.
         </p>
         <Link href="/claimed-chests" className="btn-landing btn-landing-p">
-          Mi wallet
+          My claimed chests
         </Link>
         <Link href={`/chest/${id}`} className="btn-landing btn-landing-s">
           Back to the chest

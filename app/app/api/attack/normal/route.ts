@@ -78,6 +78,6 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     console.error("attack/normal", e);
     push("demo theft failed");
-    return NextResponse.json({ error: "attack demo failed", logs }, { status: 502 });
+    return NextResponse.json({ error: "Attack demo failed. Try again in a moment.", logs }, { status: 502 });
   }
 }

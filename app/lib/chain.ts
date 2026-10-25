@@ -43,7 +43,7 @@ async function simulateRead(
   if (!rpc.Api.isSimulationSuccess(sim) || !sim.result) {
     const err = rpc.Api.isSimulationError(sim)
       ? sim.error
-      : "simulación sin resultado";
+      : "simulation returned no result";
     throw new Error(err);
   }
   return scValToNative(sim.result.retval);
