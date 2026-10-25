@@ -4,7 +4,7 @@ import { DEMO_CHEST } from "@/lib/config";
 
 const counters = [
   { label: "cofres abiertos", value: "1" },
-  { label: "copias rechazadas", value: "0" },
+  { label: "copias rechazadas", value: "1" },
   { label: "CHEST pagado", value: "100" },
 ];
 

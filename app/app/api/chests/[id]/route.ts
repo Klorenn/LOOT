@@ -23,6 +23,22 @@ export async function GET(
     });
   }
 
+  // Cofre #1 legacy: misma pregunta en UI, pero la huella era de "42".
+  if (n === 1) {
+    return NextResponse.json({
+      id: 1,
+      question: "Cofre legacy (demo v0) — usá /cofre/2",
+      hint: "Respuesta histórica: 42",
+      salt: "7",
+      fingerprintHex:
+        "06c2f5aaf2800f039ea9ab82643ef44b84609fdb5bdad06653d147c7aff34bd5",
+      prize: 100,
+      prizeLabel: "100 CHEST",
+      maxClaims: 5,
+      template: "bounty",
+    });
+  }
+
   const meta = await getChestMeta(n);
   if (!meta) {
     return NextResponse.json({ error: "not found" }, { status: 404 });

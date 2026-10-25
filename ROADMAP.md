@@ -44,9 +44,10 @@ Horas en hora de Lisboa.
 - [ ] Video y deck listos — lun 10:30
 - [ ] README final y formulario enviado — lun 11:30
 
-> Estado al dom 25 ~12:30 Lisboa: spike ✅ · contrato + Kuyfi ✅ · deploy v1 (claim e2e) ✅ · modo ataque + crear + panel ✅. Siguiente: freeze 00:30 / pulido video.
+> Estado al dom 25 ~12:55 Lisboa: MVP funcional. Cofre jueces **#2** (respuesta **8**). Bug demo #1 (huella=42 vs pregunta byte) corregido. Siguiente: freeze / video / deck.
 
 - [x] Bot + modo ataque + crear cofre + panel — **12:30**: `/ataque` (split + log), `bot/attack.mjs` confirma InvalidProof (#6) al copiar prueba, `/crear` plantillas+QR, `/panel`.
+- [x] Fix demo jueces — **12:55**: cofre #2 on-chain con Poseidon(8,7); UX InvalidProof = “respuesta incorrecta”; README con IDs.
 
 ## Hacia la final (lun 26, 12:00 → mié 28, 13:50)
 

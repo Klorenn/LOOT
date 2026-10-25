@@ -8,20 +8,29 @@ import { ChestVisual } from "@/components/chest-visual";
 function ErrorInner() {
   const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
-  const reason = params.get("reason") || "No se pudo abrir el cofre";
-  const isCopy = /nullifier|invalid.?proof|copia/i.test(reason);
+  const raw = params.get("reason") || "No se pudo abrir el cofre";
+  const isCopy = /nullifier/i.test(raw);
+  const isWrong = /invalid.?proof/i.test(raw);
+  const title = isCopy
+    ? "Copia rechazada"
+    : isWrong
+      ? "Respuesta incorrecta"
+      : "No fue esta vez";
+  const detail = isCopy
+    ? "Ese nullifier ya se usó. Una prueba no se puede reenviar a otra cuenta."
+    : isWrong
+      ? "La huella no coincide con el cofre. Revisá la respuesta e intentá de nuevo."
+      : raw;
 
   return (
     <main className="mx-auto flex min-h-[80vh] w-full max-w-md flex-col items-center justify-center gap-8 px-6">
       <ChestVisual size="sm" />
       <div className="rounded-2xl border border-border bg-card p-6 text-center">
-        <h1 className="text-2xl font-semibold tracking-[-0.03em]">
-          {isCopy ? "Copia rechazada" : "No fue esta vez"}
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-[-0.03em]">{title}</h1>
         <p
-          className={`mt-3 text-sm ${isCopy ? "text-destructive" : "text-muted-foreground"}`}
+          className={`mt-3 text-sm ${isCopy || isWrong ? "text-destructive" : "text-muted-foreground"}`}
         >
-          {reason}
+          {detail}
         </p>
       </div>
       <Link

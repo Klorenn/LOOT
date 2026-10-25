@@ -55,7 +55,22 @@ export async function POST(req: NextRequest) {
     );
 
     const sent = await tx.signAndSend();
-    const chestId = Number(sent.result);
+    const raw = sent.result as
+      | { unwrap?: () => bigint | number; value?: bigint | number }
+      | bigint
+      | number
+      | null;
+    let chestId: number;
+    if (raw && typeof raw === "object" && typeof raw.unwrap === "function") {
+      chestId = Number(raw.unwrap());
+    } else if (raw && typeof raw === "object" && "value" in raw) {
+      chestId = Number(raw.value);
+    } else {
+      chestId = Number(raw);
+    }
+    if (!Number.isFinite(chestId)) {
+      throw new Error("create_chest returned no chest id");
+    }
     const hash =
       sent.sendTransactionResponse?.hash ||
       (sent as { hash?: string }).hash ||

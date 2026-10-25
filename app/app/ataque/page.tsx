@@ -51,7 +51,7 @@ export default function AttackModePage() {
       // --- Cofre normal (simulado): la respuesta viaja en claro ---
       push("cofre normal: respuesta visible en el ledger", "normal");
       await sleep(400);
-      push("bot copia la respuesta '42'", "normal");
+      push(`bot copia la respuesta '${DEMO_CHEST.answer}'`, "normal");
       await sleep(300);
       push("bot reclama primero → PREMIO ROBADO", "normal");
       setNormalStolen(true);
