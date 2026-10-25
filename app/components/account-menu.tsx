@@ -62,14 +62,15 @@ export function AccountMenu({ address }: { address: string }) {
     <div ref={root} className="relative">
       <button
         type="button"
+        aria-label="Account menu"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className="btn-landing btn-landing-s btn-landing-sm gap-2 font-mono"
       >
         <Avatar seed={address} size="xs" />
-        {shortAddr(address)}
-        <span className="text-[var(--dim)]" aria-hidden>
+        <span className="hidden md:inline">{shortAddr(address)}</span>
+        <span className="hidden text-[var(--dim)] md:inline" aria-hidden>
           ▾
         </span>
       </button>

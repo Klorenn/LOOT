@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { PageHeader, Em } from "@/components/app/page-header";
 import { ExampleTag } from "@/components/app/example-tag";
-import { Terminal } from "@/components/app/terminal";
+import { Terminal } from "@/components/terminal";
 import { ATTACK_CHEST } from "@/lib/config";
 import { loadPlayer, enrollPreferPasskey } from "@/lib/wallet";
 import { recipientField } from "@/lib/recipient";
@@ -160,7 +160,7 @@ export function AttackClient({
         }
         title={
           <>
-            Copy the proof. <Em tone="red">Lose anyway.</Em>
+            <span className="lg:whitespace-nowrap">Copy the proof. <Em tone="red">Lose anyway.</Em></span>
           </>
         }
         lead="A bot watches the mempool, copies your proof and resends it with a higher fee. The proof is bound to your address: if a bot copies it and changes the recipient, the contract rejects it. And each proof works only once."

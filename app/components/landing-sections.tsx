@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ExampleTag } from "@/components/app/example-tag";
+import { LogoChest } from "@/components/logo-chest";
 import { DEMO_CHEST, PRIZE } from "@/lib/config";
 
 /** Valores reales de /api/stats (eventos on-chain); "—" mientras carga o si el RPC falla. */
@@ -218,25 +219,30 @@ export function CtaSection() {
   return (
     <section
       aria-labelledby="cta-h"
-      className="border-b border-[var(--line)] py-[180px]"
+      className="border-b border-[var(--line)] px-6 py-[120px]"
     >
-      <div className="mx-auto max-w-[1200px] px-6 text-center">
+      <div className="landing-panel-grid mx-auto max-w-[1368px] rounded-[28px] border border-[var(--line)] px-6 py-[120px] text-center">
+        <LogoChest
+          deg={30}
+          showInside
+          className="mx-auto mb-10 h-[200px] w-[200px]"
+        />
         <h2
           id="cta-h"
           data-reveal-h2
-          className="text-[clamp(36px,4.5vw,56px)] leading-[1.02] font-semibold tracking-[-0.04em]"
+          className="text-[clamp(36px,4.5vw,64px)] leading-[1.02] font-semibold tracking-[-0.04em]"
         >
           The next chest is waiting.
         </h2>
         <p
           data-fade
-          className="mx-auto mt-5 max-w-[28rem] text-[18px] leading-[1.55] text-[var(--muted)]"
+          className="mx-auto mt-5 max-w-[38rem] text-[18px] leading-[1.55] text-[var(--muted)]"
         >
           Bring a wallet and a sharp mind. We bring the bots that will fail.
         </p>
         <div data-fade className="mt-10 flex flex-wrap justify-center gap-3">
           <Link
-            href={`/enter?next=/chest/${DEMO_CHEST.id}`}
+            href={`/login?next=/chest/${DEMO_CHEST.id}`}
             className="btn-landing btn-landing-p"
           >
             Open a chest →

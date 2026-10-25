@@ -157,7 +157,7 @@ export async function runNormalChestFlow(o: NormalChestOpts): Promise<NormalChes
   const bot = Keypair.random();
 
   // El premio es XLM nativo: las cuentas frescas no necesitan trustline.
-  log("preparando cuentas frescas (jugador y bot)…");
+  log("preparing fresh accounts (player and bot)…");
   await submit(
     server,
     relayer,
@@ -172,17 +172,17 @@ export async function runNormalChestFlow(o: NormalChestOpts): Promise<NormalChes
     false,
   );
 
-  log(`jugador ${player.publicKey().slice(0, 8)}… cobra con la respuesta en claro`);
+  log(`player ${player.publicKey().slice(0, 8)}… claims with the plain-text answer`);
   const playerTx = await claim(server, o, relayer, player.publicKey(), o.playerAnswer);
-  log(`jugador cobró → tx ${playerTx}`);
+  log(`player claimed → tx ${playerTx}`);
 
   const answerReadFromLedger = await readAnswerFromTx(server, o.passphrase, o.contractId, playerTx);
-  log(`bot lee la tx del ledger: respuesta '${answerReadFromLedger}'`);
+  log(`bot reads the tx from the ledger: answer '${answerReadFromLedger}'`);
 
-  log(`bot ${bot.publicKey().slice(0, 8)}… cobra con su cuenta`);
+  log(`bot ${bot.publicKey().slice(0, 8)}… claims from its own account`);
   const botTx = await claim(server, o, relayer, bot.publicKey(), answerReadFromLedger);
   const botBalance = await tokenBalance(server, o, bot.publicKey(), relayer);
-  log(`bot cobró → tx ${botTx} · PAGADO (balance ${botBalance})`);
+  log(`bot claimed → tx ${botTx} · PAID (balance ${botBalance})`);
 
   return {
     playerTx,

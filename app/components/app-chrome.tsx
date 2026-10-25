@@ -9,6 +9,8 @@ import { SessionProvider } from "@/lib/session";
 export function AppChrome({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const isLanding = path === "/";
+  const isAuth = path === "/login" || path === "/register";
+  if (isAuth) return <SessionProvider>{children}</SessionProvider>;
   return (
     <SessionProvider>
       {!isLanding && (

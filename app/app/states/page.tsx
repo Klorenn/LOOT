@@ -41,7 +41,7 @@ export default function StatesPage() {
           chest="open"
           actions={[
             { href: "/explore", label: "Find an open chest", primary: true },
-            { href: "/wallet", label: "My claimed chests" },
+            { href: "/claimed-chests", label: "My claimed chests" },
           ]}
         />
         <Divider />

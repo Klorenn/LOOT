@@ -94,18 +94,18 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
             <div className="flex items-center gap-2">
               {ready && address ? (
                 <Link
-                  href="/wallet"
+                  href="/profile"
                   className="btn-landing btn-landing-s btn-landing-sm font-mono"
                 >
                   Mi wallet · {shortAddr(address)}
                 </Link>
               ) : (
-                <Link href="/enter" className="btn-landing btn-landing-s btn-landing-sm">
+                <Link href="/login" className="btn-landing btn-landing-s btn-landing-sm">
                   Sign in
                 </Link>
               )}
               <Link
-                href={`/enter?next=/chest/${DEMO_CHEST.id}`}
+                href={`/login?next=/chest/${DEMO_CHEST.id}`}
                 className="btn-landing btn-landing-p btn-landing-sm"
               >
                 Launch app →
@@ -151,7 +151,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 </p>
                 <div data-hero-fade className="mt-8 flex flex-wrap gap-3">
                   <Link
-                    href={`/enter?next=/chest/${DEMO_CHEST.id}`}
+                    href={`/login?next=/chest/${DEMO_CHEST.id}`}
                     className="btn-landing btn-landing-p"
                   >
                     Open a chest →

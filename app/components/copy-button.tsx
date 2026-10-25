@@ -11,7 +11,7 @@ type CopyState = "idle" | "copied" | "manual";
  */
 export function CopyButton({
   value,
-  label = "Copiar",
+  label = "Copy",
   className = "btn-landing btn-landing-s btn-landing-sm",
 }: {
   value: string;
@@ -50,13 +50,13 @@ export function CopyButton({
   return (
     <span className="relative inline-flex flex-col gap-2">
       <button type="button" onClick={copy} className={className}>
-        {state === "copied" ? "Copiado ✓" : label}
+        {state === "copied" ? "Copied ✓" : label}
       </button>
       <input
         ref={input}
         readOnly
         value={value}
-        aria-label="Dirección completa"
+        aria-label="Full value"
         tabIndex={state === "manual" ? 0 : -1}
         onFocus={(e) => e.currentTarget.select()}
         className={
@@ -67,7 +67,7 @@ export function CopyButton({
       />
       {state === "manual" && (
         <span className="font-mono text-[12px] text-[var(--dim)]">
-          Tu navegador bloqueó el portapapeles: copiá el texto seleccionado.
+          Your browser blocked the clipboard: copy the selected text.
         </span>
       )}
     </span>

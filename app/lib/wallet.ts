@@ -120,11 +120,28 @@ async function submitPasskeyTx(xdr: string): Promise<string> {
  * Passkey smart wallet (C…) via passkey-kit + sponsored deploy.
  * Does NOT silently fall back — callers choose classic explicitly.
  */
-export async function enrollWithPasskey(): Promise<Player> {
+export type EnrollOpts = {
+  /** Registro: crea siempre una passkey nueva (no reutiliza la sesión guardada). */
+  forceNew?: boolean;
+  /** Progreso para la UI: passkey creada → deploy → confirmación. */
+  onStage?: (
+    stage: "passkey" | "deploy" | "confirm",
+    info?: { address?: string },
+  ) => void;
+};
+
+export class NoPasskeyAccountError extends Error {
+  constructor(message = "No Loot account is linked to this passkey") {
+    super(message);
+    this.name = "NoPasskeyAccountError";
+  }
+}
+
+export async function enrollWithPasskey(opts: EnrollOpts = {}): Promise<Player> {
   if (typeof window === "undefined" || !window.PublicKeyCredential) {
     throw new PasskeyUnavailableError();
   }
-  return enrollSmartWallet();
+  return enrollSmartWallet(opts);
 }
 
 /**
@@ -143,14 +160,41 @@ export async function enrollPreferPasskey(): Promise<Player> {
   }
 }
 
-async function enrollSmartWallet(): Promise<Player> {
+const ACCOUNTS_KEY = "chestzk.accounts";
+
+/** keyId (credential id) → C…; sobrevive al cierre de sesión para poder volver a entrar. */
+function readAccounts(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function rememberAccount(keyId: string, contractId: string) {
+  try {
+    localStorage.setItem(
+      ACCOUNTS_KEY,
+      JSON.stringify({ ...readAccounts(), [keyId]: contractId }),
+    );
+  } catch {
+    /* storage bloqueado: el login por passkey no podrá resolver esta cuenta */
+  }
+}
+
+async function enrollSmartWallet(opts: EnrollOpts = {}): Promise<Player> {
   const kit = getPasskeyKit();
   const existing = loadPlayer();
 
   // Only reconnect when we already have a known keyId from a prior successful
   // session. Blind connectWallet() hits IndexedDB leftovers / Mercury and can
   // prompt WebAuthn auth that fails before we ever create a wallet.
-  if (existing?.kind === "passkey" && existing.keyId && existing.publicKey.startsWith("C")) {
+  if (
+    !opts.forceNew &&
+    existing?.kind === "passkey" &&
+    existing.keyId &&
+    existing.publicKey.startsWith("C")
+  ) {
     try {
       const connected = await kit.connectWallet({ keyId: existing.keyId });
       if (connected?.contractId) {
@@ -163,6 +207,7 @@ async function enrollSmartWallet(): Promise<Player> {
             secretFromBytes(`pk:${connected.keyIdBase64}`),
           ),
         };
+        rememberAccount(connected.keyIdBase64, connected.contractId);
         savePlayer(player);
         return player;
       }
@@ -188,7 +233,10 @@ async function enrollSmartWallet(): Promise<Player> {
     throw new Error("passkey-kit createWallet returned an incomplete result");
   }
 
+  opts.onStage?.("passkey", { address: created.contractId });
+  opts.onStage?.("deploy");
   const hashTx = await submitPasskeyTx(created.signedTx);
+  opts.onStage?.("confirm");
   try {
     await kit.confirmWalletCreation(created, hashTx);
   } catch (e) {
@@ -208,6 +256,7 @@ async function enrollSmartWallet(): Promise<Player> {
       secretFromBytes(`pk:${created.keyIdBase64}`),
     ),
   };
+  rememberAccount(created.keyIdBase64, created.contractId);
   savePlayer(player);
   return player;
 }
@@ -220,20 +269,26 @@ export async function reconnectPasskey(): Promise<Player> {
   if (typeof window === "undefined" || !window.PublicKeyCredential) {
     throw new PasskeyUnavailableError();
   }
-  const existing = loadPlayer();
-  const kit = getPasskeyKit();
-  const connected = await kit.connectWallet(
-    existing?.kind === "passkey" && existing.keyId ? { keyId: existing.keyId } : undefined,
-  );
-  if (!connected?.contractId) throw new Error("No encontramos una passkey de Loot en este dispositivo.");
+  // passkey-kit 0.19 `connectWallet()` sin keyId crashea después de la aserción WebAuthn
+  // (signer sin expiración → null.toString()). La aserción la hacemos nosotros (un prompt
+  // real de Face ID / Touch ID / llave) y el contrato se resuelve con el mapa local
+  // keyId → C… que se guarda al crear la cuenta. Sin indexer, una passkey sincronizada desde
+  // otro dispositivo no se resuelve: queda como "sin cuenta" (NoPasskeyAccountError).
+  const cred = (await navigator.credentials.get({
+    publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      userVerification: "preferred",
+      timeout: 60_000,
+    },
+  })) as PublicKeyCredential | null;
+  if (!cred) throw new DOMException("No credential returned", "NotAllowedError");
+  const contractId = readAccounts()[cred.id];
+  if (!contractId) throw new NoPasskeyAccountError();
   const player: Player = {
     kind: "passkey",
-    publicKey: connected.contractId,
-    keyId: connected.keyIdBase64,
-    playerSecret: playerSecretFor(
-      connected.contractId,
-      secretFromBytes(`pk:${connected.keyIdBase64}`),
-    ),
+    publicKey: contractId,
+    keyId: cred.id,
+    playerSecret: playerSecretFor(contractId, secretFromBytes(`pk:${cred.id}`)),
   };
   savePlayer(player);
   return player;

@@ -44,8 +44,16 @@ function loadKit(): Promise<Kit> {
 }
 
 /** Abre el selector de wallets y devuelve la cuenta G… elegida y el id del módulo. */
-export async function connectGWallet(): Promise<{ address: string; walletId: string }> {
+export async function connectGWallet(
+  walletId?: string,
+): Promise<{ address: string; walletId: string }> {
   const kit = await loadKit();
+  if (walletId) {
+    // Wallet elegida directamente (botones Freighter / xBull): sin selector.
+    kit.setWallet(walletId);
+    const { address } = await kit.fetchAddress();
+    return { address, walletId };
+  }
   const { address } = await kit.authModal();
   return { address, walletId: kit.selectedModule.productId };
 }

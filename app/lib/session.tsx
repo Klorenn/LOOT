@@ -18,6 +18,7 @@ import {
   reconnectPasskey,
   SESSION_EVENT,
   sessionKind,
+  type EnrollOpts,
   type Player,
   type SessionKind,
 } from "./wallet";
@@ -31,6 +32,8 @@ import {
 export type ConnectMethod =
   | "passkey" // reconecta o crea la passkey
   | "passkey-existing" // solo reconecta una passkey ya existente
+  | "passkey-new" // registro: crea siempre una passkey nueva
+  | "xbull" // Stellar Wallets Kit, directo a xBull
   | "wallet" // Stellar Wallets Kit (selector)
   | "freighter" // Freighter directo, sin selector
   | "demo"; // G… efímera en este navegador
@@ -41,7 +44,10 @@ type SessionValue = {
   address: string | null;
   kind: SessionKind | null;
   player: Player | null;
-  connect: (method: ConnectMethod) => Promise<Player>;
+  connect: (
+    method: ConnectMethod,
+    onStage?: EnrollOpts["onStage"],
+  ) => Promise<Player>;
   /** Borra la sesión local. NO borra la clave secreta de jugador (ver wallet.ts). */
   disconnect: () => Promise<void>;
 };
@@ -94,15 +100,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, player?.publicKey]);
 
-  const connect = useCallback(async (method: ConnectMethod): Promise<Player> => {
+  const connect = useCallback(
+    async (
+      method: ConnectMethod,
+      onStage?: EnrollOpts["onStage"],
+    ): Promise<Player> => {
     if (method === "passkey") return enrollWithPasskey();
+    if (method === "passkey-new") return enrollWithPasskey({ forceNew: true, onStage });
     if (method === "passkey-existing") return reconnectPasskey();
     // enrollClassic reemplaza la sesión solo si termina bien (no se borra antes).
     if (method === "demo") return enrollClassic();
     const { address, walletId } =
-      method === "freighter" ? await connectFreighter() : await connectGWallet();
+      method === "freighter"
+        ? await connectFreighter()
+        : await connectGWallet(method === "xbull" ? "xbull" : undefined);
     return enrollWalletAccount(address, walletId);
-  }, []);
+  },
+    [],
+  );
 
   const disconnect = useCallback(async () => {
     const current = loadPlayer();

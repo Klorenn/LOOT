@@ -22,10 +22,10 @@ function rateLimit(ip: string): string | null {
   const last = lastByIp.get(ip);
   if (last !== undefined) {
     const wait = Math.ceil((PER_IP_WINDOW_MS - (now - last)) / 1000);
-    return `Demasiado rápido: esperá ${wait}s antes de repetir el robo real.`;
+    return `Too fast: wait ${wait}s before repeating the live theft.`;
   }
   if (globalRuns.length >= GLOBAL_MAX_PER_HOUR) {
-    return "El demo en vivo alcanzó su límite por hora (gasta fondos reales de testnet). Probá en un rato.";
+    return "The live demo hit its hourly limit (it spends real testnet funds). Try again in a while.";
   }
   lastByIp.set(ip, now);
   globalRuns.push(now);
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     console.error("attack/normal", e);
-    push("falló el robo de demo");
+    push("demo theft failed");
     return NextResponse.json({ error: "attack demo failed", logs }, { status: 502 });
   }
 }

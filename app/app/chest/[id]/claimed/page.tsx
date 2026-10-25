@@ -80,7 +80,7 @@ export default function ClaimedPage() {
           No claim is recorded in this browser session, so we can&apos;t confirm a
           prize for chest #{chestId}. Your wallet lists every chest you won.
         </p>
-        <Link href="/wallet" className="btn-landing btn-landing-p">
+        <Link href="/claimed-chests" className="btn-landing btn-landing-p">
           Mi wallet
         </Link>
         <Link href={`/chest/${id}`} className="btn-landing btn-landing-s">

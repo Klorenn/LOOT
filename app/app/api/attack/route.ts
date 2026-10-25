@@ -62,10 +62,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "bad request", logs }, { status: 400 });
     }
     const body = parsed;
-    push(`bot apunta a ${body.botRecipient.slice(0, 8)}…`);
-    push("copia proof + nullifier de la víctima");
-    push("cambia recipient → cuenta del bot");
-    push("enviando claim a Loot…");
+    push(`bot targets ${body.botRecipient.slice(0, 8)}…`);
+    push("copies the victim’s proof + nullifier");
+    push("changes recipient → bot account");
+    push("sending claim to Loot…");
 
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
@@ -97,17 +97,17 @@ export async function POST(req: NextRequest) {
         },
         { write: true },
       );
-      push("INESPERADO: el claim del bot pasó");
+      push("UNEXPECTED: the bot’s claim went through");
       return NextResponse.json({ rejected: false, logs });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       // Soroban simulation surfaces contract errors as `Error(Contract, #N)`; #6 = InvalidProof.
       const rejected = /Error\(Contract,\s*#6\)|InvalidProof/i.test(message);
       if (rejected) {
-        push("RECHAZADO — la prueba no es para esta cuenta");
+        push("REJECTED — the proof is not for this account");
         return NextResponse.json({
           rejected: true,
-          reason: "la prueba no es para esta cuenta",
+          reason: "the proof is not for this account",
           error: message,
           logs,
         });
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       const envError = /Error\(Contract,\s*#(\d+)\)/.test(message)
         ? `contract error #${message.match(/Error\(Contract,\s*#(\d+)\)/)![1]}`
         : "unexpected error";
-      push(`error de entorno: ${envError}`);
+      push(`environment error: ${envError}`);
       return NextResponse.json({ rejected: false, envError, logs });
     }
   } catch (e) {
