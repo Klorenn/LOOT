@@ -1,16 +1,9 @@
 import type { ReactNode } from "react";
+import { CopyIcon } from "@/components/sdk/copy-icon";
 
-const KEYWORDS = new Set([
-  "import",
-  "from",
-  "const",
-  "await",
-  "async",
-  "return",
-  "export",
-]);
+const KEYWORDS = new Set(["import", "from", "const", "await", "async", "return", "export"]);
 
-/** One alternation, left to right: comment | string | bigint literal | word. */
+/** One alternation, left to right: comment | string | bigint | word. */
 const TOKEN = /(\/\/.*$)|("(?:[^"\\]|\\.)*")|(\b\d[\d_]*n\b)|([A-Za-z_$][\w$]*)/g;
 
 function highlight(line: string): ReactNode[] {
@@ -22,10 +15,11 @@ function highlight(line: string): ReactNode[] {
     if (at > last) out.push(line.slice(last, at));
     const [text, comment, str, big, word] = m;
     let color: string | null = null;
-    if (comment) color = "var(--dim)";
-    else if (str) color = "var(--ok)";
-    else if (big) color = "var(--gold)";
-    else if (word && KEYWORDS.has(word)) color = "var(--proof)";
+    if (comment) color = "#6F6A7A";
+    else if (str) color = "#4BE3A0";
+    else if (big) color = "#F7C948";
+    else if (word && KEYWORDS.has(word)) color = "#8A8CFF";
+    else if (word && /^[A-Z][A-Z0-9_]{2,}$/.test(word)) color = "#F7C948"; // constants
     out.push(
       color ? (
         <span key={key++} style={{ color }}>
@@ -41,51 +35,77 @@ function highlight(line: string): ReactNode[] {
   return out;
 }
 
+/** Terminal line: dim prompt, bright command. */
+function terminal(line: string): ReactNode {
+  if (!line.startsWith("$ ")) return line;
+  return (
+    <>
+      <span className="text-[var(--dim)]">$ </span>
+      <span className="text-[var(--ok)]">{line.slice(2)}</span>
+    </>
+  );
+}
+
 /**
- * Code panel: title bar (dots, file name, language tab, right label) and a
- * horizontally scrollable body. Keywords proof, strings ok, bigint gold, comments dim.
+ * Code panel: 46px tab header (active tab 2px proof underline, language label + copy icon at the
+ * right) and a horizontally scrollable body with an optional 52px line-number gutter.
  */
 export function CodeBlock({
   code,
   file,
   lang = "TypeScript",
-  label,
+  copy,
+  numbers = true,
+  shell = false,
+  size = "md",
+  bg = "var(--s1)",
 }: {
   code: string;
   file: string;
   lang?: string;
-  label?: string;
+  /** Exact text copied; defaults to `code`. */
+  copy?: string;
+  numbers?: boolean;
+  shell?: boolean;
+  size?: "md" | "sm";
+  bg?: string;
 }) {
   const lines = code.split("\n");
+  const text = size === "md" ? "text-[14px] leading-[24px]" : "text-[13px] leading-[22px]";
+  const rowH = size === "md" ? "min-h-[24px]" : "min-h-[22px]";
   return (
-    <figure className="min-w-0 overflow-hidden rounded-[12px] border border-[var(--line)] bg-[var(--s1)]">
-      <figcaption className="flex h-11 items-center gap-3 border-b border-[var(--line)] px-4">
-        <span className="flex gap-[6px]" aria-hidden>
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="size-[9px] rounded-full bg-[var(--line)]"
-            />
-          ))}
+    <figure
+      className="min-w-0 overflow-hidden rounded-[12px] border border-[var(--line)]"
+      style={{ background: bg }}
+    >
+      <figcaption className="flex h-[46px] items-stretch justify-between border-b border-[var(--line)] bg-[#111017] pr-2">
+        <span className="relative flex items-center px-5 font-mono text-[12px] text-[var(--text)]">
+          {file}
+          <span className="absolute inset-x-0 bottom-[-1px] h-[2px] bg-[#8A8CFF]" aria-hidden />
         </span>
-        <span className="font-mono text-[12px] text-[var(--muted)]">{file}</span>
-        <span className="border-b border-[var(--proof)] font-mono text-[11px] leading-[26px] text-[var(--text)]">
-          {lang}
+        <span className="flex items-center gap-2">
+          <span className="font-mono text-[11px] text-[var(--dim)]">{lang}</span>
+          <CopyIcon value={copy ?? code} label={`Copy ${file}`} />
         </span>
-        {label && (
-          <span className="ml-auto hidden font-mono text-[11px] text-[var(--dim)] sm:inline">
-            {label}
-          </span>
-        )}
       </figcaption>
       <pre
         tabIndex={0}
-        className="overflow-x-auto px-5 py-4 font-mono text-[13px] leading-[22px] text-[var(--text)]"
+        className={`overflow-x-auto py-4 pr-5 font-mono text-[var(--text)] ${text} ${
+          numbers ? "" : "pl-5"
+        }`}
       >
-        <code>
+        <code className="block w-max min-w-full">
           {lines.map((l, i) => (
-            <span key={i} className="block min-h-[22px] whitespace-pre">
-              {highlight(l)}
+            <span key={i} className={`flex whitespace-pre ${rowH}`}>
+              {numbers && (
+                <span
+                  aria-hidden
+                  className="w-[52px] shrink-0 pr-4 text-right text-[#44414F] select-none"
+                >
+                  {i + 1}
+                </span>
+              )}
+              <span className={numbers ? "pl-1" : ""}>{shell || l.startsWith("$ ") ? terminal(l) : highlight(l)}</span>
             </span>
           ))}
         </code>
