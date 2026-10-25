@@ -40,7 +40,7 @@ export type PendingMeta = Omit<ChestMeta, "id" | "createdAt" | "txHash"> & {
 
 export class StorageNotConfiguredError extends Error {
   constructor() {
-    super("Chest metadata storage is not configured (BLOB_READ_WRITE_TOKEN is missing).");
+    super("Chest metadata storage is not configured (connect a Vercel Blob store or set BLOB_READ_WRITE_TOKEN).");
     this.name = "StorageNotConfiguredError";
   }
 }
@@ -49,8 +49,15 @@ const FILE = path.join(process.cwd(), "data", "chests.json");
 const PENDING_FILE = path.join(process.cwd(), "data", "pending.json");
 
 type Backend = "blob" | "file";
+/** Blob credentials: a read-write token, or a connected store via Vercel OIDC (BLOB_STORE_ID + VERCEL_OIDC_TOKEN). */
+function hasBlob(): boolean {
+  return Boolean(
+    process.env.BLOB_READ_WRITE_TOKEN ||
+      (process.env.BLOB_STORE_ID && (process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL)),
+  );
+}
 function backend(): Backend {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return "blob";
+  if (hasBlob()) return "blob";
   if (process.env.VERCEL) throw new StorageNotConfiguredError();
   return "file";
 }
@@ -99,7 +106,7 @@ async function readLegacyFile(id: number): Promise<ChestMeta | null> {
 }
 
 export async function getChestMeta(id: number): Promise<ChestMeta | null> {
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  if (hasBlob()) {
     const m = await blobRead<ChestMeta>(`chests/${id}.json`);
     if (m) return m;
   }
@@ -145,7 +152,7 @@ let publicCache: { at: number; value: ChestMeta[] } | null = null;
 export async function listPublicMetas(): Promise<ChestMeta[]> {
   if (publicCache && Date.now() - publicCache.at < 30_000) return publicCache.value;
   let metas: ChestMeta[] = Object.values(await fileReadAll<ChestMeta>(FILE));
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  if (hasBlob()) {
     const { blobs } = await list({ prefix: "chests/", limit: 500 });
     const fetched = await Promise.all(blobs.map((b) => blobRead<ChestMeta>(b.pathname)));
     const byId = new Map(metas.map((m) => [m.id, m]));
