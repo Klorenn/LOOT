@@ -27,7 +27,7 @@ export async function GET(
   if (n === 1) {
     return NextResponse.json({
       id: 1,
-      question: "Cofre legacy (demo v0) — usá /cofre/2",
+      question: "Legacy chest (demo v0) — use /chest/2",
       hint: "Respuesta histórica: 42",
       salt: "7",
       fingerprintHex:

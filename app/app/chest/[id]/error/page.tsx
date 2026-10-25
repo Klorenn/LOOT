@@ -34,7 +34,7 @@ function ErrorInner() {
         </p>
       </div>
       <Link
-        href={`/cofre/${id}`}
+        href={`/chest/${id}`}
         className="inline-flex h-12 w-full items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground"
       >
         Probar de nuevo

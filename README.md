@@ -19,9 +19,17 @@ cd app && pnpm install && pnpm dev
 
 Abrí http://localhost:3000 → **Abrir un cofre** → respuesta `8`.
 
-- `/ataque` — demo split: cofre normal vs ChestZK (copia rechazada)
-- `/crear` — plantillas + QR
-- `/panel` — cofres creados
+| Route | What |
+|---|---|
+| `/enter` | Passkey / Face ID gate |
+| `/chest/:id` | Answer + claim |
+| `/chest/:id/proving` | Groth16 prove + submit |
+| `/chest/:id/opened` | Success |
+| `/attack` | Split demo: normal vs ZK |
+| `/create` | Templates + QR |
+| `/panel` | Creator list |
+
+Spanish URLs (`/cofre`, `/ataque`, …) redirect permanently to these.
 
 Secrets en `app/.env.local` (`CREATOR_SECRET`, `RELAYER_SECRET`) — no commitear.
 

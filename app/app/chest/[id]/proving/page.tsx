@@ -26,13 +26,13 @@ export default function ProvingPage() {
       try {
         const player = loadPlayer();
         if (!player) {
-          router.replace(`/entrar?next=/cofre/${id}`);
+          router.replace(`/enter?next=/chest/${id}`);
           return;
         }
         const answer = sessionStorage.getItem(`chestzk.answer.${id}`);
         let salt = sessionStorage.getItem(`chestzk.salt.${id}`);
         if (!answer) {
-          router.replace(`/cofre/${id}`);
+          router.replace(`/chest/${id}`);
           return;
         }
         if (!salt) {
@@ -75,7 +75,7 @@ export default function ProvingPage() {
           const msg = data.error || "Claim rechazado";
           if (/NullifierUsed|InvalidProof|SoldOut|Chest/i.test(JSON.stringify(data))) {
             router.replace(
-              `/cofre/${id}/error?reason=${encodeURIComponent(msg)}`,
+              `/chest/${id}/error?reason=${encodeURIComponent(msg)}`,
             );
             return;
           }
@@ -87,7 +87,7 @@ export default function ProvingPage() {
           `chestzk.claim.${id}`,
           JSON.stringify({ hash: data.hash, explorer: data.explorer }),
         );
-        router.replace(`/cofre/${id}/abierto`);
+        router.replace(`/chest/${id}/opened`);
       } catch (e) {
         setStep("error");
         setDetail(e instanceof Error ? e.message : String(e));
@@ -133,7 +133,7 @@ export default function ProvingPage() {
         <button
           type="button"
           className="text-sm text-primary underline"
-          onClick={() => router.push(`/cofre/${id}`)}
+          onClick={() => router.push(`/chest/${id}`)}
         >
           Volver a intentar
         </button>

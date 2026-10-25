@@ -25,7 +25,7 @@ export default function ChestPage() {
 
   useEffect(() => {
     if (!loadPlayer()) {
-      router.replace(`/entrar?next=/cofre/${id}`);
+      router.replace(`/enter?next=/chest/${id}`);
       return;
     }
     fetch(`/api/chests/${id}`)
@@ -44,7 +44,7 @@ export default function ChestPage() {
     e.preventDefault();
     if (!answer.trim() || !meta) return;
     sessionStorage.setItem(`chestzk.answer.${id}`, answer.trim());
-    router.push(`/cofre/${id}/probando`);
+    router.push(`/chest/${id}/proving`);
   }
 
   if (error) {

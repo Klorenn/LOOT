@@ -46,7 +46,7 @@ Horas en hora de Lisboa.
 
 > Estado al dom 25 ~12:55 Lisboa: MVP funcional. Cofre jueces **#2** (respuesta **8**). Bug demo #1 (huella=42 vs pregunta byte) corregido. Siguiente: freeze / video / deck.
 
-- [x] Bot + modo ataque + crear cofre + panel — **12:30**: `/ataque` (split + log), `bot/attack.mjs` confirma InvalidProof (#6) al copiar prueba, `/crear` plantillas+QR, `/panel`.
+- [x] Bot + modo ataque + crear cofre + panel — **12:30**: `/attack` (split + log), `bot/attack.mjs` confirma InvalidProof (#6) al copiar prueba, `/create` plantillas+QR, `/panel`.
 - [x] Fix demo jueces — **12:55**: cofre #2 on-chain con Poseidon(8,7); UX InvalidProof = “respuesta incorrecta”; README con IDs.
 
 ## Hacia la final (lun 26, 12:00 → mié 28, 13:50)

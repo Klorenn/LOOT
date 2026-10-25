@@ -35,7 +35,7 @@ export default function PanelPage() {
           </h1>
         </div>
         <Link
-          href="/crear"
+          href="/create"
           className="inline-flex h-12 items-center rounded-full bg-primary px-6 font-semibold text-primary-foreground"
         >
           Crear cofre
@@ -68,7 +68,7 @@ export default function PanelPage() {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    href={`/cofre/${r.id}`}
+                    href={`/chest/${r.id}`}
                     className="text-[#4C8DFF] underline"
                   >
                     abrir

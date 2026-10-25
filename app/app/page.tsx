@@ -21,7 +21,7 @@ export default function Home() {
       <ChestVisual />
 
       <Link
-        href={`/entrar?next=/cofre/${DEMO_CHEST.id}`}
+        href={`/enter?next=/chest/${DEMO_CHEST.id}`}
         className="inline-flex h-12 w-full max-w-md items-center justify-center rounded-full bg-primary px-8 text-base font-semibold text-primary-foreground hover:bg-primary/90"
       >
         Abrir un cofre

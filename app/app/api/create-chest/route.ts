@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     });
 
     const origin = req.headers.get("origin") || "http://localhost:3000";
-    const link = `${origin}/cofre/${chestId}`;
+    const link = `${origin}/chest/${chestId}`;
 
     return NextResponse.json({
       ok: true,

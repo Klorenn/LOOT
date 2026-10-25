@@ -4,12 +4,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ScanFace } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DEMO_CHEST } from "@/lib/config";
 import { enrollWithPasskey, loadPlayer } from "@/lib/wallet";
 
 function EnterInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/cofre/1";
+  const next = params.get("next") || `/chest/${DEMO_CHEST.id}`;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const existing = typeof window !== "undefined" ? loadPlayer() : null;

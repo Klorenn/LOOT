@@ -1,8 +1,31 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Cache Components choca con useParams en rutas de cofre; lo apagamos para el MVP.
+  // Cache Components choca con useParams en rutas de chest; lo apagamos para el MVP.
   cacheComponents: false,
+  async redirects() {
+    return [
+      { source: "/entrar", destination: "/enter", permanent: true },
+      { source: "/ataque", destination: "/attack", permanent: true },
+      { source: "/crear", destination: "/create", permanent: true },
+      { source: "/cofre/:id", destination: "/chest/:id", permanent: true },
+      {
+        source: "/cofre/:id/probando",
+        destination: "/chest/:id/proving",
+        permanent: true,
+      },
+      {
+        source: "/cofre/:id/abierto",
+        destination: "/chest/:id/opened",
+        permanent: true,
+      },
+      {
+        source: "/cofre/:id/error",
+        destination: "/chest/:id/error",
+        permanent: true,
+      },
+    ];
+  },
   serverExternalPackages: ["chestzk-chest", "snarkjs", "circomlibjs"],
   turbopack: {
     rules: {

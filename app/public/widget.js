@@ -9,7 +9,7 @@
   if (!id) return;
   var base = s.src.replace(/\/widget\.js(\?.*)?$/, "");
   var a = document.createElement("a");
-  a.href = base + "/cofre/" + id;
+  a.href = base + "/chest/" + id;
   a.textContent = "Abrir cofre #" + id + " · ChestZK";
   a.rel = "noopener";
   a.style.cssText =
