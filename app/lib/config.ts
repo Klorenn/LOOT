@@ -24,6 +24,9 @@ export const CONTRACTS = {
 /** SAC del XLM nativo (testnet). */
 export const XLM_SAC = CONTRACTS.token;
 
+/** Smart-wallet WASM canónico de passkey-kit (docs / artefacto Protocolo 27). */
+export const WALLET_WASM_HASH = "97ce047884106b1c6c3bb40b8973cc48db1c4dad95c9e20462bf2c701daa764e";
+
 /**
  * Factory (un contrato por cofre). Espejo de deployments/factory-testnet.json: la config
  * on-chain (get_config) manda; esto es el fallback para cotizar sin RPC.

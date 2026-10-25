@@ -9,6 +9,8 @@ import {
 import { Api, Server } from "@stellar/stellar-sdk/rpc";
 import { NETWORK } from "@/lib/config";
 import { pickRpcUrl } from "@/lib/rpc";
+import { GuardError, assertAllowedPasskeyTx, assertResourceCap } from "@/lib/passkey-guard";
+import { routeLimited } from "@/lib/rate-limit";
 
 type Body = { xdr: string };
 
@@ -147,18 +149,8 @@ async function submitAsChannel(
     return waitForHash(rpc, sent.hash, "local-channel");
   }
 
-  const feeBump = TransactionBuilder.buildFeeBumpTransaction(
-    kp,
-    "1000000",
-    parsed,
-    NETWORK.passphrase,
-  );
-  feeBump.sign(kp);
-  const sent = await rpc.sendTransaction(feeBump);
-  if (sent.status === "ERROR") {
-    throw new Error(`fee-bump ERROR: ${JSON.stringify(sent)}`);
-  }
-  return waitForHash(rpc, sent.hash, "fee-bump");
+  // assertAllowedPasskeyTx ya garantiza esta forma; nunca se hace fee-bump de ops clásicas.
+  throw new Error("unsupported transaction shape");
 }
 
 async function waitForHash(
@@ -185,9 +177,23 @@ async function waitForHash(
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as Body;
-    if (!body?.xdr) {
-      return NextResponse.json({ error: "xdr required" }, { status: 400 });
+    if (routeLimited(req, "passkey-send", 20, 120)) {
+      return NextResponse.json({ error: "too many requests" }, { status: 429 });
+    }
+    const body = (await req.json().catch(() => null)) as Body | null;
+    if (!body || typeof body.xdr !== "string" || body.xdr.length > 100_000) {
+      return NextResponse.json({ error: "bad request" }, { status: 400 });
+    }
+    // Lista cerrada: el relayer paga la fee, así que solo retransmite lo que la app genera.
+    try {
+      const tx = await assertAllowedPasskeyTx(body.xdr);
+      await assertResourceCap(tx, await pickRpcUrl());
+    } catch (e) {
+      if (e instanceof GuardError) {
+        console.warn("passkey/send rejected:", e.message);
+        return NextResponse.json({ error: "bad request" }, { status: 400 });
+      }
+      throw e;
     }
 
     const apiKey = process.env.RELAYER_API_KEY;

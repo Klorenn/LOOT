@@ -2,12 +2,10 @@
 
 import { PasskeyKit } from "passkey-kit";
 import { IndexedDBStorage } from "passkey-kit/storage";
-import { NETWORK } from "./config";
+import { NETWORK, WALLET_WASM_HASH } from "./config";
 import { ensurePasskeyFeeClamp } from "./passkey-fee-clamp";
 
-/** Canonical smart-wallet WASM (passkey-kit docs / Protocol 27 artifact). */
-export const WALLET_WASM_HASH =
-  "97ce047884106b1c6c3bb40b8973cc48db1c4dad95c9e20462bf2c701daa764e";
+export { WALLET_WASM_HASH };
 
 let kit: PasskeyKit | null = null;
 
