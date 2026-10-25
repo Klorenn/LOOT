@@ -8,6 +8,7 @@ import {
   type PendingMeta,
 } from "@/lib/chest-store";
 import { readChest } from "@/lib/chain";
+import { parseQuiz, type Quiz } from "@/lib/quiz";
 
 /**
  * Metadatos off-chain de un cofre, en dos pasos (reserve-then-confirm):
@@ -50,6 +51,12 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
   if (typeof b.prize !== "number" || !Number.isFinite(b.prize) || b.prize <= 0) return "bad prize";
   if (!Number.isSafeInteger(b.maxClaims) || (b.maxClaims as number) < 1 || (b.maxClaims as number) > 100000)
     return "bad maxClaims";
+  let quiz: Quiz | undefined;
+  if (b.quiz !== undefined && b.quiz !== null) {
+    const q = parseQuiz(b.quiz);
+    if (typeof q === "string") return q;
+    quiz = q;
+  }
   const listed = b.listed !== false;
   let salt: string | undefined;
   if (listed) {
@@ -61,6 +68,7 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
     question: (b.question as string).trim(),
     hint: typeof b.hint === "string" && b.hint.trim() ? b.hint.trim() : undefined,
     difficulty: difficulty as 1 | 2 | 3 | 4 | undefined,
+    ...(quiz ? { quiz } : {}),
     salt,
     listed,
     fingerprintHex: fp,

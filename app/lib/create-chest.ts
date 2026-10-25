@@ -4,6 +4,7 @@ import { Keypair, rpc, scValToNative } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client, networks } from "@findloot/chest";
 import { latestLedgerHint } from "./chain";
+import type { Quiz } from "./quiz";
 import { CONTRACTS, NETWORK } from "./config";
 import { getPasskeyKit } from "./passkey-client";
 import { SendError } from "./send";
@@ -32,6 +33,8 @@ export type ChestMetaInput = {
   question: string;
   hint?: string;
   difficulty?: number;
+  /** Cofre cuestionario: solo la parte pública (lib/quiz.ts). */
+  quiz?: Quiz;
   prize: number;
   /** false = privado: la sal no se guarda en el servidor */
   listed: boolean;

@@ -16,6 +16,11 @@ import { useSession } from "@/lib/session";
 import { NETWORK, stroopsToXlm } from "@/lib/config";
 import { balanceInfo, parseXlmAmount, SendError } from "@/lib/send";
 import { confirmMeta, createChestOnChain, reserveMeta } from "@/lib/create-chest";
+import { QuizBuilder } from "@/components/quiz-builder";
+import { draftToQuiz, emptyDraftQuestion, type DraftQuestion } from "@/lib/quiz-draft";
+import { quizIsGuessable } from "@/lib/quiz";
+
+type Mode = "riddle" | "quiz";
 
 const STEPS = [
   "Puzzle",
@@ -24,6 +29,9 @@ const STEPS = [
   "Expiry",
   "Review & fund",
 ] as const;
+
+const QUIZ_WEAK_MSG =
+  "Too easy to guess: with only options, someone could try every combination offline. Add a typed answer, or more questions and options.";
 
 const MIN_EXPIRY_S = 5 * 60;
 const MAX_EXPIRY_S = 90 * 24 * 3600;
@@ -46,6 +54,9 @@ export default function CreateChestPage() {
   const [question, setQuestion] = useState(TEMPLATES[2].question);
   const [hint, setHint] = useState(TEMPLATES[2].hint);
   const [answer, setAnswer] = useState("");
+  const [mode, setMode] = useState<Mode>("riddle");
+  const [quizDraft, setQuizDraft] = useState<DraftQuestion[]>(() => [emptyDraftQuestion("single")]);
+  const [quizErrIdx, setQuizErrIdx] = useState<number | undefined>(undefined);
   const [hashHex, setHashHex] = useState<string | null>(null);
   const [hashOk, setHashOk] = useState(false);
   const [prize, setPrize] = useState(String(TEMPLATES[2].prize));
@@ -85,8 +96,8 @@ export default function CreateChestPage() {
     }
   }, [expires]);
 
-  async function hashAnswer() {
-    const n = normalizeAnswer(answer);
+  async function hashAnswer(text: string = answer) {
+    const n = normalizeAnswer(text);
     if (!n) {
       setHashHex(null);
       setHashOk(false);
@@ -97,6 +108,36 @@ export default function CreateChestPage() {
     setHashHex(fieldToHex(fp));
     setHashOk(true);
     setFieldErr((e) => ({ ...e, answer: "" }));
+  }
+
+  // Cuestionario: todas las respuestas correctas se combinan en un solo secreto (lib/quiz.ts)
+  // que sigue el mismo camino que la respuesta de un acertijo.
+  const quizResult = useMemo(() => (mode === "quiz" ? draftToQuiz(quizDraft) : null), [mode, quizDraft]);
+  const quizOk = quizResult && !("error" in quizResult) ? quizResult : null;
+  const quizWeak = !!quizOk && quizIsGuessable(quizOk.quiz);
+  /** Lo que se hashea: la respuesta del acertijo o el secreto del cuestionario. */
+  const secretText = mode === "quiz" ? (quizOk?.secret ?? "") : answer;
+
+  useEffect(() => {
+    if (mode !== "quiz") return;
+    void hashAnswer(secretText);
+    // hashAnswer solo depende del texto que recibe
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, secretText]);
+
+  function switchMode(m: Mode) {
+    if (m === mode) return;
+    setMode(m);
+    // el hash del otro modo ya no vale
+    setHashHex(null);
+    setHashOk(false);
+    setQuizErrIdx(undefined);
+    setFieldErr({});
+    if (m === "riddle" && answer) void hashAnswer(answer);
+    if (m === "quiz" && question === tpl.question) {
+      setQuestion("");
+      setHint("");
+    }
   }
 
   function pick(t: ChestTemplate) {
@@ -146,8 +187,17 @@ export default function CreateChestPage() {
 
   function validateStep(): boolean {
     const e: Record<string, string> = {};
-    if (step === 0 && !question.trim()) e.question = "Puzzle text is required.";
-    if (step === 1 && !hashOk) e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
+    if (step === 0 && !question.trim())
+      e.question = mode === "quiz" ? "Give the quiz a title." : "Puzzle text is required.";
+    if (step === 1 && mode === "quiz") {
+      if (quizResult && "error" in quizResult) {
+        e.answer = quizResult.error;
+        setQuizErrIdx(quizResult.index);
+      } else if (quizWeak) {
+        e.answer = QUIZ_WEAK_MSG;
+      } else setQuizErrIdx(undefined);
+    } else if (step === 1 && !hashOk)
+      e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
     if (step === 2 && !prizeStroops) e.prize = "Enter a reward greater than 0 (up to 7 decimals).";
     if (step === 3 && (!Number.isSafeInteger(maxClaims) || maxClaims < 1)) e.maxClaims = "At least 1 claim.";
     if (step === 3) {
@@ -173,9 +223,14 @@ export default function CreateChestPage() {
     setBusy(true);
     setError(null);
     try {
+      if (mode === "quiz" && (!quizOk || quizWeak)) {
+        setStep(1);
+        setFieldErr({ answer: quizWeak ? QUIZ_WEAK_MSG : "Finish the quiz first." });
+        return;
+      }
       attempt.current ??= { salt: randomSalt() };
       const salt = attempt.current.salt;
-      const n = normalizeAnswer(answer);
+      const n = normalizeAnswer(secretText);
       const fp = await poseidon2(answerToField(n), salt);
       const fingerprintHex = fieldToHex(fp);
       const ee = expiryError(expires);
@@ -189,10 +244,11 @@ export default function CreateChestPage() {
 
       setPhase("Saving chest details…");
       await reserveMeta(player, input, {
-        template: tpl.id,
+        template: mode === "quiz" ? "quiz" : tpl.id,
         question,
         hint: hint || undefined,
         difficulty,
+        ...(mode === "quiz" && quizOk ? { quiz: quizOk.quiz } : {}),
         prize: Number(stroopsToXlm(prizeStroops)),
         listed,
         salt: salt.toString(),
@@ -398,6 +454,55 @@ export default function CreateChestPage() {
             </header>
             <div className="space-y-5 p-5">
               {step === 0 && (
+                <div
+                  role="radiogroup"
+                  aria-label="Chest type"
+                  className="inline-flex self-start overflow-hidden rounded-[10px] border border-[var(--line)]"
+                >
+                  {(
+                    [
+                      ["riddle", "Single riddle"],
+                      ["quiz", "Quiz"],
+                    ] as const
+                  ).map(([m, label], i) => (
+                    <button
+                      key={m}
+                      type="button"
+                      role="radio"
+                      aria-checked={mode === m}
+                      onClick={() => switchMode(m)}
+                      className={`px-4 py-2 font-mono text-[12px] ${
+                        mode === m ? "bg-[var(--s2)] text-[var(--text)]" : "text-[var(--muted)]"
+                      } ${i ? "border-l border-[var(--line)]" : ""}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {step === 0 && mode === "quiz" && (
+                <>
+                  <p className="text-[14px] leading-[1.55] text-[var(--muted)]">
+                    Players answer every question. All right? They win. One wrong? No prize, and
+                    they don&apos;t learn which one failed.
+                  </p>
+                  <Field
+                    label="Quiz title"
+                    hint="Public: shown to everyone who opens the chest"
+                    error={fieldErr.question}
+                  >
+                    <Input
+                      value={question}
+                      onChange={(e) => setQuestion(e.target.value)}
+                      placeholder="e.g. Stellar basics"
+                      className={`h-11 rounded-[10px] ${fieldErr.question ? "border-[var(--red)]" : ""}`}
+                    />
+                  </Field>
+                </>
+              )}
+
+              {step === 0 && mode === "riddle" && (
                 <>
                   <div className="grid grid-cols-2 gap-2">
                     {TEMPLATES.map((t) => (
@@ -444,7 +549,37 @@ export default function CreateChestPage() {
                 </>
               )}
 
-              {step === 1 && (
+              {step === 1 && mode === "quiz" && (
+                <div className="flex flex-col gap-3">
+                  <p className="text-[14px] leading-[1.55] text-[var(--muted)]">
+                    Write the questions and mark the right answers. Only a hash of all the right
+                    answers together goes on-chain. The answers never leave this device.
+                  </p>
+                  <QuizBuilder
+                    draft={quizDraft}
+                    onChange={(d) => {
+                      setQuizDraft(d);
+                      setQuizErrIdx(undefined);
+                    }}
+                    errorIndex={quizErrIdx}
+                  />
+                  {fieldErr.answer ? (
+                    <p className="text-[13px] text-[var(--red)]" role="alert">
+                      {fieldErr.answer}
+                    </p>
+                  ) : quizWeak ? (
+                    <p className="text-[13px] text-[var(--gold)]" role="alert">
+                      {QUIZ_WEAK_MSG}
+                    </p>
+                  ) : quizOk && hashOk && hashHex ? (
+                    <p className="text-[13px] text-[var(--ok)]">
+                      ✓ Hashed locally: {hashHex.slice(0, 18)}… Only the hash is stored.
+                    </p>
+                  ) : null}
+                </div>
+              )}
+
+              {step === 1 && mode === "riddle" && (
                 <Field
                   label="Answer"
                   hint="Normalized to lowercase, no accents, no spaces. Never sent to any server. Security depends on the answer being hard to guess: the fingerprint is public, so short or common answers can be brute-forced offline."
@@ -699,7 +834,9 @@ export default function CreateChestPage() {
               <ExampleTag>preview</ExampleTag>
             </div>
             <h2 className="mt-4 text-[20px] font-semibold tracking-[-0.02em]">
-              {tpl.name}
+              {mode === "quiz"
+                ? `Quiz · ${quizDraft.length} question${quizDraft.length === 1 ? "" : "s"}`
+                : tpl.name}
             </h2>
             <p className="mt-1 font-mono text-[12px] text-[var(--dim)]">
               #draft · {diffLabel}

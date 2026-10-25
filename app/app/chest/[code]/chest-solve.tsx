@@ -18,6 +18,8 @@ import { getChest } from "@/lib/chests-demo";
 import { recipientField } from "@/lib/recipient";
 import { useSession } from "@/lib/session";
 import { PasskeyUnavailableError } from "@/lib/wallet";
+import { QuizForm } from "@/components/quiz-form";
+import type { Quiz } from "@/lib/quiz";
 
 type Meta = {
   question: string;
@@ -33,13 +35,15 @@ type Meta = {
   claims?: number;
   maxClaims?: number;
   closed?: boolean;
+  /** Cofre cuestionario: preguntas públicas; el secreto se arma con lib/quiz.ts. */
+  quiz?: Quiz;
 };
 
 type StepState = "idle" | "run" | "done";
 
 /** Panel 03: qué mostrar cuando algo sale mal (inline, reemplaza el cuerpo del panel). */
 type Fail =
-  | { kind: "wrong" }
+  | { kind: "wrong"; quiz?: boolean }
   | { kind: "used" }
   | { kind: "soldout" }
   | { kind: "closed" }
@@ -135,6 +139,7 @@ export function ChestSolve({
           claims: m.claims,
           maxClaims: m.maxClaims,
           closed: m.closed,
+          quiz: m.quiz,
         }),
       )
       .catch(() => {
@@ -216,7 +221,7 @@ export function ChestSolve({
           ),
         );
         if (fp !== meta.fingerprint) {
-          setFail({ kind: "wrong" });
+          setFail({ kind: "wrong", quiz: !!meta.quiz });
           return;
         }
       }
@@ -491,25 +496,49 @@ export function ChestSolve({
               step="02 · Your answer"
               right={<span className="text-[var(--dim)]">stays on this device</span>}
             >
-              <label htmlFor="answer" className="block text-[15px] font-medium">
-                {meta?.hint || "Answer"}
-              </label>
-              <input
-                id="answer"
-                value={answer}
-                disabled={running}
-                onChange={(e) => {
-                  setAnswer(e.target.value);
-                  if (fail?.kind === "wrong") setFail(null);
-                }}
-                placeholder="type your answer"
-                className="mt-3 h-11 w-full rounded-[10px] border border-[var(--line)] bg-[var(--bg)] px-3.5 font-mono text-[15px] outline-none placeholder:text-[var(--dim)] focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[var(--proof)]"
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
-                Normalized on this device. Never sent to any server.
-              </p>
+              {meta?.quiz ? (
+                <>
+                  <QuizForm
+                    quiz={meta.quiz}
+                    disabled={running}
+                    onSecret={(s) => {
+                      setAnswer(s);
+                      if (fail?.kind === "wrong") setFail(null);
+                    }}
+                    onEdit={() => {
+                      if (answer) setAnswer("");
+                      if (fail?.kind === "wrong") setFail(null);
+                    }}
+                  />
+                  <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
+                    {answer
+                      ? "Answers locked. Generate the proof below."
+                      : "Answer every question to open the chest. Your answers stay on this device."}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <label htmlFor="answer" className="block text-[15px] font-medium">
+                    {meta?.hint || "Answer"}
+                  </label>
+                  <input
+                    id="answer"
+                    value={answer}
+                    disabled={running}
+                    onChange={(e) => {
+                      setAnswer(e.target.value);
+                      if (fail?.kind === "wrong") setFail(null);
+                    }}
+                    placeholder="type your answer"
+                    className="mt-3 h-11 w-full rounded-[10px] border border-[var(--line)] bg-[var(--bg)] px-3.5 font-mono text-[15px] outline-none placeholder:text-[var(--dim)] focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[var(--proof)]"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
+                    Normalized on this device. Never sent to any server.
+                  </p>
+                </>
+              )}
               {needsInvite && (
                 <p className="mt-3 text-[13px] text-[var(--gold)]" role="alert">
                   This chest needs its full invite link. Ask the creator for the link that ends in
@@ -624,8 +653,16 @@ function FailBlock({
         <StateBlock
           tone="red"
           label="Wrong answer"
-          title="That answer doesn’t open this chest."
-          body="Its hash doesn’t match this chest’s answer hash. Nothing was sent on-chain and no attempt was used."
+          title={
+            fail.quiz
+              ? "At least one answer is wrong."
+              : "That answer doesn’t open this chest."
+          }
+          body={
+            fail.quiz
+              ? "We can’t tell which one: the chest only checks all answers together. Nothing was sent on-chain and no attempt was used."
+              : "Its hash doesn’t match this chest’s answer hash. Nothing was sent on-chain and no attempt was used."
+          }
           chest="none"
           actions={[retry, back]}
         />
