@@ -1,0 +1,10 @@
+node_modules/
+target/
+circuits/build/*.ptau
+circuits/build/*.zkey
+circuits/build/witness.wtns
+.next/
+.env*
+!.env.example
+.DS_Store
+.playwright-mcp/

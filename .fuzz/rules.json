@@ -1,0 +1,175 @@
+{
+  "slug": "glass-noir",
+  "name": "Glass Noir",
+  "palette": [
+    "#0A0A0A",
+    "#1A1919",
+    "#2C2B2C",
+    "#FAFAFB",
+    "#A1A1A6",
+    "#DFB9E0",
+    "#2350A0",
+    "#FF5A5F",
+    "#1F1D1D",
+    "#B99098",
+    "#556185",
+    "#BCA980",
+    "#D4D7D9",
+    "#4C8DFF",
+    "#30D158",
+    "#FFD60A",
+    "#000000",
+    "#E4C4E5",
+    "#FFFFFF",
+    "#1E4488",
+    "#666666"
+  ],
+  "accent": "#DFB9E0",
+  "bg": "#0A0A0A",
+  "fonts": [
+    "Geist",
+    "Neue Montreal",
+    "system-ui",
+    "sans-serif",
+    "Geist Mono",
+    "monospace"
+  ],
+  "headingFont": "Geist",
+  "bodyFont": "Geist",
+  "monoFont": "Geist Mono",
+  "faces": [
+    "Geist",
+    "Geist Mono"
+  ],
+  "radius": "16px",
+  "radii": [
+    0,
+    9999,
+    16
+  ],
+  "spacing": [
+    0,
+    4,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64,
+    96
+  ],
+  "gradientsAllowed": true,
+  "blurAllowed": true,
+  "elevationNone": false,
+  "dosDonts": {
+    "do": [
+      "Use one accent (#DFB9E0) per view.",
+      "Keep radius 16px consistent.",
+      "Headlines in Geist at weight 600.",
+      "Apply one effect treatment per artifact."
+    ],
+    "dont": [
+      "Mix multiple saturated accents.",
+      "Mix radii and border styles.",
+      "Use more than two type families.",
+      "Stack effects for decoration."
+    ]
+  },
+  "checklist": [
+    "Background is #0A0A0A (or approved mode)",
+    "Accent ≤ 5% of the view",
+    "All text ≥ WCAG AA",
+    "Headlines Geist 600, tracking -0.03em",
+    "Max 2 families + accent face",
+    "Radius 16px everywhere",
+    "Borders 1px #2C2B2C",
+    "Spacing on base grid",
+    "Icons follow stroke spec",
+    "One effect treatment max",
+    "Motion uses tokens; Reduce Motion honored",
+    "Copy matches voice: Curious, Casual, Show-don't-tell"
+  ],
+  "accessibility": {
+    "contrastPairs": [
+      ["on-primary", "primary", 12.15, 4.5, "text"],
+      ["on-primary", "primary-hover", 13.33, 4.5, "text"],
+      ["on-secondary", "secondary", 7.7, 4.5, "text"],
+      ["on-secondary", "secondary-hover", 9.39, 4.5, "text"],
+      ["on-surface", "surface", 16.82, 4.5, "text"],
+      ["on-neutral", "neutral", 19.8, 4.5, "text"],
+      ["muted", "surface", 6.82, 4.5, "text"],
+      ["muted", "neutral", 7.7, 4.5, "text"],
+      ["on-error", "error", 6.88, 4.5, "text"],
+      ["outline-strong", "surface", 3.06, 3, "non-text: input/control border"],
+      ["outline-strong", "neutral", 3.45, 3, "non-text: input/control border"],
+      ["focus-ring", "surface", 10.15, 3, "non-text: focus indicator"],
+      ["focus-ring", "neutral", 11.46, 3, "non-text: focus indicator"]
+    ],
+    "minTapTarget": 44
+  },
+  "paywall": {
+    "source": "App Store Review Guideline 3.1.2 + Fuzz paywall checklist",
+    "appliesWhen": "code looks like a subscription paywall",
+    "hardChecks": {
+      "billedPriceMostProminent": "App Review 3.1.2: the full billed price (e.g. $29.99/yr) is the largest price on screen, larger than any per-month/per-week breakdown",
+      "termsLegible": "App Review 3.1.2: renewal terms (price, period, auto-renew, cancel) and Restore Purchases / Terms / Privacy links are >=11px with AA contrast",
+      "closeVisibleTopCorner": "Close control visible from the first frame in a top corner, >=44x44, AA contrast, never delayed or hidden",
+      "ctaBottom": "Primary CTA sits in the bottom thumb zone, full or near-full width, >=48 tall",
+      "billedPriceAdjacentCta": "The billed price sits directly above the CTA (nothing between them)",
+      "annualDefault": "Annual plan preselected; its free trial lives inside the annual card; no trial toggle, no countdown or fake urgency"
+    }
+  },
+  "icons": {
+    "primary": {
+      "library": "Phosphor",
+      "id": "phosphor",
+      "package": "@phosphor-icons/core",
+      "version": "2.1.1",
+      "license": "MIT",
+      "variant": "duotone",
+      "cdn": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/{weight}/{name}-{weight}.svg",
+      "home": "https://phosphoricons.com"
+    },
+    "fallback": {
+      "library": "Hugeicons (free)",
+      "id": "hugeicons",
+      "package": "@hugeicons/core-free-icons",
+      "version": "4.3.5",
+      "license": "MIT",
+      "variant": "stroke-rounded",
+      "strokeWidth": 1.5
+    },
+    "size": 22,
+    "strokeWidth": 1.5,
+    "linecap": "round",
+    "linejoin": "round",
+    "corner": "soft",
+    "fill": "duotone: 20% opacity back layer tinted accent",
+    "rationale": "Two-tone layering echoes frosted depth",
+    "treatment": "",
+    "names": {
+      "lock": "lock",
+      "clock": "clock",
+      "settings": "gear",
+      "user": "user",
+      "search": "magnifying-glass",
+      "close": "x",
+      "check": "check",
+      "alert": "warning",
+      "arrow": "arrow-right"
+    },
+    "fallbackNames": {
+      "lock": "SquareLock02Icon",
+      "clock": "Clock01Icon",
+      "settings": "Settings01Icon",
+      "user": "UserIcon",
+      "search": "Search01Icon",
+      "close": "Cancel01Icon",
+      "check": "Tick02Icon",
+      "alert": "Alert02Icon",
+      "arrow": "ArrowRight01Icon"
+    },
+    "gapsUseFallback": []
+  }
+}

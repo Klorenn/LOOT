@@ -1,0 +1,7 @@
+{
+  "answer": "42",
+  "salt": "7",
+  "playerSecret": "1234",
+  "chestId": "1",
+  "recipient": "999"
+}

@@ -1,0 +1,52 @@
+{
+  "primary": {
+    "library": "Phosphor",
+    "id": "phosphor",
+    "package": "@phosphor-icons/core",
+    "version": "2.1.1",
+    "license": "MIT",
+    "variant": "duotone",
+    "cdn": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/{weight}/{name}-{weight}.svg",
+    "home": "https://phosphoricons.com"
+  },
+  "fallback": {
+    "library": "Hugeicons (free)",
+    "id": "hugeicons",
+    "package": "@hugeicons/core-free-icons",
+    "version": "4.3.5",
+    "license": "MIT",
+    "variant": "stroke-rounded",
+    "strokeWidth": 1.5
+  },
+  "size": 22,
+  "strokeWidth": 1.5,
+  "linecap": "round",
+  "linejoin": "round",
+  "corner": "soft",
+  "fill": "duotone: 20% opacity back layer tinted accent",
+  "rationale": "Two-tone layering echoes frosted depth",
+  "treatment": "",
+  "names": {
+    "lock": "lock",
+    "clock": "clock",
+    "settings": "gear",
+    "user": "user",
+    "search": "magnifying-glass",
+    "close": "x",
+    "check": "check",
+    "alert": "warning",
+    "arrow": "arrow-right"
+  },
+  "fallbackNames": {
+    "lock": "SquareLock02Icon",
+    "clock": "Clock01Icon",
+    "settings": "Settings01Icon",
+    "user": "UserIcon",
+    "search": "Search01Icon",
+    "close": "Cancel01Icon",
+    "check": "Tick02Icon",
+    "alert": "Alert02Icon",
+    "arrow": "ArrowRight01Icon"
+  },
+  "gapsUseFallback": []
+}

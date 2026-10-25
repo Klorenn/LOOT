@@ -1,0 +1,34 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "fuzz-glass-noir",
+  "type": "registry:theme",
+  "title": "Glass Noir",
+  "description": "",
+  "cssVars": {
+    "theme": {
+      "font-sans": "Geist, system-ui, sans-serif",
+      "font-mono": "Geist Mono, monospace",
+      "radius": "16px"
+    },
+    "light": {
+      "background": "#0A0A0A",
+      "foreground": "#FAFAFB",
+      "card": "#1A1919",
+      "card-foreground": "#FAFAFB",
+      "popover": "#1A1919",
+      "popover-foreground": "#FAFAFB",
+      "primary": "#DFB9E0",
+      "primary-foreground": "#000000",
+      "secondary": "#1A1919",
+      "secondary-foreground": "#FAFAFB",
+      "muted": "#1A1919",
+      "muted-foreground": "#A1A1A6",
+      "accent": "#2350A0",
+      "accent-foreground": "#FFFFFF",
+      "destructive": "#FF5A5F",
+      "border": "#2C2B2C",
+      "input": "#666666",
+      "ring": "#DFB9E0"
+    }
+  }
+}
