@@ -8,6 +8,7 @@ import { Address, xdr } from "@stellar/stellar-sdk";
 import { decodeRef } from "@/lib/chest-code";
 import { factoryAddressAt } from "@/lib/factory";
 import { invokeAsRelayer } from "@/lib/relayer-invoke";
+import { routeLimited } from "@/lib/rate-limit";
 
 type Body = {
   /** código de URL del cofre de la factory */
@@ -31,7 +32,8 @@ const isHex = (v: unknown, bytes: number): v is string =>
 function validBody(b: Partial<Body> | null): b is Body {
   return (
     !!b &&
-    (typeof b.chest === "string" || (Number.isSafeInteger(b.chestId) && (b.chestId as number) >= 0)) &&
+    ((typeof b.chest === "string" && b.chest.length <= 40 && decodeRef(b.chest) !== null) ||
+      (b.chest === undefined && Number.isSafeInteger(b.chestId) && (b.chestId as number) >= 0)) &&
     typeof b.botRecipient === "string" &&
     /^[GC][A-Z2-7]{55}$/.test(b.botRecipient) &&
     isHex(b.nullifierHex, 32) &&
@@ -53,6 +55,9 @@ export async function POST(req: NextRequest) {
   };
 
   try {
+    if (routeLimited(req, "attack", 10, 60)) {
+      return NextResponse.json({ error: "Demo temporarily unavailable.", logs }, { status: 429 });
+    }
     const secret = process.env.RELAYER_SECRET;
     if (!secret) {
       console.error("attack: RELAYER_SECRET missing");
@@ -112,7 +117,7 @@ export async function POST(req: NextRequest) {
 
           const tx = await client.claim(
             {
-              chest_id: BigInt(body.chestId as number),
+              chest_id: BigInt(ref?.kind === "legacy" ? ref.id : (body.chestId as number)),
               recipient: body.botRecipient,
               nullifier: hexToBuf(body.nullifierHex),
               proof: {

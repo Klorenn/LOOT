@@ -3,6 +3,7 @@ import { DEMO_CHEST } from "@/lib/config";
 import { decodeRef, type ChestRef } from "@/lib/chest-code";
 import { chestView } from "@/lib/views";
 import { toRowFromView } from "@/lib/listing";
+import { routeLimited } from "@/lib/rate-limit";
 
 /** Acepta el código de la URL (/chest/<code>) o un id numérico legacy. */
 function refOf(param: string): ChestRef | null {
@@ -13,9 +14,12 @@ function refOf(param: string): ChestRef | null {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  if (routeLimited(req, "chest-view", 120, 1500)) {
+    return NextResponse.json({ error: "too many requests" }, { status: 429 });
+  }
   const { id } = await ctx.params;
   const ref = refOf(id);
   if (!ref) return NextResponse.json({ error: "not found" }, { status: 404 });

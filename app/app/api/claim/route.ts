@@ -8,6 +8,7 @@ import { Address, xdr } from "@stellar/stellar-sdk";
 import { decodeRef } from "@/lib/chest-code";
 import { factoryAddressAt } from "@/lib/factory";
 import { invokeAsRelayer } from "@/lib/relayer-invoke";
+import { routeLimited } from "@/lib/rate-limit";
 
 type Body = {
   /** código de URL del cofre (legacy o factory) */
@@ -43,6 +44,9 @@ function validBody(b: Partial<Body> | null): b is Body {
 
 export async function POST(req: NextRequest) {
   try {
+    if (routeLimited(req, "claim", 10, 120)) {
+      return NextResponse.json({ error: "too many requests" }, { status: 429 });
+    }
     const secret = process.env.RELAYER_SECRET;
     if (!secret) {
       console.error("claim: RELAYER_SECRET missing");
