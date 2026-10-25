@@ -132,43 +132,13 @@ export function HowSection() {
   );
 }
 
-const USE_CASES: { icon: LucideIcon; t: string; b: string; ex: string }[] = [
-  {
-    icon: MapPin,
-    t: "Treasure hunts & events",
-    b: "Hide clues around a venue or a city. The first to solve it gets paid on the spot.",
-    ex: "QR on a poster → riddle → prize",
-  },
-  {
-    icon: Megaphone,
-    t: "Marketing drops",
-    b: "Put a riddle on packaging, an ad or a stream. Engagement that pays out for real.",
-    ex: "Brand campaign · limited slots",
-  },
-  {
-    icon: Flag,
-    t: "CTFs & hackathons",
-    b: "The flag is the answer. The bounty pays itself, no manual review.",
-    ex: "flag{…} → bounty released",
-  },
-  {
-    icon: GraduationCap,
-    t: "Education & quizzes",
-    b: "Reward students who get it right. The answer never leaks to the class.",
-    ex: "Correct answer → reward",
-  },
-  {
-    icon: Users,
-    t: "Communities",
-    b: "A weekly puzzle for your Discord or Telegram. Bots can't snipe the prize.",
-    ex: "Members only · weekly chest",
-  },
-  {
-    icon: Gift,
-    t: "Gifts",
-    b: "Send a prize that only the right person can open, with a question only they know.",
-    ex: "“Where did we meet?” → gift",
-  },
+const USE_CASES: { icon: LucideIcon; t: string; b: string }[] = [
+  { icon: MapPin, t: "Treasure hunts", b: "Hide clues in a place. First to solve wins." },
+  { icon: Megaphone, t: "Marketing", b: "Put a riddle on your product or ad. Fans win real prizes." },
+  { icon: Flag, t: "Hackathons & CTFs", b: "The answer is the flag. The bounty pays out on its own." },
+  { icon: GraduationCap, t: "Classrooms", b: "Students win when they get it right." },
+  { icon: Users, t: "Communities", b: "A weekly puzzle for your Discord or Telegram." },
+  { icon: Gift, t: "Gifts", b: "A gift only the right person can open." },
 ];
 
 export function UseCasesSection() {
@@ -199,7 +169,7 @@ export function UseCasesSection() {
           If you can ask a question, you can lock a prize behind it.
         </p>
         <div className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {USE_CASES.map(({ icon: Icon, t, b, ex }) => (
+          {USE_CASES.map(({ icon: Icon, t, b }) => (
             <div
               key={t}
               data-fade
@@ -207,8 +177,7 @@ export function UseCasesSection() {
             >
               <Icon aria-hidden className="size-6 text-[var(--proof)]" strokeWidth={1.75} />
               <h3 className="mt-5 text-[20px] font-semibold tracking-[-0.02em]">{t}</h3>
-              <p className="mt-2 flex-1 text-[15px] leading-[1.55] text-[var(--muted)]">{b}</p>
-              <p className="mt-5 font-mono text-[12px] text-[var(--dim)]">{ex}</p>
+              <p className="mt-2 text-[15px] leading-[1.55] text-[var(--muted)]">{b}</p>
             </div>
           ))}
         </div>
@@ -359,22 +328,22 @@ const REPORTS_URL = "#";
 
 const SECURITY_ITEMS: { k: string; h: string; hc: string; b: string }[] = [
   {
-    k: "Recipient",
-    h: "Proof sealed to you",
+    k: "Owner",
+    h: "Only you can claim",
     hc: "text-[var(--proof)]",
-    b: "Your address is a public input of the proof. A copied proof fails for any other address.",
+    b: "Your answer is tied to your address. A copy won't work for anyone else.",
   },
   {
-    k: "Replay",
-    h: "Each proof works once",
+    k: "Once",
+    h: "One claim per answer",
     hc: "",
-    b: "Every claim spends a nullifier on-chain and only pays the address the proof was made for. Replaying the same proof reverts.",
+    b: "The same answer can't be used twice.",
   },
   {
-    k: "Funds",
-    h: "Next: one contract per chest",
+    k: "Coming soon",
+    h: "One contract per chest",
     hc: "text-[var(--gold)]",
-    b: "Today every chest lives inside one shared contract. A factory that deploys one contract per chest, so a bug in one chest cannot reach another chest's funds, is in progress and not live in this demo.",
+    b: "Each chest will get its own contract, so a problem in one can't touch the others.",
   },
 ];
 

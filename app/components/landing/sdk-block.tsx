@@ -31,8 +31,8 @@ export function SdkBlock() {
             your own app.
           </h2>
           <p className="mt-5 text-[17px] leading-[27px] text-[var(--muted)]">
-            Hash the answer, escrow XLM and claim with an address-bound proof,
-            from TypeScript on Stellar testnet.
+            Create chests and pay out prizes from your own app with a few lines
+            of TypeScript.
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-4">
             <Link
