@@ -105,7 +105,7 @@ export const DEMO_CHEST = {
  * Cofres que se muestran en /explore. Todo lo demás (#1 legacy, #2 CHEST, #5 retirado,
  * #7 de la demo de ataque, #8 de QA) existe on-chain pero no se lista.
  */
-export const LISTED_CHEST_IDS: readonly number[] = [DEMO_CHEST.id];
+export const LISTED_CHEST_IDS: readonly number[] = [];
 
 /**
  * Instancia de chest-one con la que se corrió el escaneo Kuyfi (OSINT + Chaos Monkey). Todos los
@@ -116,6 +116,14 @@ export const KUYFI_CHEST_SCAN = "CD6QXY6STFDDPESIGCHS67SUDHXNRW3SNVIJWARKCR46QMK
 
 /** Cofres de la factory (dirección del contrato) siempre listados en /explore: demo y demás curados. */
 export const LISTED_FACTORY_ADDRESSES: readonly string[] = DEMO_CHEST.address ? [DEMO_CHEST.address] : [];
+
+/** Cofres de prueba de la factory (creados en QA) que no se listan en /explore; sus páginas siguen funcionando. */
+export const HIDDEN_FACTORY_ADDRESSES: readonly string[] = [
+  "CC4BGZ62I6U7LNFJ67F5BXKXC5K7M2MOQGLAVC357VIIP7N2DDIRYI3N",
+  "CCQBNH4AC6M3T4B36CJTTV4R2LWH3TON7B5W7RDTGTQHLK26VOBPZWOZ",
+  "CAIYQKVQFU6EL7LLS4GSVMXRGLBSTQXG3NOP5XFAGN7OJFZO22HORWEN",
+  "CDADGH3KW7EGGU63QETOTGA3QPWYQQQYOX4XKHLOVTQVGQTR4ERJRKQC",
+];
 
 /** Cofres de prueba públicos (#9, #10, #11) que no se listan en /explore; sus páginas siguen funcionando. */
 export const HIDDEN_CHEST_IDS: readonly number[] = [9, 10, 11];

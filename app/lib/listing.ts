@@ -3,7 +3,7 @@ import { chestView, factoryView, legacyView, statusOf, type ChestStatus, type Ch
 import { getChest as demoMeta } from "./chests-demo";
 import { getChestMeta, listPublicMetas } from "./chest-store";
 import { allFactoryAddresses, readFactoryChest, type FactoryChest } from "./factory";
-import { CONTRACTS, DEMO_CHEST, HIDDEN_CHEST_IDS, LISTED_CHEST_IDS, LISTED_FACTORY_ADDRESSES } from "./config";
+import { CONTRACTS, DEMO_CHEST, HIDDEN_CHEST_IDS, HIDDEN_FACTORY_ADDRESSES, LISTED_CHEST_IDS, LISTED_FACTORY_ADDRESSES } from "./config";
 
 export { statusOf, type ChestStatus };
 
@@ -137,6 +137,7 @@ export async function listExploreRows(): Promise<ChestRowData[]> {
   const [factory, legacy] = await Promise.all([readAllFactory(), readAllChests()]);
   const rows: ChestRowData[] = [];
   for (const c of factory) {
+    if (HIDDEN_FACTORY_ADDRESSES.includes(c.address)) continue;
     if (!(LISTED_FACTORY_ADDRESSES.includes(c.address) || publicAddrs.has(c.address))) continue;
     rows.push(toRowFromView(factoryView(c, await metaOf(c.address)), c.index));
   }
