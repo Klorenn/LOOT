@@ -1,0 +1,282 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "kyf-osint-20261025T223801Z",
+  "generatedAt": "2026-10-25T22:38:01.022Z",
+  "mode": "osint",
+  "tool": {
+    "name": "kuyfi",
+    "version": "0.1.0"
+  },
+  "target": {
+    "contractId": "CBKH5Z25DDQRGMJDXQWUADOND4DUM5CN4CVZOX7M3OFH2HL7KYFONRRV",
+    "network": "testnet",
+    "rpcUrl": "https://soroban-testnet.stellar.org",
+    "bytecodeSize": 10685
+  },
+  "scan": {
+    "totalFunctions": 11,
+    "functions": [
+      {
+        "name": "close",
+        "parameters": [
+          {
+            "name": "chest",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "set_fees",
+        "parameters": [
+          {
+            "name": "creation_fee",
+            "type": "I128"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "max_duration_days",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "get_config",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "chest_count",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "list_chests",
+        "parameters": [
+          {
+            "name": "start",
+            "type": "U32"
+          },
+          {
+            "name": "limit",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "accept_admin",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "create_chest",
+        "parameters": [
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "question",
+            "type": "String"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "prizes",
+            "type": "Vec<I128>"
+          },
+          {
+            "name": "duration_days",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "set_treasury",
+        "parameters": [
+          {
+            "name": "treasury",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": false
+      },
+      {
+        "name": "__constructor",
+        "parameters": [
+          {
+            "name": "admin",
+            "type": "Address"
+          },
+          {
+            "name": "treasury",
+            "type": "Address"
+          },
+          {
+            "name": "chest_wasm_hash",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "creation_fee",
+            "type": "I128"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "max_duration_days",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": false
+      },
+      {
+        "name": "propose_admin",
+        "parameters": [
+          {
+            "name": "new_admin",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": false
+      },
+      {
+        "name": "set_chest_wasm",
+        "parameters": [
+          {
+            "name": "chest_wasm_hash",
+            "type": "BytesN<32>"
+          }
+        ],
+        "hasReturn": false
+      }
+    ],
+    "udts": [
+      {
+        "kind": "struct",
+        "name": "Config",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "Address"
+          },
+          {
+            "name": "chest_wasm_hash",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "creation_fee",
+            "type": "I128"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "max_duration_days",
+            "type": "U32"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "treasury",
+            "type": "Address"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          }
+        ]
+      },
+      {
+        "kind": "union",
+        "name": "DataKey",
+        "cases": [
+          {
+            "name": "Config",
+            "valueTypes": []
+          },
+          {
+            "name": "Count",
+            "valueTypes": []
+          },
+          {
+            "name": "ChestAt",
+            "valueTypes": [
+              "U32"
+            ]
+          },
+          {
+            "name": "PendingAdmin",
+            "valueTypes": []
+          }
+        ]
+      },
+      {
+        "kind": "struct",
+        "name": "ChestInit",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "duration_days",
+            "type": "U32"
+          },
+          {
+            "name": "fee_reserve",
+            "type": "I128"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "prizes",
+            "type": "Vec<I128>"
+          },
+          {
+            "name": "question",
+            "type": "String"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "treasury",
+            "type": "Address"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          }
+        ]
+      }
+    ]
+  }
+}

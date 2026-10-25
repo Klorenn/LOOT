@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { KuyfiBadge } from "@/components/kuyfi-badge";
-import { CONTRACTS } from "@/lib/config";
+import { CONTRACTS, KUYFI_CHEST_SCAN } from "@/lib/config";
 import { resolveChestRef } from "@/lib/chest-route";
 import { encodeRef } from "@/lib/chest-code";
 import { factoryAddressAt } from "@/lib/factory";
@@ -26,6 +26,6 @@ export default async function ChestPage({
   const address = await factoryAddressAt(ref.index).catch(() => null);
   if (!address) notFound();
   return (
-    <ChestSolve code={encodeRef(ref)} address={address} badge={<KuyfiBadge contractId={address} />} />
+    <ChestSolve code={encodeRef(ref)} address={address} badge={<KuyfiBadge contractId={KUYFI_CHEST_SCAN} />} />
   );
 }

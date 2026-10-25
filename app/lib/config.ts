@@ -107,6 +107,13 @@ export const DEMO_CHEST = {
  */
 export const LISTED_CHEST_IDS: readonly number[] = [DEMO_CHEST.id];
 
+/**
+ * Instancia de chest-one con la que se corrió el escaneo Kuyfi (OSINT + Chaos Monkey). Todos los
+ * cofres de la factory despliegan el mismo wasm (hash en deployments/factory-testnet.json), así que
+ * el badge de cualquier cofre muestra este reporte. Reportes en security/kuyfi/.
+ */
+export const KUYFI_CHEST_SCAN = "CD6QXY6STFDDPESIGCHS67SUDHXNRW3SNVIJWARKCR46QMKJZQJYYOQD";
+
 /** Cofres de la factory (dirección del contrato) siempre listados en /explore: demo y demás curados. */
 export const LISTED_FACTORY_ADDRESSES: readonly string[] = DEMO_CHEST.address ? [DEMO_CHEST.address] : [];
 

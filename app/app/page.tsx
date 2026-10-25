@@ -1,7 +1,7 @@
 import { KuyfiBadge } from "@/components/kuyfi-badge";
 import { LandingPage } from "@/components/landing-page";
-import { CONTRACTS } from "@/lib/config";
+import { KUYFI_CHEST_SCAN } from "@/lib/config";
 
 export default function Home() {
-  return <LandingPage kuyfiBadge={<KuyfiBadge contractId={CONTRACTS.chest} />} />;
+  return <LandingPage kuyfiBadge={<KuyfiBadge contractId={KUYFI_CHEST_SCAN} />} />;
 }

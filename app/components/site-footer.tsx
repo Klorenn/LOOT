@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/logo-chest";
 import { CellsBackground } from "@/components/cells-background";
-import { CONTRACTS, NETWORK } from "@/lib/config";
+import { FACTORY, NETWORK } from "@/lib/config";
 
-const SHORT = `${CONTRACTS.chest.slice(0, 4)}…${CONTRACTS.chest.slice(-4)}`;
+const SHORT = `${FACTORY.contract.slice(0, 4)}…${FACTORY.contract.slice(-4)}`;
 const NET = NETWORK.name.charAt(0) + NETWORK.name.slice(1).toLowerCase();
 
 const COLUMNS = [
@@ -22,7 +22,7 @@ const COLUMNS = [
       ["/sdk", "Docs"],
       ["#", "Circuits"],
       [
-        `https://stellar.expert/explorer/testnet/contract/${CONTRACTS.chest}`,
+        `https://stellar.expert/explorer/testnet/contract/${FACTORY.contract}`,
         "Soroban contract",
       ],
       ["https://github.com/Klorenn/LOOT", "GitHub"],
