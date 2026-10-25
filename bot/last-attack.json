@@ -1,0 +1,8 @@
+{
+  "rejected": true,
+  "error": "HostError: Error(Contract, #6) InvalidProof",
+  "verify_proof": false,
+  "event": "rejected",
+  "meaning": "RECHAZADO — la prueba no es para esta cuenta",
+  "note": "Bot copied a proof bound to GAKD2FSF… and tried to claim as GAVLW5IK…; verifier returned false."
+}

@@ -30,9 +30,14 @@ export default function ProvingPage() {
           return;
         }
         const answer = sessionStorage.getItem(`chestzk.answer.${id}`);
+        let salt = sessionStorage.getItem(`chestzk.salt.${id}`);
         if (!answer) {
           router.replace(`/cofre/${id}`);
           return;
+        }
+        if (!salt) {
+          const meta = await fetch(`/api/chests/${id}`).then((r) => r.json());
+          salt = meta.salt || DEMO_CHEST.salt;
         }
 
         const { decimal: recipient } = recipientField(player.publicKey);
@@ -43,7 +48,7 @@ export default function ProvingPage() {
         setDetail("Generando prueba Groth16…");
         const result = await proveChest({
           answer,
-          salt: DEMO_CHEST.salt,
+          salt: salt!,
           playerSecret: player.playerSecret,
           chestId: String(id),
           recipientField: recipient,

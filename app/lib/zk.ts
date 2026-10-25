@@ -60,8 +60,9 @@ export function snarkToContractProof(proof: snarkjs.Groth16Proof): ChestProof {
 }
 
 export async function proveChest(input: ProveInput): Promise<ProveResult> {
+  const { answerToField } = await import("./answer");
   const t0 = performance.now();
-  const answer = BigInt(input.answer);
+  const answer = answerToField(input.answer);
   const salt = BigInt(input.salt);
   const playerSecret = BigInt(input.playerSecret);
   const chestId = BigInt(input.chestId);

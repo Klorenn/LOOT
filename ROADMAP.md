@@ -44,7 +44,9 @@ Horas en hora de Lisboa.
 - [ ] Video y deck listos — lun 10:30
 - [ ] README final y formulario enviado — lun 11:30
 
-> Estado al dom 25 a las 10:48, hora de Lisboa: ningún hito cumplido todavía.
+> Estado al dom 25 ~12:30 Lisboa: spike ✅ · contrato + Kuyfi ✅ · deploy v1 (claim e2e) ✅ · modo ataque + crear + panel ✅. Siguiente: freeze 00:30 / pulido video.
+
+- [x] Bot + modo ataque + crear cofre + panel — **12:30**: `/ataque` (split + log), `bot/attack.mjs` confirma InvalidProof (#6) al copiar prueba, `/crear` plantillas+QR, `/panel`.
 
 ## Hacia la final (lun 26, 12:00 → mié 28, 13:50)
 

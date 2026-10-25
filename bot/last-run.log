@@ -1,0 +1,12 @@
+[bot 12:25:52] generando prueba para víctima GAKD2FSF…
+SyntaxError: Cannot convert 1792931152256bot to a BigInt
+    at BigInt (<anonymous>)
+    at normalize (/Users/paukoh/Chest ZK/app/node_modules/.pnpm/circom_runtime@0.1.28/node_modules/circom_runtime/build/main.cjs:43:15)
+    at /Users/paukoh/Chest ZK/app/node_modules/.pnpm/circom_runtime@0.1.28/node_modules/circom_runtime/build/main.cjs:520:41
+    at Array.forEach (<anonymous>)
+    at WitnessCalculatorCircom2._doCalculateWitness (/Users/paukoh/Chest ZK/app/node_modules/.pnpm/circom_runtime@0.1.28/node_modules/circom_runtime/build/main.cjs:500:14)
+    at WitnessCalculatorCircom2.calculateWTNSBin (/Users/paukoh/Chest ZK/app/node_modules/.pnpm/circom_runtime@0.1.28/node_modules/circom_runtime/build/main.cjs:559:20)
+    at wtnsCalculate (/Users/paukoh/Chest ZK/app/node_modules/.pnpm/snarkjs@0.7.6/node_modules/snarkjs/build/main.cjs:1315:28)
+    at async Object.groth16FullProve [as fullProve] (/Users/paukoh/Chest ZK/app/node_modules/.pnpm/snarkjs@0.7.6/node_modules/snarkjs/build/main.cjs:1348:5)
+    at async generateVictimProof (file:///Users/paukoh/Chest%20ZK/bot/attack.mjs:93:36)
+    at async main (file:///Users/paukoh/Chest%20ZK/bot/attack.mjs:126:15)

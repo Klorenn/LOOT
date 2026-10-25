@@ -5,26 +5,62 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChestVisual } from "@/components/chest-visual";
-import { DEMO_CHEST } from "@/lib/config";
 import { loadPlayer } from "@/lib/wallet";
+
+type Meta = {
+  id: number;
+  question: string;
+  hint?: string;
+  salt: string;
+  prizeLabel: string;
+  prize: number;
+};
 
 export default function ChestPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [answer, setAnswer] = useState("");
-  const chest = DEMO_CHEST; // MVP: un cofre demo
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loadPlayer()) {
       router.replace(`/entrar?next=/cofre/${id}`);
+      return;
     }
+    fetch(`/api/chests/${id}`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Cofre no encontrado");
+        return r.json();
+      })
+      .then((m) => {
+        setMeta(m);
+        sessionStorage.setItem(`chestzk.salt.${id}`, m.salt);
+      })
+      .catch((e) => setError(String(e.message || e)));
   }, [id, router]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!answer.trim()) return;
+    if (!answer.trim() || !meta) return;
     sessionStorage.setItem(`chestzk.answer.${id}`, answer.trim());
     router.push(`/cofre/${id}/probando`);
+  }
+
+  if (error) {
+    return (
+      <main className="mx-auto max-w-md px-6 py-16 text-center">
+        <p className="text-destructive">{error}</p>
+      </main>
+    );
+  }
+
+  if (!meta) {
+    return (
+      <main className="mx-auto max-w-md px-6 py-16 text-center text-muted-foreground">
+        Cargando cofre…
+      </main>
+    );
   }
 
   return (
@@ -33,15 +69,15 @@ export default function ChestPage() {
 
       <div className="rounded-2xl border border-border bg-card p-6">
         <p className="font-mono text-xs tracking-[0.04em] text-muted-foreground">
-          Cofre #{id} · {chest.prizeLabel}
+          Cofre #{id} · {meta.prizeLabel}
         </p>
         <h1 className="mt-3 text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-          {chest.question}
+          {meta.question}
         </h1>
-        {chest.hint && (
-          <p className="mt-2 text-sm text-muted-foreground">Pista: {chest.hint}</p>
+        {meta.hint && (
+          <p className="mt-2 text-sm text-muted-foreground">Pista: {meta.hint}</p>
         )}
-        <p className="mt-4 font-mono text-2xl text-gold">{chest.prizeLabel}</p>
+        <p className="mt-4 font-mono text-2xl text-gold">{meta.prizeLabel}</p>
       </div>
 
       <form onSubmit={submit} className="flex flex-col gap-4">
