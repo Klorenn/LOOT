@@ -1,0 +1,325 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "kyf-20261025T163802Z-6aedf75e",
+  "generatedAt": "2026-10-25T16:38:02.475Z",
+  "tool": {
+    "name": "kuyfi",
+    "version": "0.1.0"
+  },
+  "target": {
+    "contractId": "CCEUDLQ2HQSW5NXBLXBUNUBIZQK6O5FAGESEQYK6H4GQXY36CZDKCLUZ",
+    "network": "testnet",
+    "rpcUrl": "https://soroban-testnet.stellar.org",
+    "bytecodeSize": 10592
+  },
+  "scan": {
+    "totalFunctions": 11,
+    "functions": [
+      {
+        "name": "close",
+        "parameters": [
+          {
+            "name": "chest",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "set_fees",
+        "parameters": [
+          {
+            "name": "creation_fee",
+            "type": "I128"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "max_duration_days",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "get_config",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "chest_count",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "list_chests",
+        "parameters": [
+          {
+            "name": "start",
+            "type": "U32"
+          },
+          {
+            "name": "limit",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "accept_admin",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "create_chest",
+        "parameters": [
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "question",
+            "type": "String"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "amount_per_slot",
+            "type": "I128"
+          },
+          {
+            "name": "slots",
+            "type": "U32"
+          },
+          {
+            "name": "duration_days",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "set_treasury",
+        "parameters": [
+          {
+            "name": "treasury",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": false
+      },
+      {
+        "name": "__constructor",
+        "parameters": [
+          {
+            "name": "admin",
+            "type": "Address"
+          },
+          {
+            "name": "treasury",
+            "type": "Address"
+          },
+          {
+            "name": "chest_wasm_hash",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "creation_fee",
+            "type": "I128"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "max_duration_days",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": false
+      },
+      {
+        "name": "propose_admin",
+        "parameters": [
+          {
+            "name": "new_admin",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": false
+      },
+      {
+        "name": "set_chest_wasm",
+        "parameters": [
+          {
+            "name": "chest_wasm_hash",
+            "type": "BytesN<32>"
+          }
+        ],
+        "hasReturn": false
+      }
+    ],
+    "udts": [
+      {
+        "kind": "struct",
+        "name": "Config",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "Address"
+          },
+          {
+            "name": "chest_wasm_hash",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "creation_fee",
+            "type": "I128"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "max_duration_days",
+            "type": "U32"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "treasury",
+            "type": "Address"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          }
+        ]
+      },
+      {
+        "kind": "union",
+        "name": "DataKey",
+        "cases": [
+          {
+            "name": "Config",
+            "valueTypes": []
+          },
+          {
+            "name": "Count",
+            "valueTypes": []
+          },
+          {
+            "name": "ChestAt",
+            "valueTypes": [
+              "U32"
+            ]
+          },
+          {
+            "name": "PendingAdmin",
+            "valueTypes": []
+          }
+        ]
+      },
+      {
+        "kind": "struct",
+        "name": "ChestInit",
+        "fields": [
+          {
+            "name": "amount_per_slot",
+            "type": "I128"
+          },
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "duration_days",
+            "type": "U32"
+          },
+          {
+            "name": "fee_reserve",
+            "type": "I128"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "question",
+            "type": "String"
+          },
+          {
+            "name": "slots",
+            "type": "U32"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "treasury",
+            "type": "Address"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          }
+        ]
+      }
+    ]
+  },
+  "execution": {
+    "vectorsExecuted": 92,
+    "broadcastTransactions": 16,
+    "transactionsWithHash": 16,
+    "verificationTransactions": [
+      {
+        "functionName": "list_chests",
+        "vectorName": "start::ZERO",
+        "broadcasted": true,
+        "hash": "e915b7e8cfdff4f4685e02027d5e6a11fb2bfda29112ac3162618e9ff9095600",
+        "ledger": 5384523,
+        "explorerUrl": "https://stellar.expert/explorer/testnet/tx/e915b7e8cfdff4f4685e02027d5e6a11fb2bfda29112ac3162618e9ff9095600"
+      },
+      {
+        "functionName": "set_fees",
+        "vectorName": "max_duration_days::ONE",
+        "broadcasted": true,
+        "hash": "c3ca1b8e3998dc7a6429b320b99e1478cc69e2cd89f153cd4faebc25b44731d0",
+        "ledger": 5384520,
+        "explorerUrl": "https://stellar.expert/explorer/testnet/tx/c3ca1b8e3998dc7a6429b320b99e1478cc69e2cd89f153cd4faebc25b44731d0"
+      }
+    ]
+  },
+  "summary": {
+    "totalFindings": 0,
+    "bySeverity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "info": 0,
+      "preconditionFail": 0
+    },
+    "findingsBySignal": {}
+  },
+  "findings": []
+}

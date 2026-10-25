@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { initLandingMotion } from "@/lib/landing-motion";
 import { BrandMark, LogoChest } from "@/components/logo-chest";
 import { CellsBackground } from "@/components/cells-background";
-import { SiteFooter } from "@/components/app/site-footer";
+import { SiteFooter } from "@/components/site-footer";
 import {
   AttackSection,
   CtaSection,

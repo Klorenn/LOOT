@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/logo-chest";
-import { shortAddr } from "@/lib/format";
+import { AccountMenu } from "@/components/account-menu";
 import { useSession } from "@/lib/session";
 
 const LINKS = [
@@ -14,10 +14,10 @@ const LINKS = [
 ] as const;
 
 /**
- * Header de las rutas de la app. Misma estructura que components/app/app-nav.tsx
- * más el acceso a "Mi wallet" cuando hay sesión (app-nav no se toca: es de otra persona).
+ * AppNav de Loot (72px). Reemplaza a components/app/app-nav.tsx (de otra persona, no se toca)
+ * con las entradas de cuenta: Log in / Create account, o AccountMenu con sesión.
  */
-export function AppHeader() {
+export function AppNav() {
   const path = usePathname();
   const { ready, address } = useSession();
 
@@ -64,17 +64,16 @@ export function AppHeader() {
               Connect
             </span>
           ) : address ? (
-            <Link
-              href="/wallet"
-              aria-label="Mi wallet"
-              className="btn-landing btn-landing-s btn-landing-sm font-mono"
-            >
-              Mi wallet · {shortAddr(address)}
-            </Link>
+            <AccountMenu address={address} />
           ) : (
-            <Link href="/enter" className="btn-landing btn-landing-p btn-landing-sm">
-              Connect
-            </Link>
+            <>
+              <Link href="/login" className="btn-landing btn-landing-s btn-landing-sm">
+                Log in
+              </Link>
+              <Link href="/register" className="btn-landing btn-landing-p btn-landing-sm">
+                Create account
+              </Link>
+            </>
           )}
         </div>
       </div>

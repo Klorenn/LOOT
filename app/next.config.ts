@@ -1,4 +1,9 @@
+import path from "node:path";
 import type { NextConfig } from "next";
+
+// Hay un package-lock.json en $HOME: sin root explícito Turbopack vigila todo el
+// home y recarga en loop. Fijamos el root del monorepo (app importa ../packages).
+const repoRoot = path.join(__dirname, "..");
 
 const nextConfig: NextConfig = {
   // Cache Components choca con useParams en rutas de chest; lo apagamos para el MVP.
@@ -30,15 +35,23 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       { source: "/panel", destination: "/dashboard", permanent: true },
+      // Temporal hasta P4 (/login, /register, /profile, /qr, /claimed-chests como rutas propias).
+      { source: "/login", destination: "/enter", permanent: false },
+      { source: "/register", destination: "/enter", permanent: false },
+      { source: "/profile", destination: "/wallet", permanent: false },
+      { source: "/qr", destination: "/wallet", permanent: false },
+      { source: "/claimed-chests", destination: "/wallet", permanent: false },
     ];
   },
   serverExternalPackages: [
-    "chestzk-chest",
+    "@findloot/chest",
     "snarkjs",
     "circomlibjs",
     "passkey-kit",
   ],
+  outputFileTracingRoot: repoRoot,
   turbopack: {
+    root: repoRoot,
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],

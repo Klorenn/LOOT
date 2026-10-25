@@ -1,4 +1,4 @@
-import { Client, networks } from "chestzk-chest";
+import { Client, networks } from "@findloot/chest";
 export type ChestzkClient = Client;
 type CreateOpts = {
     contractId?: string;

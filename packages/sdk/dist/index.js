@@ -3,7 +3,7 @@
  *
  * @example
  * ```ts
- * import { createChestClient, fingerprintAnswer, CONTRACTS, NETWORK } from "loot";
+ * import { createChestClient, fingerprintAnswer, CONTRACTS, NETWORK } from "@findloot/sdk";
  *
  * const { fingerprintHex } = await fingerprintAnswer("8", 7n);
  * const client = createChestClient({

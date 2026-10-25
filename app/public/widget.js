@@ -1,5 +1,5 @@
 /**
- * ChestZK embed — redirige al cofre.
+ * Loot embed — redirige al cofre.
  * Uso: <script src="…/widget.js" data-chest="2"></script>
  */
 (function () {
@@ -10,7 +10,7 @@
   var base = s.src.replace(/\/widget\.js(\?.*)?$/, "");
   var a = document.createElement("a");
   a.href = base + "/chest/" + id;
-  a.textContent = "Abrir cofre #" + id + " · ChestZK";
+  a.textContent = "Abrir cofre #" + id + " · Loot";
   a.rel = "noopener";
   a.style.cssText =
     "display:inline-flex;align-items:center;gap:.5rem;padding:.75rem 1.25rem;" +

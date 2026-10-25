@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
-import { Client, networks } from "chestzk-chest";
+import { Client, networks } from "@findloot/chest";
 import { CONTRACTS, NETWORK, xlmToStroops } from "@/lib/config";
 import { saveChestMeta } from "@/lib/chest-store";
 import { requireAdmin } from "@/lib/admin-auth";

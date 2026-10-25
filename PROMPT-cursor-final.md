@@ -1,7 +1,7 @@
 # Prompt para Cursor: Loot — cierre antes del freeze (09:00)
 
 **HackMeridian 2026 · Stellar testnet**  
-**Marca:** **Loot** (antes ChestZK). UI y copy = Loot. Repo: `Klorenn/LOOT`. Paquete npm = `loot`.
+**Marca:** **Loot** (antes ChestZK). UI y copy = Loot. Repo: `Klorenn/LOOT`. Org npm: `findloot` → `@findloot/sdk` + `@findloot/chest`.
 
 Cofres con premio en **XLM nativo**. El jugador prueba con ZK (Groth16 BN254 en Soroban) que sabe la respuesta; la prueba lleva el `recipient` como entrada pública y un nullifier. Passkey-kit (C-address) + Stellar Wallets Kit (G). Relayer OZ Channels con fee-bump.
 

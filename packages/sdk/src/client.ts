@@ -1,4 +1,4 @@
-import { Client, networks } from "chestzk-chest";
+import { Client, networks } from "@findloot/chest";
 import { CONTRACTS, NETWORK } from "./config.js";
 
 export type ChestzkClient = Client;

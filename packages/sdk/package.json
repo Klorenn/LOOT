@@ -1,13 +1,13 @@
 {
-  "name": "loot",
-  "version": "0.1.0",
+  "name": "@findloot/sdk",
+  "version": "0.1.1",
   "description": "Loot SDK — create, read, and claim puzzle chests on Stellar (XLM, ZK proofs).",
   "type": "module",
   "license": "MIT",
   "author": "Loot",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Klorenn/LOOT.git",
+    "url": "git+https://github.com/Klorenn/LOOT.git",
     "directory": "packages/sdk"
   },
   "homepage": "https://github.com/Klorenn/LOOT",
@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^16.0.1",
-    "chestzk-chest": "file:../chestzk-chest",
+    "@findloot/chest": "^0.1.0",
     "circomlibjs": "^0.1.7"
   },
   "devDependencies": {

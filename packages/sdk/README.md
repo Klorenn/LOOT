@@ -1,11 +1,9 @@
-# loot
+# @findloot/sdk
 
 SDK for [Loot](https://github.com/Klorenn/LOOT) — puzzle chests on Stellar with ZK proofs sealed to the solver’s address.
 
-(Formerly ChestZK.) Prize token for the demo: **native XLM** (no swaps).
-
 ```bash
-npm i loot
+npm i @findloot/sdk
 ```
 
 ```ts
@@ -14,7 +12,7 @@ import {
   fingerprintAnswer,
   CONTRACTS,
   NETWORK,
-} from "loot";
+} from "@findloot/sdk";
 
 const { fingerprintHex } = await fingerprintAnswer("alexandria", 7n);
 const client = createChestClient({
@@ -25,5 +23,7 @@ const client = createChestClient({
 
 console.log(fingerprintHex, CONTRACTS.xlm);
 ```
+
+Bindings live in `@findloot/chest`.
 
 MIT · https://github.com/Klorenn/LOOT

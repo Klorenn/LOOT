@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
-import { Client, networks } from "chestzk-chest";
+import { Client, networks } from "@findloot/chest";
 import { DEMO_CHEST, NETWORK } from "@/lib/config";
 import { listChests } from "@/lib/chest-store";
 

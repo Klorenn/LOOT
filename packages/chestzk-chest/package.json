@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
-  "name": "chestzk-chest",
-  "description": "Generated Soroban client for the ChestZK registry contract (testnet).",
+  "name": "@findloot/chest",
+  "description": "Generated Soroban client for the Loot registry contract (testnet).",
   "type": "module",
   "license": "MIT",
   "repository": {

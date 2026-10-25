@@ -1,18 +1,31 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { AppChrome } from "@/components/app-chrome";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Loot — Puzzle chests that bots can’t rob",
+  title: {
+    default: "Loot — Puzzle chests that bots can't rob",
+    template: "%s · Loot",
+  },
   description:
     "Solve it, prove it in zero knowledge, claim the prize on Stellar. Proofs sealed to your address.",
+  applicationName: "Loot",
+  manifest: "/site.webmanifest",
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    shortcut: "/favicon.ico",
-    apple: "/apple-icon.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16.png", type: "image/png", sizes: "16x16" },
+    ],
+    apple: "/apple-touch-icon.png",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0C0B10",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

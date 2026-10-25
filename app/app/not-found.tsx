@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoChest } from "@/components/logo-chest";
+
+export const metadata: Metadata = { title: "Not found" };
 
 export default function NotFound() {
   return (

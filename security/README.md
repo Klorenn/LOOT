@@ -87,14 +87,11 @@ scripts/kuyfi-scan.sh <CHEST_ADDRESS>     # OSINT, read-only; address from the f
    are not reached. Prefer a fresh funded throwaway chest for the next WASM hash.
 4. Commit `security/kuyfi/` and `app/public/security/kuyfi/` so the deploy ships them.
 
-**Blocker found (Kuyfi, not the contract):** Kuyfi v0.1.0 bundles stellar-sdk 14.6.1,
-which cannot decode a contract spec whose function has more than 10 inputs. The
-chest's `__constructor` has 11, so both OSINT and `--chaos` fail on every factory
-chest with `XDR_ALIGN_FAILURE` (the scanner reports it generically; the cause was
-confirmed by parsing the same WASM with stellar-sdk 16, which decodes it, and with 14.6.1,
-which stops at `__constructor`). Until the chest constructor takes 10 or fewer
-parameters (for example packing fee settings into one struct), the per-chest step above
-cannot produce a report for factory chests.
+**Resolved blocker (Kuyfi limit, not a contract bug):** Kuyfi v0.1.0 bundles stellar-sdk
+14.6.1, which cannot decode a spec with a function of more than 10 inputs; it fails
+with `XDR_ALIGN_FAILURE`. The first chest `__constructor` had 11, so factory chests could
+not be scanned. Factory v3 packs the constructor into a struct (all functions have 10 or
+fewer params) and chests now scan. Keep every function at 10 params or fewer.
 
 ## Scan log
 
@@ -102,9 +99,15 @@ cannot produce a report for factory chests.
 | --- | --- | --- | --- |
 | 2026-10-25 | chest `CCOIK76O...GBHYZ` | Chaos Monkey (imported from `audits/`) | 0 findings, 48 vectors |
 | 2026-10-25 | verifier `CCUF6M5Y...HXTIE` | Chaos Monkey (imported) | 0 findings, 9 vectors |
-| 2026-10-25 | ChestFactory `CBLPZMXO...VN3EU` | OSINT + Chaos Monkey | 0 findings; 9 functions, 89 vectors, 13 testnet tx; 0 critical / 0 high / 0 medium / 0 low |
-| 2026-10-25 | factory throwaway chest `CAR4DMZC...NSPRK` (closed, balance 0) | OSINT + Chaos Monkey | Not scanned: `XDR_ALIGN_FAILURE` (see blocker above) |
+| 2026-10-25 | ChestFactory v1 `CBLPZMXO...VN3EU` (**superseded** by v3; report kept) | OSINT + Chaos Monkey | 0 findings; 9 functions, 89 vectors, 13 testnet tx; 0 critical / 0 high / 0 medium / 0 low |
+| 2026-10-25 | factory v1 throwaway chest `CAR4DMZC...NSPRK` (closed) | OSINT + Chaos Monkey | Not scanned: `XDR_ALIGN_FAILURE` (11-param constructor, superseded) |
+| 2026-10-25 | ChestFactory v3 `CCEUDLQ2...CLUZ` | OSINT + Chaos Monkey | 0 findings; 11 functions, 92 vectors, 16 testnet tx; 0 critical / 0 high / 0 medium / 0 low |
+| 2026-10-25 | factory v3 throwaway chest `CCLJZJ7D...C7MR` (open, 1 slot x 0.1 XLM) | OSINT + Chaos Monkey | 0 findings; 8 functions, 44 vectors, 0 testnet tx broadcast (every vector stopped at simulation) |
 | 2026-10-25 | normal chests (`CDMYX46W...`, `CAAHCYL5...`) | OSINT only | surface mapped; never fuzzed: live for the attack demo |
+
+Chest v3 coverage: with 0 broadcast transactions, Kuyfi only proved that its generated
+inputs are rejected in simulation. The success paths (valid proof, payout, fee accrual)
+are not exercised by Kuyfi; they are covered by the contract tests and the e2e claim.
 
 ChestFactory coverage notes: admin functions (`set_fees`, `set_treasury`,
 `set_chest_wasm`) take no `Address` argument that Kuyfi can swap, so the

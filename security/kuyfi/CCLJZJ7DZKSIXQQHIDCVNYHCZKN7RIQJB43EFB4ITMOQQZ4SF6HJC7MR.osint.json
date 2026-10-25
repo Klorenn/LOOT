@@ -1,0 +1,235 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "kyf-osint-20261025T163803Z",
+  "generatedAt": "2026-10-25T16:38:03.688Z",
+  "mode": "osint",
+  "tool": {
+    "name": "kuyfi",
+    "version": "0.1.0"
+  },
+  "target": {
+    "contractId": "CCLJZJ7DZKSIXQQHIDCVNYHCZKN7RIQJB43EFB4ITMOQQZ4SF6HJC7MR",
+    "network": "testnet",
+    "rpcUrl": "https://soroban-testnet.stellar.org",
+    "bytecodeSize": 11379
+  },
+  "scan": {
+    "totalFunctions": 8,
+    "functions": [
+      {
+        "name": "claim",
+        "parameters": [
+          {
+            "name": "recipient",
+            "type": "Address"
+          },
+          {
+            "name": "nullifier",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "proof",
+            "type": "Proof"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "close",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "balance",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "creator",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "get_info",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "accrue_fees",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "chest_field",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "__constructor",
+        "parameters": [
+          {
+            "name": "init",
+            "type": "ChestInit"
+          }
+        ],
+        "hasReturn": false
+      }
+    ],
+    "udts": [
+      {
+        "kind": "struct",
+        "name": "Proof",
+        "fields": [
+          {
+            "name": "a",
+            "type": "BytesN<64>"
+          },
+          {
+            "name": "b",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "c",
+            "type": "BytesN<64>"
+          }
+        ]
+      },
+      {
+        "kind": "union",
+        "name": "DataKey",
+        "cases": [
+          {
+            "name": "Info",
+            "valueTypes": []
+          },
+          {
+            "name": "Nullifier",
+            "valueTypes": [
+              "BytesN<32>"
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "struct",
+        "name": "ChestInfo",
+        "fields": [
+          {
+            "name": "amount_per_slot",
+            "type": "I128"
+          },
+          {
+            "name": "claims",
+            "type": "U32"
+          },
+          {
+            "name": "closed",
+            "type": "Bool"
+          },
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "expiry",
+            "type": "U64"
+          },
+          {
+            "name": "fee_reserve",
+            "type": "I128"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "last_fee_ts",
+            "type": "U64"
+          },
+          {
+            "name": "prize_initial",
+            "type": "I128"
+          },
+          {
+            "name": "prize_pool",
+            "type": "I128"
+          },
+          {
+            "name": "question",
+            "type": "String"
+          },
+          {
+            "name": "slots",
+            "type": "U32"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "treasury",
+            "type": "Address"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          }
+        ]
+      },
+      {
+        "kind": "struct",
+        "name": "ChestInit",
+        "fields": [
+          {
+            "name": "amount_per_slot",
+            "type": "I128"
+          },
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "duration_days",
+            "type": "U32"
+          },
+          {
+            "name": "fee_reserve",
+            "type": "I128"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "question",
+            "type": "String"
+          },
+          {
+            "name": "slots",
+            "type": "U32"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "treasury",
+            "type": "Address"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          }
+        ]
+      }
+    ]
+  }
+}
