@@ -1,3 +1,6 @@
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+patchedDependencies:
+  passkey-kit@0.19.1: patches/passkey-kit@0.19.1.patch

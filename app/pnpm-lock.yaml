@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  passkey-kit@0.19.1:
+    hash: 9ae614993bca8f68526eda1e43fdbb19d00791f6eee783e6c333919f3f0cc915
+    path: patches/passkey-kit@0.19.1.patch
+
 importers:
 
   .:
@@ -52,7 +57,7 @@ importers:
         version: 16.4.3(@babel/core@7.29.7)(@types/node@20.19.43)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       passkey-kit:
         specifier: 0.19.1
-        version: 0.19.1(@stellar/stellar-sdk@16.3.0)
+        version: 0.19.1(patch_hash=9ae614993bca8f68526eda1e43fdbb19d00791f6eee783e6c333919f3f0cc915)(@stellar/stellar-sdk@16.3.0)
       qrcode.react:
         specifier: ^4.2.0
         version: 4.2.0(react@19.3.0)
@@ -10242,7 +10247,7 @@ snapshots:
       '@stellar/stellar-sdk': 16.3.0
       buffer: 6.0.3
 
-  passkey-kit@0.19.1(@stellar/stellar-sdk@16.3.0):
+  passkey-kit@0.19.1(patch_hash=9ae614993bca8f68526eda1e43fdbb19d00791f6eee783e6c333919f3f0cc915)(@stellar/stellar-sdk@16.3.0):
     dependencies:
       '@simplewebauthn/browser': 13.3.0
       '@stellar/stellar-sdk': 16.3.0

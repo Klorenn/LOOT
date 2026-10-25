@@ -103,7 +103,7 @@ function secretFromBytes(label: string): string {
   return BigInt("0x" + arr.toString("hex")).toString();
 }
 
-async function submitPasskeyTx(xdr: string): Promise<string> {
+export async function submitPasskeyTx(xdr: string): Promise<string> {
   const res = await fetch("/api/passkey/send", {
     method: "POST",
     headers: { "content-type": "application/json" },

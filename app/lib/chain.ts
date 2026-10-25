@@ -130,7 +130,7 @@ const ledgerOfCursor = (c: string) =>
  * Ledger actual aproximado sin getLatestLedger: se reutiliza el último visto (+5 s por ledger
  * transcurrido) o se lo saca de la respuesta de una simulación barata (que trae latestLedger).
  */
-async function latestLedgerHint(): Promise<number> {
+export async function latestLedgerHint(): Promise<number> {
   const fresh = () =>
     seen ? seen.seq + Math.floor((Date.now() - seen.at) / 5000) : null;
   if (seen && Date.now() - seen.at < 60_000) return fresh()!;

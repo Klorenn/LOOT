@@ -10,7 +10,8 @@ import { useSession } from "@/lib/session";
 const ITEMS = [
   { href: "/profile", label: "Profile" },
   { href: "/claimed-chests", label: "My claimed chests" },
-  { href: "/qr", label: "Receive / share QR" },
+  { href: "/send", label: "Send" },
+  { href: "/qr", label: "Receive" },
   { href: "/dashboard", label: "Creator dashboard" },
 ] as const;
 

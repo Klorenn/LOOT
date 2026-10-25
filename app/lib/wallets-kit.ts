@@ -158,6 +158,19 @@ export async function restoreGWallet(walletId: string): Promise<string | null> {
   }
 }
 
+/** Firma un XDR clásico con la wallet elegida (Freighter, xBull…). Devuelve el XDR firmado. */
+export async function signWithWallet(
+  xdr: string,
+  address: string,
+  walletId: string,
+  networkPassphrase: string,
+): Promise<string> {
+  const kit = await loadKit();
+  kit.setWallet(walletId);
+  const { signedTxXdr } = await kit.signTransaction(xdr, { networkPassphrase, address });
+  return signedTxXdr;
+}
+
 export async function disconnectGWallet(): Promise<void> {
   try {
     const kit = await loadKit();

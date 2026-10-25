@@ -143,7 +143,7 @@ export default function ProfilePage() {
           </div>
           <div className="flex gap-3">
             <Link href="/qr" className="btn-landing btn-landing-s">
-              Receive QR
+              Receive
             </Link>
             <Link href={chestPath(DEMO_CHEST.id)} className="btn-landing btn-landing-p">
               Open a chest
@@ -196,6 +196,11 @@ export default function ProfilePage() {
                   </span>
                 )}
               </p>
+              {cell.k === "Balance" && (
+                <Link href="/send" className="btn-landing btn-landing-s btn-landing-sm mt-3">
+                  Send
+                </Link>
+              )}
             </div>
           ))}
         </div>
