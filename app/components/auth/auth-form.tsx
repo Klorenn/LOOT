@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DEMO_PATH } from "@/lib/demo";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Check, Wallet as WalletIcon } from "lucide-react";
@@ -377,7 +378,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           <>
             <CopyField value={doneAddr} />
             <Link
-              href={next ?? chestPath(DEMO_CHEST.id)}
+              href={next ?? DEMO_PATH}
               className="btn-landing btn-landing-p w-full"
             >
               Open your first chest →

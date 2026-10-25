@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DEMO_PATH } from "@/lib/demo";
 import Link from "next/link";
 import { LogoChest } from "@/components/logo-chest";
 import { chestPath } from "@/lib/chest-code";
@@ -18,7 +19,7 @@ export default function NotFound() {
         <em className="not-italic text-[var(--proof)]">empty.</em>
       </h1>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
-        <Link href={chestPath(DEMO_CHEST.id)} className="btn-landing btn-landing-p">
+        <Link href={DEMO_PATH} className="btn-landing btn-landing-p">
           Open a chest →
         </Link>
         <Link href="/" className="btn-landing btn-landing-s">

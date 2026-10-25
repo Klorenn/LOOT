@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DEMO_PATH } from "@/lib/demo";
 import { BuildersIllustration } from "@/components/landing/builders-illustration";
 import { CreatorsIllustration } from "@/components/landing/creators-illustration";
 import { PlayersIllustration } from "@/components/landing/players-illustration";
@@ -26,7 +27,7 @@ export function AudienceSection({ docsUrl }: { docsUrl: string }) {
       h: "Bots can’t steal your win.",
       b: "Your answer never leaves your device, and a copied proof won't pay anyone else.",
       cta: "Open the demo chest →",
-      href: chestPath(DEMO_CHEST.id),
+      href: DEMO_PATH,
     },
     {
       k: "Creators",

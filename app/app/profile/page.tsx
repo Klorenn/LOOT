@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DEMO_PATH } from "@/lib/demo";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/avatar";
@@ -140,7 +141,7 @@ export default function ProfilePage() {
             <Link href="/wallet?tab=receive" className="btn-landing btn-landing-s">
               Wallet
             </Link>
-            <Link href={chestPath(DEMO_CHEST.id)} className="btn-landing btn-landing-p">
+            <Link href={DEMO_PATH} className="btn-landing btn-landing-p">
               Open a chest
             </Link>
           </div>

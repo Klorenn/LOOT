@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DEMO_PATH } from "@/lib/demo";
 import { useEffect, useRef, useState } from "react";
 import { initLandingMotion } from "@/lib/landing-motion";
 import { BrandMark, LogoChest } from "@/components/logo-chest";
@@ -109,7 +110,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 </Link>
               )}
               <Link
-                href={`/login?next=${chestPath(DEMO_CHEST.id)}`}
+                href={`/login?next=${DEMO_PATH}`}
                 className="btn-landing btn-landing-p btn-landing-sm"
               >
                 Launch app →
@@ -155,7 +156,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 </p>
                 <div data-hero-fade className="mt-8 flex flex-wrap gap-3">
                   <Link
-                    href={`/login?next=${chestPath(DEMO_CHEST.id)}`}
+                    href={`/login?next=${DEMO_PATH}`}
                     className="btn-landing btn-landing-p"
                   >
                     Open a chest →

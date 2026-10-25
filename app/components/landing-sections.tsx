@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DEMO_PATH } from "@/lib/demo";
 import { ExampleTag } from "@/components/example-tag";
 import { LogoChest } from "@/components/logo-chest";
 import { chestPath } from "@/lib/chest-code";
@@ -243,7 +244,7 @@ export function CtaSection() {
         </p>
         <div data-fade className="mt-10 flex flex-wrap justify-center gap-3">
           <Link
-            href={`/login?next=${chestPath(DEMO_CHEST.id)}`}
+            href={`/login?next=${DEMO_PATH}`}
             className="btn-landing btn-landing-p"
           >
             Open a chest →

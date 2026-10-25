@@ -116,7 +116,7 @@ export function legacyView(c: OnChainChest, meta: ChestMeta | null): ChestView {
     difficulty: isDemo ? 3 : (meta?.difficulty ?? demo?.difficulty),
     creator: c.creator,
     fingerprintHex: c.fingerprintHex,
-    salt: isDemo ? DEMO_CHEST.salt : priv ? undefined : meta?.salt,
+    salt: isDemo ? DEMO_CHEST.salt : priv ? undefined : (meta?.salt ?? demo?.salt),
     saltRequired: priv || undefined,
     prizes: Array.from({ length: c.maxClaims }, () => amount),
     maxClaims: c.maxClaims,

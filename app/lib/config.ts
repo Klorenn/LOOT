@@ -75,8 +75,11 @@ export function stroopsToXlm(
  */
 export const DEMO_CHEST = {
   /** Dirección del cofre demo en la factory ("" = el demo sigue siendo el cofre legacy `id`). */
-  address: "" as string,
-  // #6: premio XLM nativo, 10 XLM × 10 slots (creado con bot/setup-xlm-chests.mjs).
+  address: "CDNU6Q35QZP56ND5XWHKQTH3QPPEQWV4QXSYFTAXSRR2SZ6QHQBCL5HR" as string,
+  /** Posición del cofre demo en la factory (list_chests); define su URL /chest/<code>. */
+  index: 5,
+  // Factory: un contrato por cofre, 10 lugares × 10 XLM (bot/setup-factory-chest.mjs). `id` 6 es el
+  // cofre legacy anterior (misma huella y sal), que sigue vivo en su URL vieja.
   // La respuesta NO está en el repo: solo la sal y la huella (públicas).
   // Fallbacks desactivados: #5 (misma config XLM, pregunta anterior; ya sin uso)
   // y #2 (token CHEST, ver bloque comentado más abajo).
