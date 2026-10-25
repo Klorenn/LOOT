@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowUp, Plus, Trash2, X } from "lucide-react";
 import { emptyDraftQuestion, type DraftQuestion } from "@/lib/quiz-draft";
-import { QUIZ_MAX_QUESTIONS, type QuizKind } from "@/lib/quiz";
+import { QUIZ_LIMITS, QUIZ_MAX_QUESTIONS, type QuizKind } from "@/lib/quiz";
 
 const KINDS: { k: QuizKind; label: string }[] = [
   { k: "single", label: "One answer" },
@@ -68,10 +68,16 @@ export function QuizBuilder({
           <input
             value={q.prompt}
             onChange={(e) => set(i, { prompt: e.target.value })}
+            maxLength={QUIZ_LIMITS.prompt}
             placeholder="Your question"
             aria-label={`Question ${i + 1}`}
             className={`${inputCls} mt-3`}
           />
+          {q.prompt.length > QUIZ_LIMITS.prompt * 0.8 && (
+            <p className="mt-1 text-right font-mono text-[11px] text-[var(--dim)]">
+              {q.prompt.length}/{QUIZ_LIMITS.prompt}
+            </p>
+          )}
 
           <div
             role="radiogroup"
@@ -143,6 +149,7 @@ export function QuizBuilder({
                       onChange={(e) =>
                         set(i, { choices: q.choices.map((x, m) => (m === k ? e.target.value : x)) })
                       }
+                      maxLength={QUIZ_LIMITS.label}
                       placeholder={`Option ${k + 1}`}
                       aria-label={`Option ${k + 1}`}
                       className={inputCls}

@@ -9,7 +9,7 @@ import { normalizeAnswer } from "./answer";
  * Formato del secreto: "quiz:v1" + US + parte_1 + US + … + parte_n   (US = \u001f)
  *   - opción única:    "c:<value>"
  *   - opción múltiple: "c:<values ordenados, separados por coma>"
- *   - texto libre:     "t:<normalizeAnswer(texto)>"
+ *   - texto libre:     "t:<normalizeAnswer(texto sin controles ni invisibles)>"
  * El prefijo con versión evita choques con un acertijo simple; "c:"/"t:" separan una opción
  * de un texto escrito igual.
  */
@@ -33,8 +33,26 @@ const SEP = "\u001f";
 export const QUIZ_MAX_QUESTIONS = 20;
 const MAX_CHOICES = 10;
 const VALUE_RE = /^[a-z0-9]{1,8}$/;
-/** Mínimo de combinaciones (en bits) para un cuestionario solo de opciones: 2^40. */
-export const QUIZ_MIN_BITS = 40;
+/**
+ * Mínimo de intentos (en bits) para publicar un cuestionario: 2^48 ≈ 2.8e14. Cada intento es
+ * SHA-256 + Poseidon; a ~1e8 intentos/s en GPU son semanas, no horas (2^40 caía en un día).
+ */
+export const QUIZ_MIN_BITS = 48;
+/** Límites que valida el servidor. La UI de /create usa los mismos. */
+export const QUIZ_LIMITS = { prompt: 300, description: 300, label: 120, title: 500 } as const;
+
+/** Controles (U+0000–U+001F, U+007F) e invisibles de ancho cero: se quitan de las respuestas escritas. */
+const INVISIBLE_RE = /[\u0000-\u001f\u007f​-‍⁠﻿]/g;
+
+/** Limpia una respuesta escrita. Mismo paso al crear y al resolver. */
+export function cleanTypedAnswer(text: string): string {
+  return text.replace(INVISIBLE_RE, "");
+}
+
+/** Respuesta escrita lista para el secreto ("" si no queda nada visible). */
+export function typedAnswerKey(text: string): string {
+  return normalizeAnswer(cleanTypedAnswer(text));
+}
 
 function choiceValues(q: QuizQuestion): Set<string> {
   return new Set((q.choices ?? []).map((c) => c.value));
@@ -46,7 +64,7 @@ function part(q: QuizQuestion, a: QuizAnswer | undefined, i: number): string {
   };
   if (!a) fail("missing answer");
   if (q.kind === "text") {
-    const text = typeof a!.text === "string" ? normalizeAnswer(a!.text) : "";
+    const text = typeof a!.text === "string" ? typedAnswerKey(a!.text) : "";
     if (!text) fail("empty answer");
     return `t:${text}`;
   }
@@ -82,20 +100,50 @@ export function quizAnswersFromForm(quiz: Quiz, form: FormData): QuizAnswer[] {
   });
 }
 
-/** log2 de las combinaciones posibles. Infinity si alguna pregunta admite texto libre. */
-export function quizSearchBits(quiz: Quiz): number {
+/** log2 de las combinaciones de las preguntas de opciones (las de texto suman 0). */
+export function quizChoiceBits(quiz: Quiz): number {
   let bits = 0;
   for (const q of quiz.questions) {
-    if (q.kind === "text") return Infinity;
+    if (q.kind === "text") continue;
     const n = q.choices?.length ?? 0;
     bits += q.kind === "multiple" ? Math.log2(2 ** n - 1) : Math.log2(n);
   }
   return bits;
 }
 
-/** true = el hash público se puede romper probando todas las combinaciones. */
-export function quizIsGuessable(quiz: Quiz): boolean {
-  return quizSearchBits(quiz) < QUIZ_MIN_BITS;
+/**
+ * Estimación conservadora de bits de una respuesta escrita, sobre el texto normalizado:
+ * solo dígitos log2(10)/carácter; solo letras ~2.3/carácter (texto en lenguaje natural, no
+ * letras al azar); mezcla u otros símbolos 4/carácter. Es una cota gruesa, no una garantía.
+ */
+export function typedAnswerBits(text: string): number {
+  const key = typedAnswerKey(text);
+  if (!key) return 0;
+  const perChar = /^\d+$/.test(key) ? Math.log2(10) : /^\p{L}+$/u.test(key) ? 2.3 : 4;
+  return key.length * perChar;
+}
+
+/** Bits totales: opciones + respuestas escritas (necesita las respuestas: solo en /create). */
+export function quizStrengthBits(quiz: Quiz, answers: QuizAnswer[]): number {
+  let bits = quizChoiceBits(quiz);
+  quiz.questions.forEach((q, i) => {
+    if (q.kind === "text") bits += typedAnswerBits(answers[i]?.text ?? "");
+  });
+  return bits;
+}
+
+/** true = el hash público se puede romper probando combinaciones offline. */
+export function quizIsGuessable(quiz: Quiz, answers: QuizAnswer[]): boolean {
+  return quizStrengthBits(quiz, answers) < QUIZ_MIN_BITS;
+}
+
+/**
+ * Regla del servidor: no ve las respuestas, así que solo puede rechazar un cuestionario de
+ * opciones con pocas combinaciones. Si hay preguntas de texto, la fuerza depende de respuestas
+ * que nunca recibe (lo controla /create).
+ */
+export function quizServerGuessable(quiz: Quiz): boolean {
+  return !quiz.questions.some((q) => q.kind === "text") && quizChoiceBits(quiz) < QUIZ_MIN_BITS;
 }
 
 const str = (v: unknown, max: number): v is string =>
@@ -114,8 +162,8 @@ export function parseQuiz(raw: unknown): Quiz | string {
     const at = `quiz question ${i + 1}`;
     if (!q || typeof q !== "object") return `bad ${at}`;
     if (q.kind !== "single" && q.kind !== "multiple" && q.kind !== "text") return `bad ${at} kind`;
-    if (!str(q.prompt, 300)) return `bad ${at} prompt`;
-    if (q.description !== undefined && q.description !== "" && !str(q.description, 300))
+    if (!str(q.prompt, QUIZ_LIMITS.prompt)) return `bad ${at} prompt`;
+    if (q.description !== undefined && q.description !== "" && !str(q.description, QUIZ_LIMITS.description))
       return `bad ${at} description`;
     const out: QuizQuestion = { kind: q.kind, prompt: q.prompt.trim() };
     if (typeof q.description === "string" && q.description.trim()) out.description = q.description.trim();
@@ -127,7 +175,7 @@ export function parseQuiz(raw: unknown): Quiz | string {
       for (const c of q.choices as Record<string, unknown>[]) {
         if (!c || typeof c.value !== "string" || !VALUE_RE.test(c.value) || seen.has(c.value))
           return `bad ${at} choice value`;
-        if (!str(c.label, 120)) return `bad ${at} choice label`;
+        if (!str(c.label, QUIZ_LIMITS.label)) return `bad ${at} choice label`;
         seen.add(c.value);
         out.choices.push({ value: c.value, label: c.label.trim() });
       }

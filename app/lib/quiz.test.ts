@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { normalizeAnswer } from "./answer";
 import {
+  QUIZ_LIMITS,
   QUIZ_MIN_BITS,
+  cleanTypedAnswer,
   parseQuiz,
   quizAnswersFromForm,
+  quizChoiceBits,
   quizFieldName,
-  quizSearchBits,
   quizSecret,
   quizIsGuessable,
+  quizServerGuessable,
+  quizStrengthBits,
+  typedAnswerBits,
   type Quiz,
 } from "./quiz";
 
@@ -120,31 +125,109 @@ describe("quizAnswersFromForm", () => {
   });
 });
 
-describe("quizSearchBits / quizIsGuessable", () => {
-  it("counts single choices as n options and multiple as 2^n - 1", () => {
-    const q: Quiz = { version: 1, questions: [quiz.questions[0], quiz.questions[1]] };
-    expect(quizSearchBits(q)).toBeCloseTo(Math.log2(2 * 7), 6);
+const ten = Array.from({ length: 10 }, (_, i) => ({ value: String.fromCharCode(97 + i), label: `${i}` }));
+const yesNo: Quiz["questions"][number] = {
+  kind: "single",
+  prompt: "Is Stellar fast?",
+  choices: [
+    { value: "a", label: "Yes" },
+    { value: "b", label: "No" },
+  ],
+};
+const year: Quiz["questions"][number] = { kind: "text", prompt: "What year did Stellar launch?" };
+
+describe("brute-force guard", () => {
+  it("uses 48 bits as the minimum", () => {
+    expect(QUIZ_MIN_BITS).toBe(48);
   });
 
-  it("treats a freeform question as not enumerable", () => {
-    expect(quizSearchBits(quiz)).toBe(Infinity);
-    expect(quizIsGuessable(quiz)).toBe(false);
+  it("counts single choices as n options and multiple as 2^n - 1; text adds 0", () => {
+    expect(quizChoiceBits({ version: 1, questions: [quiz.questions[0], quiz.questions[1]] })).toBeCloseTo(
+      Math.log2(2 * 7),
+      6,
+    );
+    expect(quizChoiceBits(quiz)).toBeCloseTo(Math.log2(2 * 7), 6);
   });
 
-  it("flags a small choices-only quiz as guessable", () => {
-    const q: Quiz = { version: 1, questions: [quiz.questions[0], quiz.questions[1]] };
-    expect(quizIsGuessable(q)).toBe(true);
+  it("estimates a typed answer by its normalized length and character set", () => {
+    expect(typedAnswerBits("yes")).toBeLessThan(10);
+    expect(typedAnswerBits("2014")).toBeCloseTo(4 * Math.log2(10), 6);
+    expect(typedAnswerBits("  ")).toBe(0);
+    expect(typedAnswerBits("where we first met in buenos aires")).toBeGreaterThanOrEqual(QUIZ_MIN_BITS);
+  });
+
+  it("does not let any typed question bypass the guard", () => {
+    const q: Quiz = { version: 1, questions: [yesNo, year] };
+    const answers = [{ choice: "a" }, { text: "2014" }];
+    expect(quizStrengthBits(q, answers)).toBeCloseTo(1 + 4 * Math.log2(10), 6);
+    expect(quizIsGuessable(q, answers)).toBe(true);
+  });
+
+  it("accepts a quiz whose typed answer is strong enough", () => {
+    const q: Quiz = { version: 1, questions: [yesNo, year] };
+    expect(quizIsGuessable(q, [{ choice: "a" }, { text: "where we first met in buenos aires" }])).toBe(false);
   });
 
   it("accepts a choices-only quiz once it reaches the minimum space", () => {
-    const ten = Array.from({ length: 10 }, (_, i) => ({ value: String.fromCharCode(97 + i), label: `${i}` }));
+    // 5 × log2(2^10 − 1) ≈ 50 bits
     const q: Quiz = {
       version: 1,
-      // 5 × log2(2^10 − 1) ≈ 50 bits
       questions: Array.from({ length: 5 }, () => ({ kind: "multiple" as const, prompt: "p", choices: ten })),
     };
-    expect(quizSearchBits(q)).toBeGreaterThanOrEqual(QUIZ_MIN_BITS);
-    expect(quizIsGuessable(q)).toBe(false);
+    expect(quizIsGuessable(q, [])).toBe(false);
+  });
+
+  it("server rule: rejects a small choices-only quiz, cannot judge typed answers", () => {
+    expect(quizServerGuessable({ version: 1, questions: [yesNo] })).toBe(true);
+    expect(quizServerGuessable({ version: 1, questions: [yesNo, year] })).toBe(false);
+    const big: Quiz = {
+      version: 1,
+      questions: Array.from({ length: 5 }, () => ({ kind: "multiple" as const, prompt: "p", choices: ten })),
+    };
+    expect(quizServerGuessable(big)).toBe(false);
+  });
+});
+
+describe("typed answer sanitizing", () => {
+  const twoText: Quiz = { version: 1, questions: [year, { kind: "text", prompt: "Second?" }] };
+
+  it("strips control and zero-width characters", () => {
+    expect(cleanTypedAnswer("li​s‌b‍o⁠a﻿")).toBe("lisboa");
+    expect(cleanTypedAnswer("a\u0000b\u001fc\u007fd")).toBe("abcd");
+  });
+
+  it("zero-width characters do not change the secret", () => {
+    const plain = quizSecret(twoText, [{ text: "lisboa" }, { text: "porto" }]);
+    expect(quizSecret(twoText, [{ text: "lis​boa" }, { text: "﻿porto" }])).toBe(plain);
+  });
+
+  it("a separator inside an answer cannot forge another answer set", () => {
+    const s1 = quizSecret(twoText, [{ text: "a\u001ft:b" }, { text: "c" }]);
+    const s2 = quizSecret(twoText, [{ text: "a" }, { text: "b\u001ft:c" }]);
+    expect(s1).not.toBe(s2);
+    // un separador por pregunta, ninguno extra dentro de las respuestas
+    expect(s1.split("\u001f")).toHaveLength(3);
+    expect(s2.split("\u001f")).toHaveLength(3);
+  });
+
+  it("an answer that is only invisible marks counts as empty", () => {
+    expect(() => quizSecret({ version: 1, questions: [year] }, [{ text: "́​" }])).toThrow();
+  });
+});
+
+describe("length limits", () => {
+  it("exports the limits the server enforces", () => {
+    expect(QUIZ_LIMITS).toEqual({ prompt: 300, description: 300, label: 120, title: 500 });
+  });
+
+  it("parseQuiz uses the same limits", () => {
+    const mk = (prompt: string, label: string) => ({
+      version: 1,
+      questions: [{ kind: "single", prompt, choices: [{ value: "a", label }, { value: "b", label: "B" }] }],
+    });
+    expect(typeof parseQuiz(mk("p".repeat(QUIZ_LIMITS.prompt), "l".repeat(QUIZ_LIMITS.label)))).toBe("object");
+    expect(typeof parseQuiz(mk("p".repeat(QUIZ_LIMITS.prompt + 1), "L"))).toBe("string");
+    expect(typeof parseQuiz(mk("p", "l".repeat(QUIZ_LIMITS.label + 1)))).toBe("string");
   });
 });
 

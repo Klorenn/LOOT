@@ -8,7 +8,7 @@ import {
   type PendingMeta,
 } from "@/lib/chest-store";
 import { readChest } from "@/lib/chain";
-import { parseQuiz, type Quiz } from "@/lib/quiz";
+import { QUIZ_LIMITS, parseQuiz, quizServerGuessable, type Quiz } from "@/lib/quiz";
 
 /**
  * Metadatos off-chain de un cofre, en dos pasos (reserve-then-confirm):
@@ -43,7 +43,7 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
   if (!HEX64.test(fp)) return "bad fingerprint";
   if (typeof b.creator !== "string" || !StrKey.isValidEd25519PublicKey(b.creator)
     && !StrKey.isValidContract(b.creator)) return "bad creator";
-  if (!str(b.question, 500)) return "bad question";
+  if (!str(b.question, QUIZ_LIMITS.title)) return "bad question";
   if (b.hint !== undefined && b.hint !== "" && !str(b.hint, 200)) return "bad hint";
   if (b.template !== undefined && !str(b.template, 40)) return "bad template";
   const difficulty = b.difficulty === undefined ? undefined : Number(b.difficulty);
@@ -55,6 +55,9 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
   if (b.quiz !== undefined && b.quiz !== null) {
     const q = parseQuiz(b.quiz);
     if (typeof q === "string") return q;
+    // Solo puede juzgar las opciones: las respuestas escritas nunca llegan al servidor.
+    if (quizServerGuessable(q))
+      return "quiz too easy to guess: add a typed question or more questions and options";
     quiz = q;
   }
   const listed = b.listed !== false;

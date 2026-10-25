@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { draftToQuiz, emptyDraftQuestion, type DraftQuestion } from "./quiz-draft";
-import { quizSecret } from "./quiz";
+import { QUIZ_LIMITS, quizSecret } from "./quiz";
 
 const single: DraftQuestion = {
   ...emptyDraftQuestion("single"),
@@ -53,5 +53,18 @@ describe("draftToQuiz", () => {
     expect(draftToQuiz([{ ...single, choices: ["only one"], correct: [0] }])).toMatchObject({ index: 0 });
     expect(draftToQuiz([{ ...text, text: "  " }])).toMatchObject({ index: 0 });
     expect(draftToQuiz([{ ...single, correct: [0, 1] }])).toMatchObject({ index: 0 });
+  });
+
+  it("rejects typed answers that normalize to nothing, without throwing", () => {
+    expect(() => draftToQuiz([{ ...text, text: "́" }])).not.toThrow();
+    expect(draftToQuiz([{ ...text, text: "́" }])).toMatchObject({ index: 0 });
+    expect(draftToQuiz([single, { ...text, text: "​‌" }])).toMatchObject({ index: 1 });
+  });
+
+  it("enforces the server length limits", () => {
+    expect(draftToQuiz([{ ...text, prompt: "p".repeat(QUIZ_LIMITS.prompt + 1) }])).toMatchObject({ index: 0 });
+    expect(
+      draftToQuiz([text, { ...single, choices: ["x".repeat(QUIZ_LIMITS.label + 1), "Mainnet"] }]),
+    ).toMatchObject({ index: 1 });
   });
 });

@@ -15,6 +15,7 @@ import {
   QuestionnaireSubmit,
   QuestionnaireTitle,
 } from "@/components/ui/questionnaire";
+import { useState } from "react";
 import { quizAnswersFromForm, quizFieldName, quizSecret, type Quiz } from "@/lib/quiz";
 
 /**
@@ -34,6 +35,7 @@ export function QuizForm({
   /** El jugador cambió alguna respuesta: el secreto anterior ya no vale. */
   onEdit?: () => void;
 }) {
+  const [err, setErr] = useState<string | null>(null);
   const items = quiz.questions.map((q, i) => ({
     name: quizFieldName(i),
     required: true,
@@ -43,14 +45,19 @@ export function QuizForm({
   return (
     <Questionnaire
       items={items}
-      onChange={() => onEdit?.()}
+      onChange={() => {
+        setErr(null);
+        onEdit?.();
+      }}
       onSubmit={(e) => {
         e.preventDefault();
         const answers = quizAnswersFromForm(quiz, new FormData(e.currentTarget));
         try {
+          setErr(null);
           onSecret(quizSecret(quiz, answers));
-        } catch {
-          /* la validación nativa ya marca la pregunta sin responder */
+        } catch (error) {
+          // p. ej. una respuesta escrita que solo tiene acentos o caracteres invisibles
+          setErr(error instanceof Error ? `${error.message}. Check that answer.` : "Check your answers.");
         }
       }}
     >
@@ -93,6 +100,11 @@ export function QuizForm({
         <QuestionnaireNext />
         <QuestionnaireSubmit>Lock answers</QuestionnaireSubmit>
       </QuestionnaireActions>
+      {err && (
+        <p role="alert" className="text-[13px] text-[var(--red)]">
+          {err}
+        </p>
+      )}
     </Questionnaire>
   );
 }

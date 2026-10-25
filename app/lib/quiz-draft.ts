@@ -1,4 +1,12 @@
-import { quizSecret, type Quiz, type QuizAnswer, type QuizKind, type QuizQuestion } from "./quiz";
+import {
+  QUIZ_LIMITS,
+  quizSecret,
+  typedAnswerKey,
+  type Quiz,
+  type QuizAnswer,
+  type QuizKind,
+  type QuizQuestion,
+} from "./quiz";
 
 /**
  * Borrador del cuestionario en /create: lo que edita el creador, CON las respuestas correctas.
@@ -40,8 +48,10 @@ export function draftToQuiz(draft: DraftQuestion[]): DraftResult {
   for (const [i, d] of draft.entries()) {
     const n = i + 1;
     if (!d.prompt.trim()) return { error: `Question ${n} needs a question.`, index: i };
+    if (d.prompt.trim().length > QUIZ_LIMITS.prompt)
+      return { error: `Question ${n} is too long (max ${QUIZ_LIMITS.prompt} characters).`, index: i };
     if (d.kind === "text") {
-      if (!d.text.trim()) return { error: `Question ${n} needs the correct answer.`, index: i };
+      if (!typedAnswerKey(d.text)) return { error: `Question ${n} needs the correct answer.`, index: i };
       questions.push({ kind: "text", prompt: d.prompt.trim() });
       answers.push({ text: d.text });
       continue;
@@ -52,6 +62,8 @@ export function draftToQuiz(draft: DraftQuestion[]): DraftResult {
       .filter((c) => c.label);
     if (kept.length < 2) return { error: `Question ${n} needs at least 2 options.`, index: i };
     if (kept.length > VALUES.length) return { error: `Question ${n} has too many options (max 10).`, index: i };
+    if (kept.some((c) => c.label.length > QUIZ_LIMITS.label))
+      return { error: `An option in question ${n} is too long (max ${QUIZ_LIMITS.label} characters).`, index: i };
     const choices = kept.map((c, k) => ({ value: VALUES[k], label: c.label }));
     const correct = kept.flatMap((c, k) => (d.correct.includes(c.idx) ? [VALUES[k]] : []));
     if (!correct.length) return { error: `Mark the correct option in question ${n}.`, index: i };
@@ -61,5 +73,10 @@ export function draftToQuiz(draft: DraftQuestion[]): DraftResult {
     answers.push(d.kind === "single" ? { choice: correct[0] } : { choices: correct });
   }
   const quiz: Quiz = { version: 1, questions };
-  return { quiz, answers, secret: quizSecret(quiz, answers) };
+  // se usa dentro de useMemo: nunca debe lanzar
+  try {
+    return { quiz, answers, secret: quizSecret(quiz, answers) };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Check your answers." };
+  }
 }

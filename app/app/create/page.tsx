@@ -18,7 +18,7 @@ import { balanceInfo, parseXlmAmount, SendError } from "@/lib/send";
 import { confirmMeta, createChestOnChain, reserveMeta } from "@/lib/create-chest";
 import { QuizBuilder } from "@/components/quiz-builder";
 import { draftToQuiz, emptyDraftQuestion, type DraftQuestion } from "@/lib/quiz-draft";
-import { quizIsGuessable } from "@/lib/quiz";
+import { QUIZ_LIMITS, quizIsGuessable } from "@/lib/quiz";
 
 type Mode = "riddle" | "quiz";
 
@@ -31,7 +31,7 @@ const STEPS = [
 ] as const;
 
 const QUIZ_WEAK_MSG =
-  "Too easy to guess: with only options, someone could try every combination offline. Add a typed answer, or more questions and options.";
+  "Too easy to guess: someone could try every combination offline. Use a longer typed answer, or add more questions and options.";
 
 const MIN_EXPIRY_S = 5 * 60;
 const MAX_EXPIRY_S = 90 * 24 * 3600;
@@ -114,7 +114,7 @@ export default function CreateChestPage() {
   // que sigue el mismo camino que la respuesta de un acertijo.
   const quizResult = useMemo(() => (mode === "quiz" ? draftToQuiz(quizDraft) : null), [mode, quizDraft]);
   const quizOk = quizResult && !("error" in quizResult) ? quizResult : null;
-  const quizWeak = !!quizOk && quizIsGuessable(quizOk.quiz);
+  const quizWeak = !!quizOk && quizIsGuessable(quizOk.quiz, quizOk.answers);
   /** Lo que se hashea: la respuesta del acertijo o el secreto del cuestionario. */
   const secretText = mode === "quiz" ? (quizOk?.secret ?? "") : answer;
 
@@ -398,14 +398,26 @@ export default function CreateChestPage() {
   return (
     <main>
       <PageHeader
-        eyebrow={`New chest · step ${step + 1} of ${STEPS.length}`}
+        eyebrow={`New chest · step ${step + 1} of ${STEPS.length} · Stellar testnet`}
         title={
           <>
             Create a <Em>chest</Em>
           </>
         }
-        lead="Escrow a prize behind a riddle. Only the hash of the answer goes on-chain."
+        lead="Escrow a prize behind a riddle. Only the hash of the answer goes on-chain. You can preview every step; funding needs a login."
       />
+
+      {!player && (
+        <div className="mx-auto max-w-[1200px] px-6 pt-2">
+          <p className="rounded-[10px] border border-[var(--line)] bg-[var(--s1)] px-4 py-3 text-[14px] text-[var(--muted)]">
+            Preview mode — explore the form freely.{" "}
+            <Link href="/login?next=/create" className="text-[var(--proof)] underline-offset-2 hover:underline">
+              Log in
+            </Link>{" "}
+            when you&apos;re ready to fund a chest on testnet.
+          </p>
+        </div>
+      )}
 
       <div className="mx-auto grid max-w-[1200px] gap-12 px-6 py-10 lg:grid-cols-[220px_1fr_340px]">
         {/* Stepper */}
@@ -495,6 +507,7 @@ export default function CreateChestPage() {
                     <Input
                       value={question}
                       onChange={(e) => setQuestion(e.target.value)}
+                      maxLength={QUIZ_LIMITS.title}
                       placeholder="e.g. Stellar basics"
                       className={`h-11 rounded-[10px] ${fieldErr.question ? "border-[var(--red)]" : ""}`}
                     />
@@ -531,6 +544,7 @@ export default function CreateChestPage() {
                     <textarea
                       value={question}
                       onChange={(e) => setQuestion(e.target.value)}
+                      maxLength={QUIZ_LIMITS.title}
                       rows={4}
                       className={`w-full rounded-[10px] border bg-[var(--bg)] px-3 py-2.5 text-[15px] outline-none ${
                         fieldErr.question
