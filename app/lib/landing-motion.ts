@@ -6,27 +6,39 @@ import { setChest } from "@/lib/chest-hinge";
 
 gsap.registerPlugin(ScrollTrigger);
 
+/** Parte el texto en palabras (overflow:hidden) conservando los elementos anidados (acentos de color). */
 function splitWords(el: Element) {
-  const text = el.textContent || "";
-  el.textContent = "";
-  const words = text.split(/(\s+)/).filter(Boolean);
   const inners: HTMLElement[] = [];
-  for (const w of words) {
-    if (/^\s+$/.test(w)) {
-      el.appendChild(document.createTextNode(w));
-      continue;
-    }
-    const outer = document.createElement("span");
-    outer.style.display = "inline-block";
-    outer.style.overflow = "hidden";
-    outer.style.verticalAlign = "bottom";
-    const inner = document.createElement("span");
-    inner.style.display = "inline-block";
-    inner.textContent = w;
-    outer.appendChild(inner);
-    el.appendChild(outer);
-    inners.push(inner);
-  }
+  const walk = (src: Element, dst: Element) => {
+    src.childNodes.forEach((n) => {
+      if (n.nodeType === Node.ELEMENT_NODE) {
+        const clone = (n as Element).cloneNode(false) as Element;
+        dst.appendChild(clone);
+        walk(n as Element, clone);
+        return;
+      }
+      const text = n.textContent || "";
+      for (const w of text.split(/(\s+)/).filter(Boolean)) {
+        if (/^\s+$/.test(w)) {
+          dst.appendChild(document.createTextNode(w));
+          continue;
+        }
+        const outer = document.createElement("span");
+        outer.style.display = "inline-block";
+        outer.style.overflow = "hidden";
+        outer.style.verticalAlign = "bottom";
+        const inner = document.createElement("span");
+        inner.style.display = "inline-block";
+        inner.textContent = w;
+        outer.appendChild(inner);
+        dst.appendChild(outer);
+        inners.push(inner);
+      }
+    });
+  };
+  const holder = el.cloneNode(false) as Element;
+  walk(el, holder);
+  el.replaceChildren(...Array.from(holder.childNodes));
   return inners;
 }
 

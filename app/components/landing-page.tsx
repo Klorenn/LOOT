@@ -12,7 +12,6 @@ import {
   HeroStats,
   HowSection,
   SecuritySection,
-  WhoSection,
   type Stats,
 } from "@/components/landing-sections";
 import { ScrollProgress } from "@/components/scroll-progress";
@@ -140,8 +139,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                   className="max-w-[14ch] text-[clamp(52px,7vw,92px)] leading-[0.98] font-semibold tracking-[-0.04em]"
                 >
                   Puzzle chests that bots{" "}
-                  <span className="text-[var(--proof)]">can’t</span>{" "}
-                  <span className="text-[var(--proof-d)]">rob.</span>
+                  <span className="text-[var(--proof)]">can’t rob.</span>
                 </h1>
                 <p
                   data-hero-fade
@@ -161,9 +159,6 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                   <a href="#how" className="btn-landing btn-landing-s">
                     How it works
                   </a>
-                  <Link href="/attack" className="btn-landing btn-landing-s">
-                    See the theft live →
-                  </Link>
                 </div>
                 <HeroStats stats={stats} />
               </div>
@@ -186,7 +181,6 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
 
           <StackMarquee />
 
-          <WhoSection />
           <HowSection />
           <AttackSection />
 
@@ -221,7 +215,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                     k: "Replay",
                     h: "Nullifiers",
                     hc: "",
-                    b: "A proof can't be spent twice.",
+                    b: "Each proof works once.",
                   },
                   {
                     k: "Settlement",

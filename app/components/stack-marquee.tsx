@@ -40,7 +40,7 @@ const ITEMS: Item[] = [
     icon: <IconFreighter style={{ height: 20, width: "auto" }} />,
   },
   {
-    name: "Smart Account Kit",
+    name: "Passkeys",
     icon: <IconSmartAccountKit style={{ height: 22, width: "auto" }} />,
   },
 ];
