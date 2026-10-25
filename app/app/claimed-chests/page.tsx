@@ -7,8 +7,8 @@ import { LogoChest } from "@/components/logo-chest";
 import { StateBlock } from "@/components/state-block";
 import { Mono } from "@/components/kv";
 import { readWonChests, type WonChestsResult } from "@/lib/chain";
-import { chestPath } from "@/lib/chest-code";
-import { CONTRACTS, DEMO_CHEST, stroopsToXlm, tokenDecimals, tokenLabel } from "@/lib/config";
+import { ordinal } from "@/lib/factory";
+import { CONTRACTS, stroopsToXlm, tokenDecimals, tokenLabel } from "@/lib/config";
 import { getChest } from "@/lib/chests-demo";
 import { expertTx, shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";
@@ -102,7 +102,7 @@ export default function ClaimedChestsPage() {
             body="Only claims from the last ~7 days appear here (testnet event window). Solve a chest and it shows up in a few seconds."
             chest="closed"
             actions={[
-              { href: chestPath(DEMO_CHEST.id), label: "Open a chest →", primary: true },
+              { href: "/explore", label: "Explore chests →", primary: true },
               { href: "/#security", label: "See why proofs can’t be stolen" },
             ]}
           />
@@ -132,22 +132,22 @@ export default function ClaimedChestsPage() {
                 </thead>
                 <tbody>
                   {items.map((w) => {
-                    const cat = getChest(w.chestId);
+                    const cat = w.chestId >= 0 ? getChest(w.chestId) : undefined;
                     return (
-                      <tr key={`${w.txHash}-${w.chestId}`} className="border-b border-[var(--line)]">
+                      <tr key={`${w.txHash}-${w.code}`} className="border-b border-[var(--line)]">
                         <td className="py-4">
                           <LogoChest className="w-[44px]" deg={30} showInside />
                         </td>
                         <td className="py-4 font-mono text-[13px] text-[var(--dim)]">
-                          #{String(w.chestId).padStart(4, "0")}
+                          {w.chestId >= 0 ? `#${String(w.chestId).padStart(4, "0")}` : w.code}
                         </td>
                         <td className="py-4">
                           <p className="text-[15px] font-medium">
-                            {cat?.live ? cat.name : `Chest #${w.chestId}`}
+                            {cat?.live ? cat.name : w.chestId >= 0 ? `Chest #${w.chestId}` : `Chest ${w.code}`}
                           </p>
                           <p className="flex items-center gap-2 font-mono text-[12px] text-[var(--ok)]">
                             <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden />
-                            claimed by you
+                            {w.place ? `${ordinal(w.place)} place · claimed by you` : "claimed by you"}
                           </p>
                         </td>
                         <td className="py-4 text-right font-mono text-[14px] text-[var(--gold)]">
@@ -166,7 +166,7 @@ export default function ClaimedChestsPage() {
                           </a>
                         </td>
                         <td className="py-4 text-right">
-                          <Link href={chestPath(w.chestId)} className="btn-landing btn-landing-s btn-landing-sm">
+                          <Link href={`/chest/${w.code}`} className="btn-landing btn-landing-s btn-landing-sm">
                             Open
                           </Link>
                         </td>

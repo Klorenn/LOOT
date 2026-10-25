@@ -29,7 +29,7 @@ async function existsOnChain(id: number): Promise<boolean | null> {
 
 export async function GET() {
   // Solo cofres públicos; la sal no sale en el listado.
-  const stored = (await listChests()).map(({ salt: _s, ...c }) => (void _s, c));
+  const stored = (await listChests()).filter((c) => c.id !== undefined).map(({ salt: _s, ...c }) => (void _s, c));
   const demo = {
     id: DEMO_CHEST.id,
     template: "bounty",
@@ -42,7 +42,7 @@ export async function GET() {
   const ids = new Set(stored.map((c) => c.id));
   const all = ids.has(demo.id) ? stored : [demo, ...stored];
   const chests = await Promise.all(
-    all.map(async (c) => ({ ...c, onchain: await existsOnChain(c.id) })),
+    all.map(async (c) => ({ ...c, onchain: await existsOnChain(c.id as number) })),
   );
   return NextResponse.json({ chests });
 }

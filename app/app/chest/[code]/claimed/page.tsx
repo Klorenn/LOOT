@@ -1,4 +1,5 @@
-import { resolveChestParam } from "@/lib/chest-route";
+import { encodeRef } from "@/lib/chest-code";
+import { resolveChestRef } from "@/lib/chest-route";
 import { ClaimedClient } from "./claimed-client";
 
 export default async function ClaimedPage({
@@ -7,5 +8,11 @@ export default async function ClaimedPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  return <ClaimedClient chestId={resolveChestParam(code, "/claimed")} />;
+  const ref = resolveChestRef(code, "/claimed");
+  return (
+    <ClaimedClient
+      code={encodeRef(ref)}
+      label={ref.kind === "legacy" ? `#${String(ref.id).padStart(4, "0")}` : encodeRef(ref)}
+    />
+  );
 }

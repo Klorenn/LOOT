@@ -4,9 +4,16 @@ import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client, networks } from "@findloot/chest";
 import { NETWORK } from "@/lib/config";
 import { withRpcUrl } from "@/lib/rpc";
+import { Address, xdr } from "@stellar/stellar-sdk";
+import { decodeRef } from "@/lib/chest-code";
+import { factoryAddressAt } from "@/lib/factory";
+import { invokeAsRelayer } from "@/lib/relayer-invoke";
 
 type Body = {
-  chestId: number;
+  /** código de URL del cofre (legacy o factory) */
+  chest?: string;
+  /** legacy: id numérico (clientes viejos) */
+  chestId?: number;
   recipient: string;
   nullifierHex: string;
   proof: { a: string; b: string; c: string };
@@ -23,8 +30,7 @@ const isHex = (v: unknown, bytes: number): v is string =>
 function validBody(b: Partial<Body> | null): b is Body {
   return (
     !!b &&
-    Number.isSafeInteger(b.chestId) &&
-    (b.chestId as number) >= 0 &&
+    (typeof b.chest === "string" || (Number.isSafeInteger(b.chestId) && (b.chestId as number) >= 0)) &&
     typeof b.recipient === "string" &&
     /^[GC][A-Z2-7]{55}$/.test(b.recipient) &&
     isHex(b.nullifierHex, 32) &&
@@ -51,6 +57,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "bad request" }, { status: 400 });
     }
     const body = parsed;
+
+    // Cofre de la factory: la dirección del contrato sale de la factory (nunca del cliente).
+    const ref = typeof body.chest === "string" ? decodeRef(body.chest) : null;
+    if (typeof body.chest === "string" && !ref) {
+      return NextResponse.json({ error: "bad request" }, { status: 400 });
+    }
+    if (ref?.kind === "factory") {
+      const address = await factoryAddressAt(ref.index);
+      if (!address) return NextResponse.json({ error: "bad request" }, { status: 400 });
+      const proofScVal = xdr.ScVal.scvMap(
+        (["a", "b", "c"] as const).map(
+          (k) =>
+            new xdr.ScMapEntry({
+              key: xdr.ScVal.scvSymbol(k),
+              val: xdr.ScVal.scvBytes(hexToBuf(body.proof[k])),
+            }),
+        ),
+      );
+      const r = await invokeAsRelayer(
+        address,
+        "claim",
+        [
+          Address.fromString(body.recipient).toScVal(),
+          xdr.ScVal.scvBytes(hexToBuf(body.nullifierHex)),
+          proofScVal,
+        ],
+        { cpuInstructions: 100_000_000 },
+      );
+      return NextResponse.json({
+        ok: true,
+        hash: r.hash,
+        ledger: r.ledger,
+        explorer: `https://stellar.expert/explorer/testnet/tx/${r.hash}`,
+      });
+    }
+    const legacyId = ref?.kind === "legacy" ? ref.id : (body.chestId as number);
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
 
@@ -67,7 +109,7 @@ export async function POST(req: NextRequest) {
 
         const tx = await client.claim(
           {
-            chest_id: BigInt(body.chestId),
+            chest_id: BigInt(legacyId),
             recipient: body.recipient,
             nullifier: hexToBuf(body.nullifierHex),
             proof: {

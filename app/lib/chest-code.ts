@@ -30,3 +30,32 @@ export function decodeChestId(code: string): number | null {
 
 /** Ruta pública de un cofre. */
 export const chestPath = (id: number) => `/chest/${encodeChestId(id)}`;
+
+/**
+ * Referencia a un cofre: legacy (id numérico en el contrato registry) o de la factory
+ * (posición en `list_chests`; la dirección del contrato se resuelve on-chain).
+ * Códigos: legacy = Sqids([id]) (sin cambios, los links viejos siguen vivos),
+ * factory = Sqids([1, index]).
+ */
+export type ChestRef = { kind: "legacy"; id: number } | { kind: "factory"; index: number };
+
+export function encodeRef(ref: ChestRef): string {
+  if (ref.kind === "legacy") return encodeChestId(ref.id);
+  if (!Number.isSafeInteger(ref.index) || ref.index < 0) throw new Error(`bad factory index ${ref.index}`);
+  return sqids.encode([1, ref.index]);
+}
+
+export function decodeRef(code: string): ChestRef | null {
+  if (!/^[a-z0-9]{8,32}$/.test(code)) return null;
+  const nums = sqids.decode(code);
+  if (nums.length === 1) {
+    return sqids.encode([nums[0]]) === code ? { kind: "legacy", id: nums[0] } : null;
+  }
+  if (nums.length === 2 && nums[0] === 1) {
+    return sqids.encode(nums) === code ? { kind: "factory", index: nums[1] } : null;
+  }
+  return null;
+}
+
+export const refPath = (ref: ChestRef) => `/chest/${encodeRef(ref)}`;
+export const factoryPath = (index: number) => refPath({ kind: "factory", index });

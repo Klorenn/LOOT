@@ -16,7 +16,10 @@ import { del, get, list, put } from "@vercel/blob";
  */
 
 export type ChestMeta = {
-  id: number;
+  /** Cofre legacy (contrato registry): id numérico. */
+  id?: number;
+  /** Cofre de la factory: dirección del contrato. Exactamente uno de id/address. */
+  address?: string;
   template?: string;
   question: string;
   hint?: string;
@@ -33,7 +36,7 @@ export type ChestMeta = {
   createdAt: string;
 };
 
-export type PendingMeta = Omit<ChestMeta, "id" | "createdAt" | "txHash"> & {
+export type PendingMeta = Omit<ChestMeta, "id" | "address" | "createdAt" | "txHash"> & {
   creator: string;
   reservedAt: string;
 };
@@ -115,12 +118,17 @@ async function readLegacyFile(id: number): Promise<ChestMeta | null> {
   return (await fileReadAll<ChestMeta>(FILE))[String(id)] ?? null;
 }
 
-export async function getChestMeta(id: number): Promise<ChestMeta | null> {
+/** Clave de Blob: legacy en chests/<id>, factory en factory/<address> (prefijo aparte: main no lo lista). */
+const metaKey = (k: number | string) => (typeof k === "number" ? `chests/${k}.json` : `factory/${k}.json`);
+const fileKey = (k: number | string) => String(k);
+
+export async function getChestMeta(key: number | string): Promise<ChestMeta | null> {
   if (hasBlob()) {
-    const m = await blobRead<ChestMeta>(`chests/${id}.json`);
+    const m = await blobRead<ChestMeta>(metaKey(key));
     if (m) return m;
   }
-  return readLegacyFile(id); // legado / dev local (en Vercel el archivo no existe: null)
+  if (typeof key === "string") return (await fileReadAll<ChestMeta>(FILE))[key] ?? null;
+  return readLegacyFile(key); // legado / dev local (en Vercel el archivo no existe: null)
 }
 
 /** Reserva (write-once) los metadatos de un cofre por su huella, antes de crearlo on-chain. */
@@ -138,17 +146,18 @@ export async function getPending(fingerprintHex: string): Promise<PendingMeta | 
   return (await fileReadAll<PendingMeta>(PENDING_FILE))[fingerprintHex] ?? null;
 }
 
-/** Publica (write-once) los metadatos definitivos por id de cofre. Devuelve los que queden guardados. */
+/** Publica (write-once) los metadatos definitivos por id/dirección de cofre. Devuelve los que queden guardados. */
 export async function saveChestMeta(meta: ChestMeta): Promise<ChestMeta> {
+  const key = (meta.address ?? meta.id) as number | string;
   if (backend() === "blob") {
-    const r = await blobWriteOnce(`chests/${meta.id}.json`, meta);
-    if (r === "exists") return (await blobRead<ChestMeta>(`chests/${meta.id}.json`)) ?? meta;
+    const r = await blobWriteOnce(metaKey(key), meta);
+    if (r === "exists") return (await blobRead<ChestMeta>(metaKey(key))) ?? meta;
     await del(`pending/${meta.fingerprintHex}.json`, auth()).catch(() => {});
     return meta;
   }
   const all = await fileReadAll<ChestMeta>(FILE);
-  if (all[String(meta.id)]) return all[String(meta.id)];
-  all[String(meta.id)] = meta;
+  if (all[fileKey(key)]) return all[fileKey(key)];
+  all[fileKey(key)] = meta;
   await fileWriteAll(FILE, all);
   const pend = await fileReadAll<PendingMeta>(PENDING_FILE);
   delete pend[meta.fingerprintHex];
@@ -163,13 +172,18 @@ export async function listPublicMetas(): Promise<ChestMeta[]> {
   if (publicCache && Date.now() - publicCache.at < 30_000) return publicCache.value;
   let metas: ChestMeta[] = Object.values(await fileReadAll<ChestMeta>(FILE));
   if (hasBlob()) {
-    const { blobs } = await list({ prefix: "chests/", limit: 500, ...auth() });
-    const fetched = await Promise.all(blobs.map((b) => blobRead<ChestMeta>(b.pathname)));
-    const byId = new Map(metas.map((m) => [m.id, m]));
-    for (const m of fetched) if (m) byId.set(m.id, m);
-    metas = [...byId.values()];
+    const [a, b] = await Promise.all([
+      list({ prefix: "chests/", limit: 500, ...auth() }),
+      list({ prefix: "factory/", limit: 500, ...auth() }),
+    ]);
+    const fetched = await Promise.all([...a.blobs, ...b.blobs].map((x) => blobRead<ChestMeta>(x.pathname)));
+    const byKey = new Map(metas.map((m) => [m.address ?? m.id, m]));
+    for (const m of fetched) if (m) byKey.set(m.address ?? m.id, m);
+    metas = [...byKey.values()];
   }
-  const value = metas.filter((m) => m.listed !== false).sort((a, b) => b.id - a.id);
+  const value = metas
+    .filter((m) => m.listed !== false)
+    .sort((x, y) => (y.createdAt ?? "").localeCompare(x.createdAt ?? ""));
   publicCache = { at: Date.now(), value };
   return value;
 }

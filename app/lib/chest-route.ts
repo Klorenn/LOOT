@@ -1,5 +1,5 @@
 import { notFound, permanentRedirect } from "next/navigation";
-import { chestPath, decodeChestId } from "./chest-code";
+import { chestPath, decodeChestId, decodeRef, type ChestRef } from "./chest-code";
 
 /**
  * Resuelve el segmento /chest/<param> (solo servidor):
@@ -10,6 +10,14 @@ import { chestPath, decodeChestId } from "./chest-code";
 export function resolveChestParam(param: string, suffix = ""): number {
   const id = decodeChestId(param);
   if (id !== null) return id;
+  if (/^\d{1,9}$/.test(param)) permanentRedirect(`${chestPath(Number(param))}${suffix}`);
+  notFound();
+}
+
+/** Igual que resolveChestParam pero devuelve la referencia completa (legacy o factory). */
+export function resolveChestRef(param: string, suffix = ""): ChestRef {
+  const ref = decodeRef(param);
+  if (ref) return ref;
   if (/^\d{1,9}$/.test(param)) permanentRedirect(`${chestPath(Number(param))}${suffix}`);
   notFound();
 }

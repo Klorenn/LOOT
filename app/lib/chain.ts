@@ -9,7 +9,9 @@ import {
   scValToNative,
   xdr,
 } from "@stellar/stellar-sdk";
-import { CONTRACTS, NETWORK } from "./config";
+import { CONTRACTS, FACTORY, NETWORK } from "./config";
+import { encodeChestId, encodeRef } from "./chest-code";
+import { allFactoryAddresses, factoryIndexOf } from "./factory";
 import { withRpc } from "./rpc";
 
 /**
@@ -26,7 +28,7 @@ const noteLedger = (seq: number | undefined) => {
   if (seq) seen = { seq, at: Date.now() };
 };
 
-async function simulateRead(
+export async function simulateRead(
   contractId: string,
   method: string,
   args: xdr.ScVal[],
@@ -89,7 +91,14 @@ export async function readPrizeBalance(address: string): Promise<bigint> {
 }
 
 export type WonChest = {
+  /** id legacy; -1 en cofres de la factory (ver `address`) */
   chestId: number;
+  /** cofre de la factory: dirección del contrato */
+  address?: string;
+  /** segmento de URL /chest/<code> */
+  code: string;
+  /** lugar (1-based) en cofres de la factory */
+  place?: number;
   /** unidades mínimas del token del cofre */
   prize: bigint;
   /** SAC del token pagado (se resuelve con get_chest; "" si no se pudo leer) */
@@ -152,14 +161,77 @@ type EventFilter = {
   topics: string[][];
 };
 
+/** Hasta 5 filtros × 5 contratos por request del RPC. */
+const MAX_FILTERS = 5;
+const IDS_PER_FILTER = 5;
+
 async function scanEvents(name: "claimed" | "created"): Promise<EventsScan> {
-  return scanWithFilters([
-    {
-      type: "contract" as const,
-      contractIds: [CONTRACTS.chest],
-      topics: [[xdr.ScVal.scvSymbol(name).toXDR("base64"), "*"]],
-    },
-  ]);
+  const topic = (n: string) => [xdr.ScVal.scvSymbol(n).toXDR("base64"), "*"];
+  if (name === "created") {
+    return scanWithFilters([
+      { type: "contract" as const, contractIds: [CONTRACTS.chest], topics: [topic("created")] },
+      { type: "contract" as const, contractIds: [FACTORY.contract], topics: [topic("chest_created")] },
+    ]);
+  }
+  // claimed: contrato legacy + los cofres de la factory más nuevos que quepan (24 en total)
+  const chests = (await allFactoryAddresses().catch(() => [] as string[])).slice().reverse();
+  const filters: EventFilter[] = [
+    { type: "contract", contractIds: [CONTRACTS.chest], topics: [topic("claimed")] },
+  ];
+  const room = (MAX_FILTERS - 1) * IDS_PER_FILTER + (IDS_PER_FILTER - 1);
+  for (let i = 0; i < Math.min(chests.length, room); i += IDS_PER_FILTER) {
+    const ids = chests.slice(i, i + IDS_PER_FILTER);
+    if (i === 0 && ids.length) {
+      // el primer filtro ya tiene el contrato legacy: completa con hasta 4 cofres
+      filters[0].contractIds.push(...ids.slice(0, IDS_PER_FILTER - 1));
+      const rest = ids.slice(IDS_PER_FILTER - 1);
+      if (rest.length) filters.push({ type: "contract", contractIds: rest, topics: [topic("claimed")] });
+    } else {
+      filters.push({ type: "contract", contractIds: ids, topics: [topic("claimed")] });
+    }
+    if (filters.length >= MAX_FILTERS) break;
+  }
+  return scanWithFilters(filters);
+}
+
+type ParsedClaim = {
+  chestId: number;
+  address?: string;
+  place?: number;
+  recipient: string;
+  prize: bigint;
+  token: string;
+  code: string;
+};
+
+/** `claimed` legacy: topic[1]=id u64, valor (receptor, premio). Factory: topic[1]=dirección, valor (receptor, lugar, premio). */
+async function parseClaimed(ev: rpc.Api.EventResponse): Promise<ParsedClaim | null> {
+  try {
+    const key = scValToNative(ev.topic[1]);
+    const val = scValToNative(ev.value) as unknown[];
+    if (typeof key === "string") {
+      const idx = await factoryIndexOf(key);
+      if (idx === null) return null;
+      return {
+        chestId: -1,
+        address: key,
+        place: Number(val[1]),
+        recipient: String(val[0]),
+        prize: BigInt(val[2] as bigint),
+        token: CONTRACTS.token,
+        code: encodeRef({ kind: "factory", index: idx }),
+      };
+    }
+    return {
+      chestId: Number(key),
+      recipient: String(val[0]),
+      prize: BigInt(val[1] as bigint),
+      token: "",
+      code: encodeChestId(Number(key)),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Ventana máxima que el RPC escanea por request (el resto se pide en ventanas paralelas). */
@@ -269,25 +341,24 @@ export async function readWonChests(address: string): Promise<WonChestsResult> {
   const scan = await scanEvents("claimed");
   const items: WonChest[] = [];
   for (const ev of scan.events) {
-    try {
-      const val = scValToNative(ev.value) as [unknown, unknown];
-      if (String(val[0]) !== address) continue;
-      items.push({
-        chestId: Number(scValToNative(ev.topic[1])),
-        prize: BigInt(val[1] as bigint),
-        token: "",
-        txHash: ev.txHash,
-        ledger: ev.ledger,
-        closedAt: ev.ledgerClosedAt,
-      });
-    } catch {
-      /* evento con forma inesperada: se ignora */
-    }
+    const c = await parseClaimed(ev);
+    if (!c || c.recipient !== address) continue;
+    items.push({
+      chestId: c.chestId,
+      address: c.address,
+      code: c.code,
+      place: c.place,
+      prize: c.prize,
+      token: c.token,
+      txHash: ev.txHash,
+      ledger: ev.ledger,
+      closedAt: ev.ledgerClosedAt,
+    });
   }
-  // el evento no trae el token: se resuelve una vez por cofre
+  // el evento legacy no trae el token: se resuelve una vez por cofre
   const tokens = new Map<number, string>();
   await Promise.all(
-    [...new Set(items.map((i) => i.chestId))].map(async (id) => {
+    [...new Set(items.filter((i) => !i.token).map((i) => i.chestId))].map(async (id) => {
       try {
         tokens.set(id, (await readChest(id)).token);
       } catch {
@@ -295,7 +366,7 @@ export async function readWonChests(address: string): Promise<WonChestsResult> {
       }
     }),
   );
-  for (const it of items) it.token = tokens.get(it.chestId) ?? "";
+  for (const it of items) if (!it.token) it.token = tokens.get(it.chestId) ?? "";
   items.sort((a, b) => b.ledger - a.ledger);
   return {
     items,
@@ -316,7 +387,7 @@ export type ProtocolStats = {
   truncated: boolean;
 };
 
-/** Contadores reales del contrato principal a partir de sus eventos (ventana del RPC). */
+/** Contadores reales (contrato legacy + factory) a partir de sus eventos (ventana del RPC). */
 export async function readProtocolStats(): Promise<ProtocolStats> {
   // `rejected` no se cuenta: la tx de un claim inválido revierte y sus eventos no se guardan.
   const [claimed, created] = await Promise.all([
@@ -324,23 +395,17 @@ export async function readProtocolStats(): Promise<ProtocolStats> {
     scanEvents("created"),
   ]);
 
-  // El evento no dice el token: se resuelve por cofre y solo se suma XLM.
-  const perChest = new Map<number, bigint>();
-  for (const ev of claimed.events) {
-    try {
-      const val = scValToNative(ev.value) as [unknown, unknown];
-      const id = Number(scValToNative(ev.topic[1]));
-      perChest.set(
-        id,
-        (perChest.get(id) ?? BigInt(0)) + BigInt(val[1] as bigint),
-      );
-    } catch {
-      /* ignorado */
-    }
-  }
+  // Solo se suma XLM: factory siempre paga XLM; legacy se resuelve por cofre.
   let paid = BigInt(0);
+  const perLegacy = new Map<number, bigint>();
+  for (const ev of claimed.events) {
+    const c = await parseClaimed(ev);
+    if (!c) continue;
+    if (c.address) paid += c.prize;
+    else perLegacy.set(c.chestId, (perLegacy.get(c.chestId) ?? BigInt(0)) + c.prize);
+  }
   await Promise.all(
-    [...perChest].map(async ([id, sum]) => {
+    [...perLegacy].map(async ([id, sum]) => {
       try {
         if ((await readChest(id)).token === CONTRACTS.token) paid += sum;
       } catch {
@@ -360,7 +425,10 @@ export async function readProtocolStats(): Promise<ProtocolStats> {
 }
 
 export type ClaimedEvent = {
+  /** id legacy; -1 en cofres de la factory */
   chestId: number;
+  address?: string;
+  place?: number;
   /** unidades mínimas del token del cofre */
   prize: bigint;
   recipient: string;
@@ -378,19 +446,18 @@ export async function readClaimedEvents(): Promise<{
   const scan = await scanEvents("claimed");
   const items: ClaimedEvent[] = [];
   for (const ev of scan.events) {
-    try {
-      const val = scValToNative(ev.value) as [unknown, unknown];
-      items.push({
-        chestId: Number(scValToNative(ev.topic[1])),
-        prize: BigInt(val[1] as bigint),
-        recipient: String(val[0]),
-        txHash: ev.txHash,
-        ledger: ev.ledger,
-        closedAt: ev.ledgerClosedAt,
-      });
-    } catch {
-      /* evento con forma inesperada: se ignora */
-    }
+    const c = await parseClaimed(ev);
+    if (!c) continue;
+    items.push({
+      chestId: c.chestId,
+      address: c.address,
+      place: c.place,
+      prize: c.prize,
+      recipient: c.recipient,
+      txHash: ev.txHash,
+      ledger: ev.ledger,
+      closedAt: ev.ledgerClosedAt,
+    });
   }
   return { items, oldestLedger: scan.oldestLedger, truncated: scan.truncated };
 }

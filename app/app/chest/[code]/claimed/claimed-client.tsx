@@ -6,8 +6,6 @@ import { LogoChest } from "@/components/logo-chest";
 import { CellsBackground } from "@/components/cells-background";
 import { Em } from "@/components/page-header";
 import { KV, Mono } from "@/components/kv";
-import { chestPath } from "@/lib/chest-code";
-import { DEMO_CHEST } from "@/lib/config";
 import { loadPlayer } from "@/lib/wallet";
 
 type ClaimTx = {
@@ -22,9 +20,9 @@ function shortAddr(a: string) {
   return `${a.slice(0, 4)}…${a.slice(-4)}`;
 }
 
-export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
-  const id = String(chestNum);
-  const chestId = id.padStart(4, "0");
+export function ClaimedClient({ code, label }: { code: string; label: string }) {
+  const id = code;
+  const chestId = label;
   const [deg, setDeg] = useState(0);
   const [tx, setTx] = useState<ClaimTx | null>(null);
   const [addr, setAddr] = useState("");
@@ -79,12 +77,12 @@ export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
       <main className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="text-[var(--muted)]">
           No claim is recorded in this browser session, so we can&apos;t confirm a
-          prize for chest #{chestId}. Your wallet lists every chest you won.
+          prize for chest {chestId}. Your wallet lists every chest you won.
         </p>
         <Link href="/claimed-chests" className="btn-landing btn-landing-p">
           My claimed chests
         </Link>
-        <Link href={chestPath(chestNum)} className="btn-landing btn-landing-s">
+        <Link href={`/chest/${code}`} className="btn-landing btn-landing-s">
           Back to the chest
         </Link>
       </main>
@@ -119,7 +117,7 @@ export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
           </p>
 
           <h1 className="mt-4 text-[clamp(40px,6vw,64px)] leading-[1.02] font-semibold tracking-[-0.04em]">
-            Chest #{chestId} is <Em tone="ok">yours.</Em>
+            Chest {chestId} is <Em tone="ok">yours.</Em>
           </h1>
 
           <p className="mt-5 max-w-[36rem] text-[18px] leading-[1.55] text-[var(--muted)]">
@@ -134,7 +132,7 @@ export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href={chestPath(DEMO_CHEST.id)} className="btn-landing btn-landing-p">
+            <Link href="/explore" className="btn-landing btn-landing-p">
               Open another chest →
             </Link>
             {tx?.explorer ? (

@@ -1,15 +1,20 @@
-import { chestPath } from "./chest-code";
 import { readChest, readClaimedEvents, type ClaimedEvent, type OnChainChest } from "./chain";
+import { chestView, factoryView, legacyView, statusOf, type ChestStatus, type ChestView } from "./views";
 import { getChest as demoMeta } from "./chests-demo";
 import { getChestMeta, listPublicMetas } from "./chest-store";
-import { CONTRACTS, DEMO_CHEST, HIDDEN_CHEST_IDS, LISTED_CHEST_IDS, stroopsToXlm, tokenDecimals, tokenLabel } from "./config";
+import { allFactoryAddresses, readFactoryChest, type FactoryChest } from "./factory";
+import { CONTRACTS, DEMO_CHEST, HIDDEN_CHEST_IDS, LISTED_CHEST_IDS, LISTED_FACTORY_ADDRESSES } from "./config";
+
+export { statusOf, type ChestStatus };
 
 /** Solo servidor. Lecturas de cadena con failover (lib/rpc.ts) y caché en memoria de 30 s. */
 
 const TTL = 30_000;
 const MAX_SCAN = 300;
+const MAX_FACTORY_READ = 80;
 
-let chestsCache: { at: number; value: OnChainChest[] } | null = null;
+let legacyCache: { at: number; value: OnChainChest[] } | null = null;
+let factoryCache: { at: number; value: FactoryChest[] } | null = null;
 let claimedCache: { at: number; value: ClaimedEvent[] } | null = null;
 
 const isMissing = (e: unknown) =>
@@ -17,9 +22,9 @@ const isMissing = (e: unknown) =>
     (e as { message?: string })?.message ?? String(e),
   );
 
-/** Todos los cofres del contrato principal (ids 1.. hasta el primero que no existe). */
+/** Todos los cofres del contrato legacy (ids 1.. hasta el primero que no existe). */
 export async function readAllChests(fresh = false): Promise<OnChainChest[]> {
-  if (!fresh && chestsCache && Date.now() - chestsCache.at < TTL) return chestsCache.value;
+  if (!fresh && legacyCache && Date.now() - legacyCache.at < TTL) return legacyCache.value;
   const out: OnChainChest[] = [];
   const CHUNK = 6;
   for (let start = 1; start <= MAX_SCAN; start += CHUNK) {
@@ -36,7 +41,25 @@ export async function readAllChests(fresh = false): Promise<OnChainChest[]> {
     for (const r of firstMissing === -1 ? res : res.slice(0, firstMissing)) if (r) out.push(r);
     if (firstMissing !== -1) break;
   }
-  chestsCache = { at: Date.now(), value: out };
+  legacyCache = { at: Date.now(), value: out };
+  return out;
+}
+
+/** Los cofres más nuevos de la factory (hasta MAX_FACTORY_READ), con su posición. */
+export async function readAllFactory(fresh = false): Promise<FactoryChest[]> {
+  if (!fresh && factoryCache && Date.now() - factoryCache.at < TTL) return factoryCache.value;
+  const addrs = await allFactoryAddresses(fresh);
+  const from = Math.max(0, addrs.length - MAX_FACTORY_READ);
+  const idx = Array.from({ length: addrs.length - from }, (_, i) => from + i);
+  const out: FactoryChest[] = [];
+  const CHUNK = 6;
+  for (let i = 0; i < idx.length; i += CHUNK) {
+    const part = await Promise.all(
+      idx.slice(i, i + CHUNK).map((k) => readFactoryChest(addrs[k], k).catch(() => null)),
+    );
+    for (const c of part) if (c) out.push(c);
+  }
+  factoryCache = { at: Date.now(), value: out };
   return out;
 }
 
@@ -47,10 +70,10 @@ export async function readClaimedCached(): Promise<ClaimedEvent[]> {
   return items;
 }
 
-export type ChestStatus = "open" | "claimed" | "expired";
-
 export type ChestRowData = {
+  /** legacy: id; factory: posición en la factory (solo como clave) */
   id: number;
+  kind: "legacy" | "factory";
   code: string;
   href: string;
   name: string;
@@ -61,83 +84,111 @@ export type ChestRowData = {
   maxClaims: number;
   prizeLabel: string;
   prizeStroops: string;
+  /** premio por lugar (XLM), orden de reclamo */
+  prizes: string[];
   token: string;
   creator: string;
   deadline: number;
+  /** factory: tope de lo que devuelve cerrar (premio sin reclamar + reserva de fees) */
+  refundStroops: string | null;
+  poolStroops: string;
+  address: string | null;
 };
 
-export function statusOf(c: OnChainChest, nowSec = Math.floor(Date.now() / 1000)): ChestStatus {
-  if (c.closed || c.claims >= c.maxClaims) return "claimed";
-  if (c.deadline && c.deadline < nowSec) return "expired";
-  return "open";
-}
-
-export async function toRow(c: OnChainChest): Promise<ChestRowData> {
-  const demo = demoMeta(c.id);
-  let name = demo?.name;
-  let question = c.id === DEMO_CHEST.id ? DEMO_CHEST.question : demo?.question;
-  let difficulty = demo?.difficulty ?? null;
-  if (!question) {
-    const meta = await getChestMeta(c.id).catch(() => null);
-    question = meta?.question;
-    difficulty = meta?.difficulty ?? difficulty;
-  }
-  const amount = stroopsToXlm(c.prize, tokenDecimals(c.token));
+export function toRowFromView(v: ChestView, index = 0): ChestRowData {
+  const demo = v.id !== undefined ? demoMeta(v.id) : undefined;
+  const isDemo = v.address ? v.address === DEMO_CHEST.address : false;
+  const name =
+    demo?.name ??
+    (isDemo ? "Who created SCP" : v.question.length > 44 ? `${v.question.slice(0, 43)}…` : v.question);
   return {
-    id: c.id,
-    code: chestPath(c.id).replace("/chest/", ""),
-    href: chestPath(c.id),
-    name: name ?? `Chest #${String(c.id).padStart(4, "0")}`,
-    question: question ?? "—",
-    difficulty,
-    status: statusOf(c),
-    claims: c.claims,
-    maxClaims: c.maxClaims,
-    prizeLabel: `${amount} ${tokenLabel(c.token)}`,
-    prizeStroops: c.prize.toString(),
-    token: c.token,
-    creator: c.creator,
-    deadline: c.deadline,
+    id: v.id ?? index,
+    kind: v.kind,
+    code: v.code,
+    href: v.href,
+    name: v.kind === "legacy" && !demo ? `Chest #${String(v.id).padStart(4, "0")}` : name,
+    question: v.question,
+    difficulty: v.difficulty ?? null,
+    status: statusOf(v),
+    claims: v.claims,
+    maxClaims: v.maxClaims,
+    prizeLabel: v.prizeLabel,
+    prizeStroops: v.prizeStroops,
+    prizes: v.prizes,
+    token: v.token,
+    creator: v.creator,
+    deadline: v.deadline,
+    refundStroops: v.refundStroops ?? null,
+    poolStroops: v.poolStroops,
+    address: v.address ?? null,
   };
 }
 
-/** Cofres listados en /explore: LISTED_CHEST_IDS + cofres públicos (listed:true) del almacén de metadatos. */
+const metaOf = (key: number | string) => getChestMeta(key).catch(() => null);
+
+/** /explore: curados (demo, attack…) + cofres públicos (listed:true) de factory y legacy. */
 export async function listExploreRows(): Promise<ChestRowData[]> {
-  const all = await readAllChests();
-  const publicIds = new Set(
-    (await listPublicMetas().catch(() => [])).filter((m) => m.listed === true).map((m) => m.id),
-  );
-  const listed = all.filter(
-    (c) => (LISTED_CHEST_IDS.includes(c.id) || publicIds.has(c.id)) && !HIDDEN_CHEST_IDS.includes(c.id),
-  );
-  return Promise.all(listed.map(toRow));
+  const publicMetas = (await listPublicMetas().catch(() => [])).filter((m) => m.listed === true);
+  const publicAddrs = new Set(publicMetas.flatMap((m) => (m.address ? [m.address] : [])));
+  const publicIds = new Set(publicMetas.flatMap((m) => (m.id !== undefined ? [m.id] : [])));
+
+  const [factory, legacy] = await Promise.all([readAllFactory(), readAllChests()]);
+  const rows: ChestRowData[] = [];
+  for (const c of factory) {
+    if (!(LISTED_FACTORY_ADDRESSES.includes(c.address) || publicAddrs.has(c.address))) continue;
+    rows.push(toRowFromView(factoryView(c, await metaOf(c.address)), c.index));
+  }
+  for (const c of legacy) {
+    const listed = LISTED_CHEST_IDS.includes(c.id) || publicIds.has(c.id);
+    if (!listed || HIDDEN_CHEST_IDS.includes(c.id)) continue;
+    rows.push(toRowFromView(legacyView(c, await metaOf(c.id))));
+  }
+  // demo primero, luego lo más nuevo (factory por posición, legacy al final)
+  rows.sort((a, b) => {
+    const da = a.address === DEMO_CHEST.address && a.address ? 1 : 0;
+    const db = b.address === DEMO_CHEST.address && b.address ? 1 : 0;
+    if (da !== db) return db - da;
+    if (a.kind !== b.kind) return a.kind === "factory" ? -1 : 1;
+    return b.id - a.id;
+  });
+  return rows;
 }
 
 export type DashboardData = {
   rows: ChestRowData[];
-  /** stroops por cupo restante de los cofres abiertos del creador (solo XLM) */
+  /** stroops aún sin reclamar en los cofres abiertos del creador (solo XLM) */
   inEscrowStroops: string;
   /** stroops pagados por esos cofres en la ventana del RPC (solo XLM) */
   paidStroops: string;
 };
 
 export async function dashboardFor(address: string, fresh = false): Promise<DashboardData> {
-  const all = await readAllChests(fresh);
-  const mine = all.filter((c) => c.creator === address);
-  const ids = new Set(mine.map((c) => c.id));
-  let escrow = BigInt(0);
-  for (const c of mine) {
-    if (c.token === CONTRACTS.token && !c.closed) {
-      escrow += c.prize * BigInt(Math.max(0, c.maxClaims - c.claims));
-    }
+  const [factory, legacy] = await Promise.all([readAllFactory(fresh), readAllChests(fresh)]);
+  const views: ChestView[] = [];
+  const idx: number[] = [];
+  for (const c of factory.filter((c) => c.creator === address)) {
+    views.push(factoryView(c, await metaOf(c.address)));
+    idx.push(c.index);
   }
+  for (const c of legacy.filter((c) => c.creator === address)) {
+    views.push(legacyView(c, await metaOf(c.id)));
+    idx.push(0);
+  }
+  let escrow = BigInt(0);
+  for (const v of views) if (v.token === CONTRACTS.token && !v.closed) escrow += BigInt(v.poolStroops);
+
+  const ids = new Set(views.flatMap((v) => (v.id !== undefined ? [v.id] : [])));
+  const addrs = new Set(views.flatMap((v) => (v.address ? [v.address] : [])));
   let paid = BigInt(0);
   const claimed = await readClaimedCached();
-  const xlmChests = new Set(mine.filter((c) => c.token === CONTRACTS.token).map((c) => c.id));
-  for (const e of claimed) if (ids.has(e.chestId) && xlmChests.has(e.chestId)) paid += e.prize;
+  for (const e of claimed) {
+    if (e.address ? addrs.has(e.address) : ids.has(e.chestId)) paid += e.prize;
+  }
   return {
-    rows: await Promise.all(mine.map(toRow)),
+    rows: views.map((v, i) => toRowFromView(v, idx[i])).sort((a, b) => (a.kind === b.kind ? b.id - a.id : a.kind === "factory" ? -1 : 1)),
     inEscrowStroops: escrow.toString(),
     paidStroops: paid.toString(),
   };
 }
+
+export { chestView };

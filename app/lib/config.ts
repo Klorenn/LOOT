@@ -24,6 +24,20 @@ export const CONTRACTS = {
 /** SAC del XLM nativo (testnet). */
 export const XLM_SAC = CONTRACTS.token;
 
+/**
+ * Factory (un contrato por cofre). Espejo de deployments/factory-testnet.json: la config
+ * on-chain (get_config) manda; esto es el fallback para cotizar sin RPC.
+ */
+export const FACTORY = {
+  contract: "CBKH5Z25DDQRGMJDXQWUADOND4DUM5CN4CVZOX7M3OFH2HL7KYFONRRV",
+  treasury: "GBTDED5SE2QAKFQ3Y6NY75QGCKQTQ3Z6H3ZYM4PWUX3X36QMOKEEJFPQ",
+  creationFeeStroops: BigInt(50_000_000),
+  dailyFeeBps: 10,
+  maxDurationDays: 30,
+  maxPlaces: 50,
+  maxQuestionLen: 280,
+} as const;
+
 export const PRIZE = {
   code: "XLM",
   decimals: 7,
@@ -60,6 +74,8 @@ export function stroopsToXlm(
  * Cofre demo para jueces / demo en vivo (pregunta sobre Stellar).
  */
 export const DEMO_CHEST = {
+  /** Dirección del cofre demo en la factory ("" = el demo sigue siendo el cofre legacy `id`). */
+  address: "" as string,
   // #6: premio XLM nativo, 10 XLM × 10 slots (creado con bot/setup-xlm-chests.mjs).
   // La respuesta NO está en el repo: solo la sal y la huella (públicas).
   // Fallbacks desactivados: #5 (misma config XLM, pregunta anterior; ya sin uso)
@@ -87,6 +103,9 @@ export const DEMO_CHEST = {
  * #7 de la demo de ataque, #8 de QA) existe on-chain pero no se lista.
  */
 export const LISTED_CHEST_IDS: readonly number[] = [DEMO_CHEST.id];
+
+/** Cofres de la factory (dirección del contrato) siempre listados en /explore: demo y demás curados. */
+export const LISTED_FACTORY_ADDRESSES: readonly string[] = DEMO_CHEST.address ? [DEMO_CHEST.address] : [];
 
 /** Cofres de prueba públicos (#9, #10, #11) que no se listan en /explore; sus páginas siguen funcionando. */
 export const HIDDEN_CHEST_IDS: readonly number[] = [9, 10, 11];

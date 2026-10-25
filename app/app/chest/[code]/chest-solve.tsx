@@ -16,10 +16,15 @@ import { chestPath } from "@/lib/chest-code";
 import { DEMO_CHEST, PRIZE, ZK_ASSETS } from "@/lib/config";
 import { getChest } from "@/lib/chests-demo";
 import { recipientField } from "@/lib/recipient";
+import { ordinal } from "@/lib/factory";
 import { useSession } from "@/lib/session";
 import { PasskeyUnavailableError } from "@/lib/wallet";
 
 type Meta = {
+  name?: string;
+  /** premio por lugar (XLM), orden de reclamo */
+  prizes?: string[];
+  nextPlace?: { place: number; amountXlm: string } | null;
   question: string;
   hint?: string;
   /** ausente en cofres privados: viaja en el #s= del link */
@@ -75,14 +80,22 @@ function expiresIn(deadline?: number) {
 }
 
 export function ChestSolve({
-  chestId,
+  code,
+  address,
+  legacyId,
   badge,
 }: {
-  chestId: number;
+  /** segmento de URL /chest/<code> */
+  code: string;
+  /** cofre de la factory: dirección del contrato (el chestId público de la prueba es su field) */
+  address?: string;
+  /** cofre legacy: id numérico del registry */
+  legacyId?: number;
   badge?: React.ReactNode;
 }) {
   const router = useRouter();
-  const catalog = getChest(chestId);
+  const chestId = legacyId ?? -1;
+  const catalog = legacyId !== undefined ? getChest(legacyId) : undefined;
 
   const { player, connect } = useSession();
   const [answer, setAnswer] = useState("");
@@ -106,7 +119,6 @@ export function ChestSolve({
   }, []);
 
   useEffect(() => {
-    if (!Number.isFinite(chestId)) return;
     if (catalog && !catalog.live) {
       setMeta({
         question: catalog.question,
@@ -116,7 +128,7 @@ export function ChestSolve({
       });
       return;
     }
-    fetch(`/api/chests/${chestId}`)
+    fetch(`/api/chests/${code}`)
       .then(async (r) => {
         if (!r.ok) throw new Error("Chest not found");
         return r.json();
@@ -127,6 +139,9 @@ export function ChestSolve({
           hint: m.hint,
           salt: m.salt,
           saltRequired: m.saltRequired,
+          name: m.name,
+          prizes: m.prizes,
+          nextPlace: m.nextPlace,
           difficulty: m.difficulty,
           prizeLabel: m.prizeLabel ?? "—",
           fingerprint: m.fingerprintHex,
@@ -138,7 +153,7 @@ export function ChestSolve({
         }),
       )
       .catch(() => {
-        if (chestId === DEMO_CHEST.id) {
+        if (legacyId !== undefined && legacyId === DEMO_CHEST.id && !DEMO_CHEST.address) {
           setMeta({
             question: DEMO_CHEST.question,
             hint: DEMO_CHEST.hint,
@@ -148,7 +163,7 @@ export function ChestSolve({
           });
         } else setNotFound(true);
       });
-  }, [chestId, catalog]);
+  }, [code, legacyId, catalog]);
 
   const salt = meta?.salt ?? fragSalt ?? undefined;
   const needsInvite = !!meta?.saltRequired && !fragSalt;
@@ -156,10 +171,10 @@ export function ChestSolve({
   const canProve = connected && answer.trim().length > 0 && !running && !needsInvite;
 
   const titleWord = useMemo(() => {
-    const n = catalog?.name || `Chest #${chestId}`;
+    const n = catalog?.name || meta?.name || (legacyId !== undefined ? `Chest #${legacyId}` : `Chest ${code}`);
     const parts = n.split(" ");
     return { head: parts.slice(0, -1).join(" "), last: parts.at(-1) || n };
-  }, [catalog, chestId]);
+  }, [catalog, meta, legacyId, code]);
 
   const status = useMemo(() => {
     if (!meta) return "open" as const;
@@ -232,7 +247,7 @@ export function ChestSolve({
           answer: secretAnswer,
           salt: salt ?? "0",
           playerSecret: player.playerSecret,
-          chestId: String(chestId),
+          chestId: address ? recipientField(address).decimal : String(chestId),
           recipientField: recipient,
           onStage: (stage) => {
             if (stage === "witness") mark(1, "run");
@@ -256,7 +271,7 @@ export function ChestSolve({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chestId,
+          chest: code,
           recipient: player.publicKey,
           nullifierHex: result.nullifierHex,
           proof: result.proof,
@@ -271,7 +286,7 @@ export function ChestSolve({
       }
       mark(3, "done");
       sessionStorage.setItem(
-        `chestzk.claim.${chestId}`,
+        `chestzk.claim.${code}`,
         JSON.stringify({
           hash: data.hash,
           explorer: data.explorer,
@@ -281,7 +296,7 @@ export function ChestSolve({
       );
       // la wallet (si está abierta) refresca saldo e historial
       window.dispatchEvent(new Event("chestzk:claimed"));
-      router.push(`${chestPath(chestId)}/claimed`);
+      router.push(`/chest/${code}/claimed`);
     } catch (e) {
       setFail({
         kind: "relayer",
@@ -314,7 +329,7 @@ export function ChestSolve({
   const failView = fail && (
     <FailBlock
       fail={fail}
-      chestId={chestId}
+      code={code}
       onRetry={() => {
         setFail(null);
         setSteps(["idle", "idle", "idle", "idle"]);
@@ -330,7 +345,8 @@ export function ChestSolve({
             <Link href="/explore" className="hover:text-[var(--text)]">
               Explore
             </Link>
-            {" / "}#{String(chestId).padStart(4, "0")}
+            {" / "}
+            {legacyId !== undefined ? `#${String(legacyId).padStart(4, "0")}` : code}
             {!catalog?.live && catalog && (
               <>
                 {" · "}
@@ -378,6 +394,34 @@ export function ChestSolve({
                       value: meta.prizeLabel,
                       valueClass: "text-[var(--gold)]",
                     },
+                    ...(meta.prizes && meta.prizes.length > 1 && new Set(meta.prizes).size > 1
+                      ? [
+                          {
+                            label: "Schedule",
+                            value: (
+                              <span>
+                                {meta.prizes
+                                  .slice(0, 5)
+                                  .map((p, i) => `${ordinal(i + 1)} ${p}`)
+                                  .join(" · ")}
+                                {meta.prizes.length > 5 ? ` · +${meta.prizes.length - 5} more` : ""}
+                              </span>
+                            ),
+                          },
+                        ]
+                      : []),
+                    ...(meta.nextPlace && status === "open"
+                      ? [
+                          {
+                            label: "Next prize",
+                            value: (
+                              <span className="text-[var(--gold)]">
+                                {ordinal(meta.nextPlace.place)} place · {meta.nextPlace.amountXlm} {PRIZE.code}
+                              </span>
+                            ),
+                          },
+                        ]
+                      : []),
                     {
                       label: "Difficulty",
                       value: <DifficultyBars level={catalog?.difficulty ?? meta?.difficulty ?? 1} />,
@@ -566,7 +610,7 @@ export function ChestSolve({
                   </button>
                   <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
                     {connected && answer.trim()
-                      ? `Proof binds: answer hash + ${player!.publicKey.slice(0, 4)}…${player!.publicKey.slice(-4)} + chest #${String(chestId).padStart(4, "0")}.`
+                      ? `Proof binds: answer hash + ${player!.publicKey.slice(0, 4)}…${player!.publicKey.slice(-4)} + chest ${legacyId !== undefined ? `#${String(legacyId).padStart(4, "0")}` : code}.`
                       : "Connect and enter an answer to continue."}
                   </p>
                 </>
@@ -605,11 +649,11 @@ function Panel({
 
 function FailBlock({
   fail,
-  chestId,
+  code,
   onRetry,
 }: {
   fail: Fail;
-  chestId: number;
+  code: string;
   onRetry: () => void;
 }) {
   const retry = { label: "Try again", onClick: onRetry, primary: true } as const;
@@ -717,7 +761,7 @@ function FailBlock({
           chest="none"
           actions={[
             { label: "Retry", onClick: onRetry, primary: true },
-            { href: chestPath(chestId), label: "Reload chest" },
+            { href: `/chest/${code}`, label: "Reload chest" },
           ]}
         />
       );

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { decodeChestId } from "@/lib/chest-code";
+import { decodeRef } from "@/lib/chest-code";
 
 export async function generateMetadata({
   params,
@@ -7,8 +7,11 @@ export async function generateMetadata({
   params: Promise<{ code: string }>;
 }): Promise<Metadata> {
   const { code } = await params;
-  const id = decodeChestId(code);
-  return { title: id === null ? "Chest" : `Chest #${String(id).padStart(4, "0")}` };
+  const ref = decodeRef(code);
+  if (!ref) return { title: "Chest" };
+  return {
+    title: ref.kind === "legacy" ? `Chest #${String(ref.id).padStart(4, "0")}` : `Chest ${code}`,
+  };
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
