@@ -7,6 +7,7 @@ import { LogoChest } from "@/components/logo-chest";
 import { StateBlock } from "@/components/state-block";
 import { Mono } from "@/components/kv";
 import { readWonChests, type WonChestsResult } from "@/lib/chain";
+import { chestPath } from "@/lib/chest-code";
 import { CONTRACTS, DEMO_CHEST, stroopsToXlm, tokenDecimals, tokenLabel } from "@/lib/config";
 import { getChest } from "@/lib/chests-demo";
 import { expertTx, shortAddr } from "@/lib/format";
@@ -101,7 +102,7 @@ export default function ClaimedChestsPage() {
             body="Only claims from the last ~7 days appear here (testnet event window). Solve a chest and it shows up in a few seconds."
             chest="closed"
             actions={[
-              { href: `/chest/${DEMO_CHEST.id}`, label: "Open a chest →", primary: true },
+              { href: chestPath(DEMO_CHEST.id), label: "Open a chest →", primary: true },
               { href: "/#security", label: "See why proofs can’t be stolen" },
             ]}
           />
@@ -165,7 +166,7 @@ export default function ClaimedChestsPage() {
                           </a>
                         </td>
                         <td className="py-4 text-right">
-                          <Link href={`/chest/${w.chestId}`} className="btn-landing btn-landing-s btn-landing-sm">
+                          <Link href={chestPath(w.chestId)} className="btn-landing btn-landing-s btn-landing-sm">
                             Open
                           </Link>
                         </td>

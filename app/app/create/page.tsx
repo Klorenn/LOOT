@@ -11,6 +11,7 @@ import { KV } from "@/components/kv";
 import { TEMPLATES, type ChestTemplate } from "@/lib/templates";
 import { answerToField, normalizeAnswer, randomSalt } from "@/lib/answer";
 import { poseidon2, fieldToHex } from "@/lib/zk";
+import { chestPath } from "@/lib/chest-code";
 
 const STEPS = [
   "Puzzle",
@@ -180,7 +181,7 @@ export default function CreateChestPage() {
             {result.link}
           </a>
           <div className="flex flex-wrap gap-3">
-            <Link href={`/chest/${result.chestId}`} className="btn-landing btn-landing-p">
+            <Link href={chestPath(result.chestId)} className="btn-landing btn-landing-p">
               Open chest →
             </Link>
             <Link href="/dashboard" className="btn-landing btn-landing-s">

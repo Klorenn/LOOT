@@ -5,6 +5,7 @@ import { Client, networks } from "@findloot/chest";
 import { CONTRACTS, NETWORK, xlmToStroops } from "@/lib/config";
 import { saveChestMeta } from "@/lib/chest-store";
 import { withRpcUrl } from "@/lib/rpc";
+import { chestPath } from "@/lib/chest-code";
 import { requireAdmin } from "@/lib/admin-auth";
 
 type Body = {
@@ -138,7 +139,7 @@ export async function POST(req: NextRequest) {
     }
 
     const origin = req.headers.get("origin") || "http://localhost:3000";
-    const link = `${origin}/chest/${chestId}`;
+    const link = `${origin}${chestPath(chestId)}`;
 
     return NextResponse.json({
       ok: true,

@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LogoChest } from "@/components/logo-chest";
 import { CellsBackground } from "@/components/cells-background";
 import { Em } from "@/components/page-header";
 import { KV, Mono } from "@/components/kv";
+import { chestPath } from "@/lib/chest-code";
 import { DEMO_CHEST } from "@/lib/config";
 import { loadPlayer } from "@/lib/wallet";
 
@@ -22,9 +22,9 @@ function shortAddr(a: string) {
   return `${a.slice(0, 4)}…${a.slice(-4)}`;
 }
 
-export default function ClaimedPage() {
-  const { id } = useParams<{ id: string }>();
-  const chestId = String(id).padStart(4, "0");
+export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
+  const id = String(chestNum);
+  const chestId = id.padStart(4, "0");
   const [deg, setDeg] = useState(0);
   const [tx, setTx] = useState<ClaimTx | null>(null);
   const [addr, setAddr] = useState("");
@@ -84,7 +84,7 @@ export default function ClaimedPage() {
         <Link href="/claimed-chests" className="btn-landing btn-landing-p">
           My claimed chests
         </Link>
-        <Link href={`/chest/${id}`} className="btn-landing btn-landing-s">
+        <Link href={chestPath(chestNum)} className="btn-landing btn-landing-s">
           Back to the chest
         </Link>
       </main>
@@ -134,7 +134,7 @@ export default function ClaimedPage() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href={`/chest/${DEMO_CHEST.id}`} className="btn-landing btn-landing-p">
+            <Link href={chestPath(DEMO_CHEST.id)} className="btn-landing btn-landing-p">
               Open another chest →
             </Link>
             {tx?.explorer ? (

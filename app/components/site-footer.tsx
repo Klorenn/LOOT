@@ -19,7 +19,7 @@ const COLUMNS = [
   [
     "Developers",
     [
-      ["#", "Docs"],
+      ["/sdk", "Docs"],
       ["#", "Circuits"],
       [
         `https://stellar.expert/explorer/testnet/contract/${CONTRACTS.chest}`,

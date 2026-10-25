@@ -5,6 +5,7 @@ import { CellsCanvas } from "@/components/cells-canvas";
 import { CopyField } from "@/components/copy-field";
 import { QrTile, downloadQrPng } from "@/components/qr-tile";
 import { ExampleTag } from "@/components/example-tag";
+import { chestPath } from "@/lib/chest-code";
 import { DEMO_CHEST } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";
@@ -34,8 +35,8 @@ export default function QrPage() {
   }, []);
 
   const chestNo = String(DEMO_CHEST.id).padStart(4, "0");
-  const invite = origin ? `${origin}/chest/${DEMO_CHEST.id}` : "";
-  const handoff = origin && code ? `${origin}/chest/${DEMO_CHEST.id}?handoff=${code}` : "";
+  const invite = origin ? `${origin}${chestPath(DEMO_CHEST.id)}` : "";
+  const handoff = origin && code ? `${origin}${chestPath(DEMO_CHEST.id)}?handoff=${code}` : "";
   const left = Math.max(0, expires - now);
   const mmss = useMemo(
     () =>

@@ -139,7 +139,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (method === "passkey-existing") return reconnectPasskey();
     // enrollClassic reemplaza la sesión solo si termina bien (no se borra antes).
     if (method === "demo") return enrollClassic();
-    if (method === "wallet") return openPicker();
+    if (method === "wallet") {
+      // Por defecto: modal de Stellar Wallets Kit con tema Loot (ver lib/wallets-kit.ts).
+      // NEXT_PUBLIC_WALLET_MODAL=loot: selector propio (components/wallet-picker.tsx).
+      if (process.env.NEXT_PUBLIC_WALLET_MODAL === "loot") return openPicker();
+      const { address, walletId } = await connectGWallet();
+      return enrollWalletAccount(address, walletId);
+    }
     if (method.startsWith("wallet:")) {
       const { address, walletId } = await connectGWallet(method.slice(7));
       return enrollWalletAccount(address, walletId);

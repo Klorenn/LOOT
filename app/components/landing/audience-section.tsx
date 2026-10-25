@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BuildersIllustration } from "@/components/landing/builders-illustration";
 import { CreatorsIllustration } from "@/components/landing/creators-illustration";
 import { PlayersIllustration } from "@/components/landing/players-illustration";
+import { chestPath } from "@/lib/chest-code";
 import { DEMO_CHEST } from "@/lib/config";
 
 type Card = {
@@ -25,7 +26,7 @@ export function AudienceSection({ docsUrl }: { docsUrl: string }) {
       h: "Bots can’t steal your win.",
       b: "Your answer never leaves your device, and a copied proof won't pay anyone else.",
       cta: "Open the demo chest →",
-      href: `/chest/${DEMO_CHEST.id}`,
+      href: chestPath(DEMO_CHEST.id),
     },
     {
       k: "Creators",

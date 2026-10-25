@@ -18,6 +18,8 @@ import { ScrollProgress } from "@/components/scroll-progress";
 import { SmoothScroll } from "@/components/smooth-scroll";
 import { StackMarquee } from "@/components/stack-marquee";
 import { AudienceSection } from "@/components/landing/audience-section";
+import { SdkBlock } from "@/components/landing/sdk-block";
+import { chestPath } from "@/lib/chest-code";
 import { DEMO_CHEST, PRIZE, stroopsToXlm } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";
@@ -82,6 +84,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 ["#how", "How it works"],
                 ["#security", "Security"],
                 [DOCS_URL, "Docs"],
+                ["/sdk", "SDK"],
               ].map(([href, label]) => (
                 <a
                   key={label}
@@ -106,7 +109,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 </Link>
               )}
               <Link
-                href={`/login?next=/chest/${DEMO_CHEST.id}`}
+                href={`/login?next=${chestPath(DEMO_CHEST.id)}`}
                 className="btn-landing btn-landing-p btn-landing-sm"
               >
                 Launch app →
@@ -152,7 +155,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 </p>
                 <div data-hero-fade className="mt-8 flex flex-wrap gap-3">
                   <Link
-                    href={`/login?next=/chest/${DEMO_CHEST.id}`}
+                    href={`/login?next=${chestPath(DEMO_CHEST.id)}`}
                     className="btn-landing btn-landing-p"
                   >
                     Open a chest →
@@ -293,6 +296,8 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
           </section>
 
           <SecuritySection kuyfiBadge={kuyfiBadge} />
+
+          <SdkBlock />
 
           <CtaSection />
         </main>

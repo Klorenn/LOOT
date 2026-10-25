@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ExampleTag } from "@/components/example-tag";
 import { LogoChest } from "@/components/logo-chest";
+import { chestPath } from "@/lib/chest-code";
 import { DEMO_CHEST, PRIZE } from "@/lib/config";
 
 /** Valores reales de /api/stats (eventos on-chain); "—" mientras carga o si el RPC falla. */
@@ -242,7 +243,7 @@ export function CtaSection() {
         </p>
         <div data-fade className="mt-10 flex flex-wrap justify-center gap-3">
           <Link
-            href={`/login?next=/chest/${DEMO_CHEST.id}`}
+            href={`/login?next=${chestPath(DEMO_CHEST.id)}`}
             className="btn-landing btn-landing-p"
           >
             Open a chest →

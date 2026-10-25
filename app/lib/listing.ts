@@ -1,0 +1,136 @@
+import { chestPath } from "./chest-code";
+import { readChest, readClaimedEvents, type ClaimedEvent, type OnChainChest } from "./chain";
+import { getChest as demoMeta } from "./chests-demo";
+import { getChestMeta } from "./chest-store";
+import { CONTRACTS, DEMO_CHEST, LISTED_CHEST_IDS, stroopsToXlm, tokenDecimals, tokenLabel } from "./config";
+
+/** Solo servidor. Lecturas de cadena con failover (lib/rpc.ts) y caché en memoria de 30 s. */
+
+const TTL = 30_000;
+const MAX_SCAN = 300;
+
+let chestsCache: { at: number; value: OnChainChest[] } | null = null;
+let claimedCache: { at: number; value: ClaimedEvent[] } | null = null;
+
+const isMissing = (e: unknown) =>
+  /Error\(Contract,\s*#1\)|ChestNotFound/i.test(
+    (e as { message?: string })?.message ?? String(e),
+  );
+
+/** Todos los cofres del contrato principal (ids 1.. hasta el primero que no existe). */
+export async function readAllChests(): Promise<OnChainChest[]> {
+  if (chestsCache && Date.now() - chestsCache.at < TTL) return chestsCache.value;
+  const out: OnChainChest[] = [];
+  const CHUNK = 6;
+  for (let start = 1; start <= MAX_SCAN; start += CHUNK) {
+    const ids = Array.from({ length: CHUNK }, (_, i) => start + i);
+    const res = await Promise.all(
+      ids.map((id) =>
+        readChest(id).catch((e) => {
+          if (isMissing(e)) return null;
+          throw e; // RPC caído: no se cachea un listado incompleto
+        }),
+      ),
+    );
+    const firstMissing = res.findIndex((r) => r === null);
+    for (const r of firstMissing === -1 ? res : res.slice(0, firstMissing)) if (r) out.push(r);
+    if (firstMissing !== -1) break;
+  }
+  chestsCache = { at: Date.now(), value: out };
+  return out;
+}
+
+export async function readClaimedCached(): Promise<ClaimedEvent[]> {
+  if (claimedCache && Date.now() - claimedCache.at < TTL) return claimedCache.value;
+  const { items } = await readClaimedEvents();
+  claimedCache = { at: Date.now(), value: items };
+  return items;
+}
+
+export type ChestStatus = "open" | "claimed" | "expired";
+
+export type ChestRowData = {
+  id: number;
+  code: string;
+  href: string;
+  name: string;
+  question: string;
+  difficulty: 1 | 2 | 3 | 4 | null;
+  status: ChestStatus;
+  claims: number;
+  maxClaims: number;
+  prizeLabel: string;
+  prizeStroops: string;
+  token: string;
+  creator: string;
+  deadline: number;
+};
+
+export function statusOf(c: OnChainChest, nowSec = Math.floor(Date.now() / 1000)): ChestStatus {
+  if (c.closed || c.claims >= c.maxClaims) return "claimed";
+  if (c.deadline && c.deadline < nowSec) return "expired";
+  return "open";
+}
+
+export async function toRow(c: OnChainChest): Promise<ChestRowData> {
+  const demo = demoMeta(c.id);
+  let name = demo?.name;
+  let question = c.id === DEMO_CHEST.id ? DEMO_CHEST.question : demo?.question;
+  if (!question) {
+    const meta = await getChestMeta(c.id).catch(() => null);
+    question = meta?.question;
+  }
+  const amount = stroopsToXlm(c.prize, tokenDecimals(c.token));
+  return {
+    id: c.id,
+    code: chestPath(c.id).replace("/chest/", ""),
+    href: chestPath(c.id),
+    name: name ?? `Chest #${String(c.id).padStart(4, "0")}`,
+    question: question ?? "—",
+    difficulty: demo?.difficulty ?? null,
+    status: statusOf(c),
+    claims: c.claims,
+    maxClaims: c.maxClaims,
+    prizeLabel: `${amount} ${tokenLabel(c.token)}`,
+    prizeStroops: c.prize.toString(),
+    token: c.token,
+    creator: c.creator,
+    deadline: c.deadline,
+  };
+}
+
+/** Cofres listados en /explore (LISTED_CHEST_IDS), leídos de la cadena. */
+export async function listExploreRows(): Promise<ChestRowData[]> {
+  const all = await readAllChests();
+  const listed = all.filter((c) => LISTED_CHEST_IDS.includes(c.id));
+  return Promise.all(listed.map(toRow));
+}
+
+export type DashboardData = {
+  rows: ChestRowData[];
+  /** stroops por cupo restante de los cofres abiertos del creador (solo XLM) */
+  inEscrowStroops: string;
+  /** stroops pagados por esos cofres en la ventana del RPC (solo XLM) */
+  paidStroops: string;
+};
+
+export async function dashboardFor(address: string): Promise<DashboardData> {
+  const all = await readAllChests();
+  const mine = all.filter((c) => c.creator === address);
+  const ids = new Set(mine.map((c) => c.id));
+  let escrow = BigInt(0);
+  for (const c of mine) {
+    if (c.token === CONTRACTS.token && !c.closed) {
+      escrow += c.prize * BigInt(Math.max(0, c.maxClaims - c.claims));
+    }
+  }
+  let paid = BigInt(0);
+  const claimed = await readClaimedCached();
+  const xlmChests = new Set(mine.filter((c) => c.token === CONTRACTS.token).map((c) => c.id));
+  for (const e of claimed) if (ids.has(e.chestId) && xlmChests.has(e.chestId)) paid += e.prize;
+  return {
+    rows: await Promise.all(mine.map(toRow)),
+    inEscrowStroops: escrow.toString(),
+    paidStroops: paid.toString(),
+  };
+}

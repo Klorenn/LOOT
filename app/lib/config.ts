@@ -83,6 +83,12 @@ export const DEMO_CHEST = {
 //   tokenDecimals/tokenLabel must return 0 / "CHEST" for it; DEMO_CHEST.id = 2.
 
 /**
+ * Cofres que se muestran en /explore. Todo lo demás (#1 legacy, #2 CHEST, #5 retirado,
+ * #7 de la demo de ataque, #8 de QA) existe on-chain pero no se lista.
+ */
+export const LISTED_CHEST_IDS: readonly number[] = [DEMO_CHEST.id];
+
+/**
  * Cofre dedicado al modo ataque (#7: 100 cupos × 0.1 XLM). La respuesta es PÚBLICA a propósito:
  * solo sirve para armar una prueba válida que el bot copia y el contrato rechaza.
  * OJO: `claim` revisa cerrado / vencido / agotado / nullifier usado ANTES de verificar la prueba,

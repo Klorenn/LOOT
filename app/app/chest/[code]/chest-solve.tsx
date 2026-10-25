@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { CellsCanvas } from "@/components/cells-canvas";
 import { LogoChest } from "@/components/logo-chest";
@@ -12,6 +12,7 @@ import { StatusLabel } from "@/components/status-label";
 import { DifficultyBars } from "@/components/difficulty-bars";
 import { ExampleTag } from "@/components/example-tag";
 import { InlineAlert } from "@/components/inline-alert";
+import { chestPath } from "@/lib/chest-code";
 import { DEMO_CHEST, PRIZE, ZK_ASSETS } from "@/lib/config";
 import { getChest } from "@/lib/chests-demo";
 import { recipientField } from "@/lib/recipient";
@@ -70,10 +71,14 @@ function expiresIn(deadline?: number) {
   return `expires in ${d ? `${d}d ` : ""}${h}h`;
 }
 
-export function ChestSolve({ badge }: { badge?: React.ReactNode }) {
-  const { id } = useParams<{ id: string }>();
+export function ChestSolve({
+  chestId,
+  badge,
+}: {
+  chestId: number;
+  badge?: React.ReactNode;
+}) {
   const router = useRouter();
-  const chestId = Number(id);
   const catalog = getChest(chestId);
 
   const { player, connect } = useSession();
@@ -258,7 +263,7 @@ export function ChestSolve({ badge }: { badge?: React.ReactNode }) {
       );
       // la wallet (si está abierta) refresca saldo e historial
       window.dispatchEvent(new Event("chestzk:claimed"));
-      router.push(`/chest/${chestId}/claimed`);
+      router.push(`${chestPath(chestId)}/claimed`);
     } catch (e) {
       setFail({
         kind: "relayer",
@@ -277,7 +282,7 @@ export function ChestSolve({ badge }: { badge?: React.ReactNode }) {
           title="Not found"
           body="This chest id is not on the catalogue."
           actions={[
-            { href: `/chest/${DEMO_CHEST.id}`, label: "Open the demo chest", primary: true },
+            { href: chestPath(DEMO_CHEST.id), label: "Open the demo chest", primary: true },
           ]}
         />
       </main>
@@ -606,7 +611,7 @@ function FailBlock({
           body="This account’s nullifier is already stored on this chest. Each proof works once and only pays the address it was made for."
           chest="none"
           actions={[
-            { href: `/chest/${DEMO_CHEST.id}`, label: "Open the demo chest", primary: true },
+            { href: chestPath(DEMO_CHEST.id), label: "Open the demo chest", primary: true },
             { href: "/claimed-chests", label: "My claimed chests" },
           ]}
         />
@@ -619,7 +624,7 @@ function FailBlock({
           title="Every slot is claimed."
           body="All prizes in this chest have been paid out."
           chest="none"
-          actions={[{ href: `/chest/${DEMO_CHEST.id}`, label: "Open the demo chest", primary: true }]}
+          actions={[{ href: chestPath(DEMO_CHEST.id), label: "Open the demo chest", primary: true }]}
         />
       );
     case "closed":
@@ -630,7 +635,7 @@ function FailBlock({
           title="This chest is closed or expired."
           body="The creator closed it, its deadline passed, or it doesn’t exist on the network."
           chest="none"
-          actions={[{ href: `/chest/${DEMO_CHEST.id}`, label: "Open the demo chest", primary: true }]}
+          actions={[{ href: chestPath(DEMO_CHEST.id), label: "Open the demo chest", primary: true }]}
         />
       );
     case "invalid":
@@ -688,7 +693,7 @@ function FailBlock({
           chest="none"
           actions={[
             { label: "Retry", onClick: onRetry, primary: true },
-            { href: `/chest/${chestId}`, label: "Reload chest" },
+            { href: chestPath(chestId), label: "Reload chest" },
           ]}
         />
       );
@@ -701,7 +706,7 @@ function FailBlock({
           body="Open the live demo chest to try a real claim."
           chest="none"
           actions={[
-            { href: `/chest/${DEMO_CHEST.id}`, label: "Open live demo", primary: true },
+            { href: chestPath(DEMO_CHEST.id), label: "Open live demo", primary: true },
           ]}
         />
       );

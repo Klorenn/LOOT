@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { chestPath } from "@/lib/chest-code";
 
 type Row = {
   id: number;
@@ -133,7 +134,7 @@ export default function PanelPage() {
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-3">
                     <Link
-                      href={`/chest/${r.id}`}
+                      href={chestPath(r.id)}
                       className="text-[#4C8DFF] underline"
                     >
                       open

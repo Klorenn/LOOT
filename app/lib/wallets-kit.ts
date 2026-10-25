@@ -54,25 +54,26 @@ function loadKit(): Promise<Kit> {
           new bitget.BitgetModule(),
         ],
         network: Networks.TESTNET,
-        // Fallback: si algún flujo abre el modal por defecto del kit, que sea oscuro y de Loot.
+        // Tema Loot para el modal del kit (contraste AA: foreground/strong 15:1, secondary 7:1,
+        // primary-foreground sobre primary 6.5:1, danger 6:1; light/gray solo son bordes).
         theme: {
           background: "#14131A",
           "background-secondary": "#1B1A23",
           "foreground-strong": "#F5F2EC",
-          foreground: "#A6A1B0",
-          "foreground-secondary": "#6F6A7A",
+          foreground: "#F5F2EC",
+          "foreground-secondary": "#A6A1B0",
           primary: "#8A8CFF",
           "primary-foreground": "#0C0B10",
           transparent: "rgba(12,11,16,0)",
           lighter: "#1B1A23",
           light: "#2A2833",
-          "light-gray": "#6F6A7A",
-          gray: "#A6A1B0",
+          "light-gray": "#2A2833",
+          gray: "#44414F",
           danger: "#FF5C61",
           border: "#2A2833",
           shadow: "none",
-          "border-radius": "10px",
-          "font-family": "Geist, ui-sans-serif, system-ui, sans-serif",
+          "border-radius": "14px",
+          "font-family": "var(--font-geist-sans), Geist, ui-sans-serif, system-ui, sans-serif",
         },
       });
       return StellarWalletsKit;

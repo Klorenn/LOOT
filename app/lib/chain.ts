@@ -294,3 +294,39 @@ export async function readProtocolStats(): Promise<ProtocolStats> {
     truncated: claimed.truncated || created.truncated,
   };
 }
+
+export type ClaimedEvent = {
+  chestId: number;
+  /** unidades mínimas del token del cofre */
+  prize: bigint;
+  recipient: string;
+  txHash: string;
+  ledger: number;
+  closedAt: string;
+};
+
+/** Todos los `claimed` del contrato principal en la ventana del RPC (~7 días). */
+export async function readClaimedEvents(): Promise<{
+  items: ClaimedEvent[];
+  oldestLedger: number;
+  truncated: boolean;
+}> {
+  const scan = await scanEvents("claimed");
+  const items: ClaimedEvent[] = [];
+  for (const ev of scan.events) {
+    try {
+      const val = scValToNative(ev.value) as [unknown, unknown];
+      items.push({
+        chestId: Number(scValToNative(ev.topic[1])),
+        prize: BigInt(val[1] as bigint),
+        recipient: String(val[0]),
+        txHash: ev.txHash,
+        ledger: ev.ledger,
+        closedAt: ev.ledgerClosedAt,
+      });
+    } catch {
+      /* evento con forma inesperada: se ignora */
+    }
+  }
+  return { items, oldestLedger: scan.oldestLedger, truncated: scan.truncated };
+}

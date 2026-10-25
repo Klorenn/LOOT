@@ -12,6 +12,7 @@ import {
   readWonChests,
   type WonChestsResult,
 } from "@/lib/chain";
+import { chestPath } from "@/lib/chest-code";
 import { CONTRACTS, DEMO_CHEST, PRIZE, stroopsToXlm, tokenDecimals } from "@/lib/config";
 import { expertAddress, shortAddr } from "@/lib/format";
 import { getHandle, HANDLE_RE, setHandle } from "@/lib/handle";
@@ -144,7 +145,7 @@ export default function ProfilePage() {
             <Link href="/qr" className="btn-landing btn-landing-s">
               Receive QR
             </Link>
-            <Link href={`/chest/${DEMO_CHEST.id}`} className="btn-landing btn-landing-p">
+            <Link href={chestPath(DEMO_CHEST.id)} className="btn-landing btn-landing-p">
               Open a chest
             </Link>
           </div>

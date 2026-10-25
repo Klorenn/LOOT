@@ -7,6 +7,7 @@ import { Check, Wallet as WalletIcon } from "lucide-react";
 import { CopyField } from "@/components/copy-field";
 import { IconSmartAccountKit as PasskeyGlyph } from "@/components/stack-logos";
 import { InlineAlert } from "@/components/inline-alert";
+import { chestPath } from "@/lib/chest-code";
 import { DEMO_CHEST } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { HANDLE_RE, setHandle } from "@/lib/handle";
@@ -369,7 +370,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           <>
             <CopyField value={doneAddr} />
             <Link
-              href={next ?? `/chest/${DEMO_CHEST.id}`}
+              href={next ?? chestPath(DEMO_CHEST.id)}
               className="btn-landing btn-landing-p w-full"
             >
               Open your first chest →
