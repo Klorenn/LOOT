@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CellsCanvas } from "@/components/cells-canvas";
 import { CopyField } from "@/components/copy-field";
 import { QrTile, downloadQrPng } from "@/components/qr-tile";
-import { ExampleTag } from "@/components/app/example-tag";
+import { ExampleTag } from "@/components/example-tag";
 import { DEMO_CHEST } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";

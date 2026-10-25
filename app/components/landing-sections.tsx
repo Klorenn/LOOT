@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ExampleTag } from "@/components/app/example-tag";
+import { ExampleTag } from "@/components/example-tag";
 import { LogoChest } from "@/components/logo-chest";
 import { DEMO_CHEST, PRIZE } from "@/lib/config";
 

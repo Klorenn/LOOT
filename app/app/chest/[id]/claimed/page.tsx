@@ -5,8 +5,9 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LogoChest } from "@/components/logo-chest";
 import { CellsBackground } from "@/components/cells-background";
-import { Em } from "@/components/app/page-header";
-import { KV, Mono } from "@/components/app/kv";
+import { Em } from "@/components/page-header";
+import { KV, Mono } from "@/components/kv";
+import { DEMO_CHEST } from "@/lib/config";
 import { loadPlayer } from "@/lib/wallet";
 
 type ClaimTx = {
@@ -133,7 +134,7 @@ export default function ClaimedPage() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/explore" className="btn-landing btn-landing-p">
+            <Link href={`/chest/${DEMO_CHEST.id}`} className="btn-landing btn-landing-p">
               Open another chest →
             </Link>
             {tx?.explorer ? (

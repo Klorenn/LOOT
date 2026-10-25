@@ -6,13 +6,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { CellsCanvas } from "@/components/cells-canvas";
 import { CopyField } from "@/components/copy-field";
-import { KV } from "@/components/app/kv";
+import { KV } from "@/components/kv";
 import {
   readPrizeBalance,
   readWonChests,
   type WonChestsResult,
 } from "@/lib/chain";
-import { CONTRACTS, PRIZE, stroopsToXlm, tokenDecimals } from "@/lib/config";
+import { CONTRACTS, DEMO_CHEST, PRIZE, stroopsToXlm, tokenDecimals } from "@/lib/config";
 import { expertAddress, shortAddr } from "@/lib/format";
 import { getHandle, HANDLE_RE, setHandle } from "@/lib/handle";
 import { useSession } from "@/lib/session";
@@ -144,8 +144,8 @@ export default function ProfilePage() {
             <Link href="/qr" className="btn-landing btn-landing-s">
               Receive QR
             </Link>
-            <Link href="/explore" className="btn-landing btn-landing-p">
-              Explore chests
+            <Link href={`/chest/${DEMO_CHEST.id}`} className="btn-landing btn-landing-p">
+              Open a chest
             </Link>
           </div>
         </div>

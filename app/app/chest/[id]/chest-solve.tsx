@@ -6,12 +6,12 @@ import { useEffect, useMemo, useState } from "react";
 import { CellsCanvas } from "@/components/cells-canvas";
 import { LogoChest } from "@/components/logo-chest";
 import { StateBlock } from "@/components/state-block";
-import { PageHeader, Em } from "@/components/app/page-header";
-import { KV, Mono } from "@/components/app/kv";
-import { StatusLabel } from "@/components/app/status-label";
-import { DifficultyBars } from "@/components/app/difficulty-bars";
-import { ExampleTag } from "@/components/app/example-tag";
-import { InlineAlert } from "@/components/app/inline-alert";
+import { PageHeader, Em } from "@/components/page-header";
+import { KV, Mono } from "@/components/kv";
+import { StatusLabel } from "@/components/status-label";
+import { DifficultyBars } from "@/components/difficulty-bars";
+import { ExampleTag } from "@/components/example-tag";
+import { InlineAlert } from "@/components/inline-alert";
 import { DEMO_CHEST, PRIZE, ZK_ASSETS } from "@/lib/config";
 import { getChest } from "@/lib/chests-demo";
 import { recipientField } from "@/lib/recipient";
@@ -276,7 +276,7 @@ export function ChestSolve({ badge }: { badge?: React.ReactNode }) {
           title="Not found"
           body="This chest id is not on the catalogue."
           actions={[
-            { href: "/explore", label: "Explore chests", primary: true },
+            { href: `/chest/${DEMO_CHEST.id}`, label: "Open the demo chest", primary: true },
             { href: `/chest/${DEMO_CHEST.id}`, label: "Open demo chest" },
           ]}
         />
@@ -606,7 +606,7 @@ function FailBlock({
           body="This account’s nullifier is already stored on this chest. Each proof works once and only pays the address it was made for."
           chest="none"
           actions={[
-            { href: "/explore", label: "Find an open chest", primary: true },
+            { href: `/chest/${DEMO_CHEST.id}`, label: "Open the demo chest", primary: true },
             { href: "/claimed-chests", label: "My claimed chests" },
           ]}
         />
@@ -619,7 +619,7 @@ function FailBlock({
           title="Every slot is claimed."
           body="All prizes in this chest have been paid out."
           chest="none"
-          actions={[{ href: "/explore", label: "Find an open chest", primary: true }]}
+          actions={[{ href: `/chest/${DEMO_CHEST.id}`, label: "Open the demo chest", primary: true }]}
         />
       );
     case "closed":
@@ -630,7 +630,7 @@ function FailBlock({
           title="This chest is closed or expired."
           body="The creator closed it, its deadline passed, or it doesn’t exist on the network."
           chest="none"
-          actions={[{ href: "/explore", label: "Find an open chest", primary: true }]}
+          actions={[{ href: `/chest/${DEMO_CHEST.id}`, label: "Open the demo chest", primary: true }]}
         />
       );
     case "invalid":

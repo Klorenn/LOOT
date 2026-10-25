@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { CopyField } from "@/components/copy-field";
 import { IconSmartAccountKit as PasskeyGlyph } from "@/components/stack-logos";
-import { InlineAlert } from "@/components/app/inline-alert";
+import { InlineAlert } from "@/components/inline-alert";
 import { DEMO_CHEST } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { HANDLE_RE, setHandle } from "@/lib/handle";
@@ -62,7 +62,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   useEffect(() => {
     if (!ready || checked.current) return;
     checked.current = true;
-    if (address) router.replace(next ?? "/explore");
+    if (address) router.replace(next ?? "/profile");
   }, [ready, address, next, router]);
 
   const q = rawNext && next ? `?next=${encodeURIComponent(next)}` : "";
@@ -102,7 +102,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   }
 
   async function finishLogin() {
-    router.replace(next ?? "/explore");
+    router.replace(next ?? "/profile");
   }
 
   async function withPasskey() {

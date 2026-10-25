@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { PageHeader, Em } from "@/components/app/page-header";
-import { ExampleTag } from "@/components/app/example-tag";
+import { PageHeader, Em } from "@/components/page-header";
+import { ExampleTag } from "@/components/example-tag";
 import { Terminal } from "@/components/terminal";
 import { ATTACK_CHEST } from "@/lib/config";
 import { loadPlayer, enrollPreferPasskey } from "@/lib/wallet";

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { PageHeader } from "@/components/app/page-header";
-import { InlineAlert } from "@/components/app/inline-alert";
-import { ExampleTag } from "@/components/app/example-tag";
+import { PageHeader } from "@/components/page-header";
+import { InlineAlert } from "@/components/inline-alert";
+import { ExampleTag } from "@/components/example-tag";
 import { StateBlock } from "@/components/state-block";
 import { DEMO_CHEST } from "@/lib/config";
 
@@ -40,7 +40,7 @@ export default function StatesPage() {
           body="The nullifier is already stored on this chest, so replaying the same proof reverts. Each proof works once and only pays the address it was made for."
           chest="open"
           actions={[
-            { href: "/explore", label: "Find an open chest", primary: true },
+            { href: `/chest/${DEMO_CHEST.id}`, label: "Open the demo chest", primary: true },
             { href: "/claimed-chests", label: "My claimed chests" },
           ]}
         />

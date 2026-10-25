@@ -5,9 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CellsCanvas } from "@/components/cells-canvas";
 import { LogoChest } from "@/components/logo-chest";
 import { StateBlock } from "@/components/state-block";
-import { Mono } from "@/components/app/kv";
+import { Mono } from "@/components/kv";
 import { readWonChests, type WonChestsResult } from "@/lib/chain";
-import { CONTRACTS, stroopsToXlm, tokenDecimals, tokenLabel } from "@/lib/config";
+import { CONTRACTS, DEMO_CHEST, stroopsToXlm, tokenDecimals, tokenLabel } from "@/lib/config";
 import { getChest } from "@/lib/chests-demo";
 import { expertTx, shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";
@@ -100,7 +100,7 @@ export default function ClaimedChestsPage() {
             body="Only claims from the last ~7 days appear here (testnet event window). Solve a chest and it shows up in a few seconds."
             chest="closed"
             actions={[
-              { href: "/explore", label: "Explore chests →", primary: true },
+              { href: `/chest/${DEMO_CHEST.id}`, label: "Open a chest →", primary: true },
               { href: "/#security", label: "See why proofs can’t be stolen" },
             ]}
           />
