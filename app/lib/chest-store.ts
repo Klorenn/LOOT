@@ -40,7 +40,7 @@ export type PendingMeta = Omit<ChestMeta, "id" | "createdAt" | "txHash"> & {
 
 export class StorageNotConfiguredError extends Error {
   constructor() {
-    super("Chest metadata storage is not configured (connect a Vercel Blob store or set BLOB_READ_WRITE_TOKEN).");
+    super("Chest metadata storage is not configured (connect a Vercel Blob store or set LOOT_READ_WRITE_TOKEN).");
     this.name = "StorageNotConfiguredError";
   }
 }
@@ -52,7 +52,8 @@ type Backend = "blob" | "file";
 /** Blob credentials: a read-write token, or a connected store via Vercel OIDC (BLOB_STORE_ID + VERCEL_OIDC_TOKEN). */
 function hasBlob(): boolean {
   return Boolean(
-    process.env.BLOB_READ_WRITE_TOKEN ||
+    process.env.LOOT_READ_WRITE_TOKEN ||
+      process.env.BLOB_READ_WRITE_TOKEN ||
       (process.env.BLOB_STORE_ID && (process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL)),
   );
 }
@@ -66,7 +67,11 @@ function backend(): Backend {
 // El store es PRIVADO: los metadatos (y la sal de cofres públicos) solo se sirven vía nuestra API.
 // The SDK prefers Vercel OIDC + BLOB_STORE_ID over BLOB_READ_WRITE_TOKEN; a stale store id from an
 // integration then yields "Access denied". Passing the token explicitly makes it win.
-const auth = () => (process.env.BLOB_READ_WRITE_TOKEN ? { token: process.env.BLOB_READ_WRITE_TOKEN } : {});
+const blobToken = () => process.env.LOOT_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
+const auth = () => {
+  const token = blobToken();
+  return token ? { token } : {};
+};
 
 async function blobRead<T>(key: string): Promise<T | null> {
   const r = await get(key, { access: "private", useCache: false, ...auth() }).catch(() => null);
