@@ -77,7 +77,7 @@ export function LandingPage() {
           {/* Hero */}
           <header
             data-hero
-            className="relative min-h-[760px] overflow-hidden border-b border-[var(--line)]"
+            className="hero relative min-h-[760px] overflow-hidden border-b border-[var(--line)]"
             style={{ height: "100vh" }}
           >
             <CellsBackground variant="hero" />
@@ -127,7 +127,11 @@ export function LandingPage() {
                   filter: "drop-shadow(0 40px 60px rgba(91,94,232,.25))",
                 }}
               >
-                <LogoChest className="w-[240px] lg:w-[340px]" lidClassName="lid" />
+                <LogoChest
+                  className="w-[240px] lg:w-[340px]"
+                  deg={0}
+                  showInside
+                />
               </div>
             </div>
           </header>
@@ -247,7 +251,7 @@ export function LandingPage() {
             id="attack"
             data-attack
             aria-labelledby="attack-h"
-            className="flex min-h-screen items-center border-b border-[var(--line)] py-32"
+            className="flex min-h-screen items-center border-b border-[var(--line)] py-0"
           >
             <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 items-center gap-12 px-6 lg:grid-cols-2">
               <div>

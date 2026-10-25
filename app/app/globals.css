@@ -148,10 +148,7 @@
   outline-offset: 3px;
 }
 
-.chest .lid {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-}
+/* Lid transforms come from chest-hinge matrix() — no CSS rotate/translate. */
 
 @layer base {
   * {

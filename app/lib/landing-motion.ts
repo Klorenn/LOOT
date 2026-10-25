@@ -2,6 +2,7 @@
 
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { setChest } from "@/lib/chest-hinge";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -64,7 +65,8 @@ export function initLandingMotion(root: HTMLElement) {
     });
 
     const hero = root.querySelector("[data-hero]");
-    if (hero) {
+    const chestSvg = root.querySelector<SVGSVGElement>(".hero .chest");
+    if (hero && chestSvg) {
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: hero,
@@ -73,16 +75,20 @@ export function initLandingMotion(root: HTMLElement) {
           scrub: 0.6,
         },
       });
-      // Sealed hinge — smaller than prototype (−70/−8)
-      tl.to(root.querySelectorAll(".chest .lid"), {
-        y: -36,
-        rotation: -5,
-        ease: "none",
-      }, 0)
-        .to(root.querySelectorAll("[data-chest-wrap]"), { y: 80, ease: "none" }, 0)
+      const st = { a: 0 };
+      tl.to(
+        st,
+        {
+          a: 30,
+          ease: "power1.inOut",
+          onUpdate: () => setChest(chestSvg, st.a),
+        },
+        0,
+      )
+        .to(root.querySelectorAll("[data-chest-wrap]"), { y: 60, ease: "none" }, 0)
         .to(root.querySelectorAll("[data-hero-copy]"), {
-          y: -48,
-          opacity: 0.25,
+          y: -60,
+          opacity: 0.2,
           ease: "none",
         }, 0);
     }
