@@ -5,6 +5,7 @@ import { PageHeader, Em } from "@/components/page-header";
 import { ExampleTag } from "@/components/example-tag";
 import { Terminal } from "@/components/terminal";
 import { ATTACK_CHEST } from "@/lib/config";
+import { encodeRef } from "@/lib/chest-code";
 import { loadPlayer, enrollPreferPasskey } from "@/lib/wallet";
 import { recipientField } from "@/lib/recipient";
 import { proveChest } from "@/lib/zk";
@@ -78,7 +79,7 @@ export function AttackClient({
         answer: ATTACK_CHEST.answer,
         salt: ATTACK_CHEST.salt,
         playerSecret: demoSecret,
-        chestId: String(ATTACK_CHEST.id),
+        chestId: recipientField(ATTACK_CHEST.address).decimal,
         recipientField: recipient,
       });
       push(`π generated (${Math.round(proved.timings.proveMs)}ms)`, "you");
@@ -108,7 +109,7 @@ export function AttackClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chestId: ATTACK_CHEST.id,
+          chest: encodeRef({ kind: "factory", index: ATTACK_CHEST.index }),
           botRecipient,
           nullifierHex: proved.nullifierHex,
           proof: proved.proof,

@@ -123,6 +123,10 @@ export const HIDDEN_CHEST_IDS: readonly number[] = [9, 10, 11];
  * El premio real vive en DEMO_CHEST, cuya respuesta no está en el repo.
  */
 export const ATTACK_CHEST = {
+  /** Factory (50 lugares × 0.1 XLM, respuesta pública): de acá sale el InvalidProof de la demo. */
+  address: "CA2LAPG3EIALHEJHASSUPKXEIXXDT5GX3WADABYWHVK4LJPAVFN6BIJ2",
+  index: 6,
+  /** Cofre legacy anterior (#7). */
   id: 7,
   salt: "7",
   answer: "8",

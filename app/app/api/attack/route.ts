@@ -4,9 +4,15 @@ import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client, networks } from "@findloot/chest";
 import { NETWORK } from "@/lib/config";
 import { withRpcUrl } from "@/lib/rpc";
+import { Address, xdr } from "@stellar/stellar-sdk";
+import { decodeRef } from "@/lib/chest-code";
+import { factoryAddressAt } from "@/lib/factory";
+import { invokeAsRelayer } from "@/lib/relayer-invoke";
 
 type Body = {
-  chestId: number;
+  /** código de URL del cofre de la factory */
+  chest?: string;
+  chestId?: number;
   /** Cuenta del bot (destino ilegítimo) */
   botRecipient: string;
   nullifierHex: string;
@@ -25,8 +31,7 @@ const isHex = (v: unknown, bytes: number): v is string =>
 function validBody(b: Partial<Body> | null): b is Body {
   return (
     !!b &&
-    Number.isSafeInteger(b.chestId) &&
-    (b.chestId as number) >= 0 &&
+    (typeof b.chest === "string" || (Number.isSafeInteger(b.chestId) && (b.chestId as number) >= 0)) &&
     typeof b.botRecipient === "string" &&
     /^[GC][A-Z2-7]{55}$/.test(b.botRecipient) &&
     isHex(b.nullifierHex, 32) &&
@@ -72,6 +77,31 @@ export async function POST(req: NextRequest) {
     try {
       await withRpcUrl(
         async (rpcUrl) => {
+          const ref = typeof body.chest === "string" ? decodeRef(body.chest) : null;
+          if (ref?.kind === "factory") {
+            const address = await factoryAddressAt(ref.index);
+            if (!address) throw new Error("unknown chest");
+            const proofScVal = xdr.ScVal.scvMap(
+              (["a", "b", "c"] as const).map(
+                (k) =>
+                  new xdr.ScMapEntry({
+                    key: xdr.ScVal.scvSymbol(k),
+                    val: xdr.ScVal.scvBytes(hexToBuf(body.proof[k])),
+                  }),
+              ),
+            );
+            await invokeAsRelayer(
+              address,
+              "claim",
+              [
+                Address.fromString(body.botRecipient).toScVal(),
+                xdr.ScVal.scvBytes(hexToBuf(body.nullifierHex)),
+                proofScVal,
+              ],
+              { cpuInstructions: 100_000_000 },
+            );
+            return;
+          }
           const client = new Client({
             ...networks.testnet,
             rpcUrl,
@@ -82,7 +112,7 @@ export async function POST(req: NextRequest) {
 
           const tx = await client.claim(
             {
-              chest_id: BigInt(body.chestId),
+              chest_id: BigInt(body.chestId as number),
               recipient: body.botRecipient,
               nullifier: hexToBuf(body.nullifierHex),
               proof: {
