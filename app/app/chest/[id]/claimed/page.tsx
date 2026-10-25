@@ -124,8 +124,8 @@ export default function ClaimedPage() {
           <p className="mt-5 max-w-[36rem] text-[18px] leading-[1.55] text-[var(--muted)]">
             Your proof verified for{" "}
             <span className="font-mono text-[var(--text)]">{prover}</span> and
-            the prize was released to that address. This proof is now spent and can&apos;t be
-            replayed.
+            the prize was released to that address. The proof is bound to your address, and each
+            proof works only once.
           </p>
 
           <p className="mt-10 font-mono text-[clamp(40px,6vw,56px)] font-medium tracking-[-0.03em] text-[var(--gold)]">

@@ -418,8 +418,8 @@ export function ChestSolve({ badge }: { badge?: React.ReactNode }) {
               }
             >
               <p className="text-[15px] leading-[1.5] text-[var(--muted)]">
-                Your address becomes a public input of the proof. Only it can
-                claim.
+                The proof is bound to your address: if a bot copies it and changes
+                the recipient, the contract rejects it. Each proof works only once.
               </p>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <button

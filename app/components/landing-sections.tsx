@@ -157,9 +157,7 @@ export function AttackSection() {
             data-fade
             className="mt-5 text-[18px] leading-[1.55] text-[var(--muted)]"
           >
-            Front-running bots resend winning transactions with a higher fee. On
-            Loot the copy fails, because the proof only verifies for the address
-            that made it.
+            Front-running bots resend winning transactions with a higher fee. The proof is bound to your address: if a bot copies it and changes the recipient, the contract rejects it. And each proof works only once.
           </p>
           <Link
             href="/attack"

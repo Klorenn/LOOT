@@ -163,7 +163,7 @@ export function AttackClient({
             Copy the proof. <Em tone="red">Lose anyway.</Em>
           </>
         }
-        lead="A bot watches the mempool, copies your proof and resends it with a higher fee. Watch both sides: the contract only pays the address sealed inside the proof."
+        lead="A bot watches the mempool, copies your proof and resends it with a higher fee. The proof is bound to your address: if a bot copies it and changes the recipient, the contract rejects it. And each proof works only once."
         right={
           <div className="flex flex-wrap gap-2">
             <button
