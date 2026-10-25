@@ -56,7 +56,6 @@ export default function StatesPage() {
           chest="closed"
           actions={[
             { href: "/enter", label: "Continue with passkey", primary: true },
-            { href: "/enter", label: "Use Freighter" },
           ]}
         />
 

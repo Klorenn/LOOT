@@ -10,6 +10,7 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 import { CONTRACTS, NETWORK } from "./config";
+import { withRpc } from "./rpc";
 
 /**
  * Lecturas de solo-lectura contra Soroban RPC. Sirven en server y en browser
@@ -19,11 +20,17 @@ import { CONTRACTS, NETWORK } from "./config";
 /** Cuenta pública cualquiera: la simulación no la usa para nada más que armar la tx. */
 const SIM_SOURCE = "GAKD2FSFFNLBVTUB4JHFYVUUMTKKEEJO2TG77BHV2KCZTDPUB64JU7E2";
 
-function server() {
-  return new rpc.Server(NETWORK.rpcUrl);
-}
+/** Último ledger visto en cualquier respuesta (simulate/getEvents); evita getLatestLedger, que hoy tarda 15–60 s. */
+let seen: { seq: number; at: number } | null = null;
+const noteLedger = (seq: number | undefined) => {
+  if (seq) seen = { seq, at: Date.now() };
+};
 
-async function simulateRead(contractId: string, method: string, args: xdr.ScVal[]) {
+async function simulateRead(
+  contractId: string,
+  method: string,
+  args: xdr.ScVal[],
+) {
   const tx = new TransactionBuilder(new Account(SIM_SOURCE, "0"), {
     fee: BASE_FEE,
     networkPassphrase: NETWORK.passphrase,
@@ -31,9 +38,12 @@ async function simulateRead(contractId: string, method: string, args: xdr.ScVal[
     .addOperation(new Contract(contractId).call(method, ...args))
     .setTimeout(30)
     .build();
-  const sim = await server().simulateTransaction(tx);
+  const sim = await withRpc((s) => s.simulateTransaction(tx));
+  noteLedger(sim.latestLedger);
   if (!rpc.Api.isSimulationSuccess(sim) || !sim.result) {
-    const err = rpc.Api.isSimulationError(sim) ? sim.error : "simulación sin resultado";
+    const err = rpc.Api.isSimulationError(sim)
+      ? sim.error
+      : "simulación sin resultado";
     throw new Error(err);
   }
   return scValToNative(sim.result.retval);
@@ -108,16 +118,36 @@ export type WonChestsResult = {
 const WINDOW_LEDGERS = 120_000; // ~7 días a 5 s por ledger (con margen)
 const MAX_PAGES = 80;
 /** El RPC escanea como mucho ~10.000 ledgers por request: hay que seguir el cursor hasta el último ledger. */
-const ledgerOfCursor = (c: string) => Number(BigInt(c.split("-")[0]) >> BigInt(32));
+const ledgerOfCursor = (c: string) =>
+  Number(BigInt(c.split("-")[0]) >> BigInt(32));
 
 /**
  * Todos los eventos `<name>` del contrato principal dentro de la ventana de
  * retención del RPC (~7 días). Se arranca en el borde de esa ventana y, si el
  * RPC informa un rango menor, se reintenta con su mínimo.
  */
+/**
+ * Ledger actual aproximado sin getLatestLedger: se reutiliza el último visto (+5 s por ledger
+ * transcurrido) o se lo saca de la respuesta de una simulación barata (que trae latestLedger).
+ */
+async function latestLedgerHint(): Promise<number> {
+  const fresh = () =>
+    seen ? seen.seq + Math.floor((Date.now() - seen.at) / 5000) : null;
+  if (seen && Date.now() - seen.at < 60_000) return fresh()!;
+  try {
+    await simulateRead(CONTRACTS.token, "balance", [
+      Address.fromString(SIM_SOURCE).toScVal(),
+    ]);
+  } catch {
+    /* si falla, último recurso abajo */
+  }
+  const f = fresh();
+  if (f) return f;
+  return withRpc(async (s) => (await s.getLatestLedger()).sequence);
+}
+
 async function scanEvents(name: "claimed" | "created"): Promise<EventsScan> {
-  const s = server();
-  const latest = (await s.getLatestLedger()).sequence;
+  const latest = await latestLedgerHint();
   let start = Math.max(1, latest - WINDOW_LEDGERS);
 
   const filters = [
@@ -133,13 +163,16 @@ async function scanEvents(name: "claimed" | "created"): Promise<EventsScan> {
   let truncated = false;
 
   for (let page = 0; page < MAX_PAGES; page++) {
-    let res: Awaited<ReturnType<typeof s.getEvents>>;
+    let res: Awaited<ReturnType<rpc.Server["getEvents"]>>;
     try {
-      res = await s.getEvents(
-        cursor
-          ? { filters, cursor, limit: 200 }
-          : { filters, startLedger: start, limit: 200 },
+      res = await withRpc((s) =>
+        s.getEvents(
+          cursor
+            ? { filters, cursor, limit: 200 }
+            : { filters, startLedger: start, limit: 200 },
+        ),
       );
+      noteLedger(res.latestLedger);
     } catch (e) {
       // el SDK lanza el objeto JSON-RPC ({code, message}), no un Error
       const msg = (e as { message?: string })?.message ?? String(e);
@@ -152,9 +185,13 @@ async function scanEvents(name: "claimed" | "created"): Promise<EventsScan> {
       throw e;
     }
     events.push(...res.events);
-    cursor = res.cursor;
+    cursor = res.cursor ?? cursor;
     // fin: página parcial y el cursor ya alcanzó el último ledger
-    if (res.events.length < 200 && ledgerOfCursor(cursor) >= res.latestLedger - 1) break;
+    if (
+      res.events.length < 200 &&
+      (!cursor || ledgerOfCursor(cursor) >= res.latestLedger - 1)
+    )
+      break;
     if (page === MAX_PAGES - 1) truncated = true;
   }
   return { events, oldestLedger: start, latestLedger: latest, truncated };
@@ -229,7 +266,10 @@ export async function readProtocolStats(): Promise<ProtocolStats> {
     try {
       const val = scValToNative(ev.value) as [unknown, unknown];
       const id = Number(scValToNative(ev.topic[1]));
-      perChest.set(id, (perChest.get(id) ?? BigInt(0)) + BigInt(val[1] as bigint));
+      perChest.set(
+        id,
+        (perChest.get(id) ?? BigInt(0)) + BigInt(val[1] as bigint),
+      );
     } catch {
       /* ignorado */
     }

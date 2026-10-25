@@ -3,6 +3,7 @@ import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client, networks } from "@findloot/chest";
 import { NETWORK } from "@/lib/config";
+import { withRpcUrl } from "@/lib/rpc";
 
 type Body = {
   chestId: number;
@@ -18,7 +19,8 @@ function hexToBuf(hex: string): Buffer {
 }
 
 const isHex = (v: unknown, bytes: number): v is string =>
-  typeof v === "string" && new RegExp(`^(0x)?[0-9a-fA-F]{${bytes * 2}}$`).test(v);
+  typeof v === "string" &&
+  new RegExp(`^(0x)?[0-9a-fA-F]{${bytes * 2}}$`).test(v);
 
 function validBody(b: Partial<Body> | null): b is Body {
   return (
@@ -49,7 +51,10 @@ export async function POST(req: NextRequest) {
     const secret = process.env.RELAYER_SECRET;
     if (!secret) {
       console.error("attack: RELAYER_SECRET missing");
-      return NextResponse.json({ error: "server not configured", logs }, { status: 500 });
+      return NextResponse.json(
+        { error: "server not configured", logs },
+        { status: 500 },
+      );
     }
 
     const parsed = (await req.json().catch(() => null)) as Partial<Body> | null;
@@ -64,29 +69,34 @@ export async function POST(req: NextRequest) {
 
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
-    const client = new Client({
-      ...networks.testnet,
-      rpcUrl: NETWORK.rpcUrl,
-      allowHttp: true,
-      publicKey: kp.publicKey(),
-      signTransaction,
-    });
-
     try {
-      const tx = await client.claim(
-        {
-          chest_id: BigInt(body.chestId),
-          recipient: body.botRecipient,
-          nullifier: hexToBuf(body.nullifierHex),
-          proof: {
-            a: hexToBuf(body.proof.a),
-            b: hexToBuf(body.proof.b),
-            c: hexToBuf(body.proof.c),
-          },
+      await withRpcUrl(
+        async (rpcUrl) => {
+          const client = new Client({
+            ...networks.testnet,
+            rpcUrl,
+            allowHttp: true,
+            publicKey: kp.publicKey(),
+            signTransaction,
+          });
+
+          const tx = await client.claim(
+            {
+              chest_id: BigInt(body.chestId),
+              recipient: body.botRecipient,
+              nullifier: hexToBuf(body.nullifierHex),
+              proof: {
+                a: hexToBuf(body.proof.a),
+                b: hexToBuf(body.proof.b),
+                c: hexToBuf(body.proof.c),
+              },
+            },
+            { fee: "10000000", timeoutInSeconds: 120, simulate: true },
+          );
+          await tx.signAndSend();
         },
-        { fee: "10000000", timeoutInSeconds: 120, simulate: true },
+        { write: true },
       );
-      await tx.signAndSend();
       push("INESPERADO: el claim del bot pasó");
       return NextResponse.json({ rejected: false, logs });
     } catch (e) {
@@ -111,6 +121,9 @@ export async function POST(req: NextRequest) {
     }
   } catch (e) {
     console.error("attack error", e);
-    return NextResponse.json({ error: "internal error", logs }, { status: 500 });
+    return NextResponse.json(
+      { error: "internal error", logs },
+      { status: 500 },
+    );
   }
 }

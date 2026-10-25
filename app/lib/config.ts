@@ -2,6 +2,13 @@
 export const NETWORK = {
   name: "TESTNET",
   passphrase: "Test SDF Network ; September 2015",
+  /** Primario primero; el resto es fallback (ver lib/rpc.ts). Verificado: simulate/getLedgerEntries en ambos; el envío en el fallback no está verificado. */
+  rpcUrls: [
+    "https://soroban-testnet.stellar.org",
+    "https://soroban-rpc.testnet.stellar.gateway.fm",
+  ],
+  /** Timeout de las lecturas antes de probar el siguiente RPC. */
+  rpcTimeoutMs: 8000,
   rpcUrl: "https://soroban-testnet.stellar.org",
   horizonUrl: "https://horizon-testnet.stellar.org",
   friendbotUrl: "https://friendbot.stellar.org",

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
 import { Client, networks } from "@findloot/chest";
 import { DEMO_CHEST, NETWORK } from "@/lib/config";
+import { withRpcUrl } from "@/lib/rpc";
 import { listChests } from "@/lib/chest-store";
 
 /** true = exists on-chain, false = ChestNotFound (#1), null = could not verify. */
@@ -9,14 +10,16 @@ async function existsOnChain(id: number): Promise<boolean | null> {
   const secret = process.env.RELAYER_SECRET;
   if (!secret) return null;
   try {
-    const client = new Client({
-      ...networks.testnet,
-      rpcUrl: NETWORK.rpcUrl,
-      allowHttp: true,
-      publicKey: Keypair.fromSecret(secret).publicKey(),
+    return await withRpcUrl(async (rpcUrl) => {
+      const client = new Client({
+        ...networks.testnet,
+        rpcUrl,
+        allowHttp: true,
+        publicKey: Keypair.fromSecret(secret).publicKey(),
+      });
+      const tx = await client.get_chest({ chest_id: BigInt(id) });
+      return tx.result.isOk();
     });
-    const tx = await client.get_chest({ chest_id: BigInt(id) });
-    return tx.result.isOk();
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (/Error\(Contract,\s*#1\)|ChestNotFound/i.test(message)) return false;

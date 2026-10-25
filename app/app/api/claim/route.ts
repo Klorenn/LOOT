@@ -3,6 +3,7 @@ import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client, networks } from "@findloot/chest";
 import { NETWORK } from "@/lib/config";
+import { withRpcUrl } from "@/lib/rpc";
 
 type Body = {
   chestId: number;
@@ -16,7 +17,8 @@ function hexToBuf(hex: string): Buffer {
 }
 
 const isHex = (v: unknown, bytes: number): v is string =>
-  typeof v === "string" && new RegExp(`^(0x)?[0-9a-fA-F]{${bytes * 2}}$`).test(v);
+  typeof v === "string" &&
+  new RegExp(`^(0x)?[0-9a-fA-F]{${bytes * 2}}$`).test(v);
 
 function validBody(b: Partial<Body> | null): b is Body {
   return (
@@ -38,7 +40,10 @@ export async function POST(req: NextRequest) {
     const secret = process.env.RELAYER_SECRET;
     if (!secret) {
       console.error("claim: RELAYER_SECRET missing");
-      return NextResponse.json({ error: "server not configured" }, { status: 500 });
+      return NextResponse.json(
+        { error: "server not configured" },
+        { status: 500 },
+      );
     }
 
     const parsed = (await req.json().catch(() => null)) as Partial<Body> | null;
@@ -49,49 +54,60 @@ export async function POST(req: NextRequest) {
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
 
-    const client = new Client({
-      ...networks.testnet,
-      rpcUrl: NETWORK.rpcUrl,
-      allowHttp: true,
-      publicKey: kp.publicKey(),
-      signTransaction,
-    });
+    // Escritura: RPC primario; fallback solo ante error de red (ver lib/rpc.ts).
+    const sent = await withRpcUrl(
+      async (rpcUrl) => {
+        const client = new Client({
+          ...networks.testnet,
+          rpcUrl,
+          allowHttp: true,
+          publicKey: kp.publicKey(),
+          signTransaction,
+        });
 
-    const tx = await client.claim(
-      {
-        chest_id: BigInt(body.chestId),
-        recipient: body.recipient,
-        nullifier: hexToBuf(body.nullifierHex),
-        proof: {
-          a: hexToBuf(body.proof.a),
-          b: hexToBuf(body.proof.b),
-          c: hexToBuf(body.proof.c),
-        },
+        const tx = await client.claim(
+          {
+            chest_id: BigInt(body.chestId),
+            recipient: body.recipient,
+            nullifier: hexToBuf(body.nullifierHex),
+            proof: {
+              a: hexToBuf(body.proof.a),
+              b: hexToBuf(body.proof.b),
+              c: hexToBuf(body.proof.c),
+            },
+          },
+          {
+            fee: "10000000",
+            timeoutInSeconds: 120,
+            // BN254 verify_proof necesita margen de instrucciones
+            simulate: true,
+          },
+        );
+
+        // Forzar leeway alto si el SDK lo expone en la simulación
+        if (
+          typeof (tx as { simulate?: (o?: object) => Promise<unknown> })
+            .simulate === "function"
+        ) {
+          await (tx as { simulate: (o?: object) => Promise<unknown> }).simulate(
+            {
+              instructionLeeway: 100_000_000,
+            },
+          );
+        }
+
+        return tx.signAndSend();
       },
-      {
-        fee: "10000000",
-        timeoutInSeconds: 120,
-        // BN254 verify_proof necesita margen de instrucciones
-        simulate: true,
-      },
+      { write: true },
     );
-
-    // Forzar leeway alto si el SDK lo expone en la simulación
-    if (typeof (tx as { simulate?: (o?: object) => Promise<unknown> }).simulate === "function") {
-      await (tx as { simulate: (o?: object) => Promise<unknown> }).simulate({
-        instructionLeeway: 100_000_000,
-      });
-    }
-
-    const sent = await tx.signAndSend();
     const hash =
       sent.sendTransactionResponse?.hash ||
       (sent as { hash?: string }).hash ||
       "";
 
     const ledger =
-      (sent as { getTransactionResponse?: { ledger?: number } }).getTransactionResponse
-        ?.ledger ?? null;
+      (sent as { getTransactionResponse?: { ledger?: number } })
+        .getTransactionResponse?.ledger ?? null;
 
     return NextResponse.json({
       ok: true,

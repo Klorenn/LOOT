@@ -80,8 +80,8 @@ export default function WalletPage() {
         <InlineAlert
           tone="dim"
           title="Sin sesión"
-          body="Conectá una passkey o una wallet para ver tu dirección, tu saldo y los cofres que ganaste."
-          actions={[{ href: "/enter", label: "Conectar", primary: true }]}
+          body="Entrá con passkey para ver tu dirección, tu saldo y los cofres que ganaste."
+          actions={[{ href: "/enter", label: "Entrar con passkey", primary: true }]}
         />
       </main>
     );

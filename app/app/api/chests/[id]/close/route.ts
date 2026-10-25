@@ -3,6 +3,7 @@ import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client, networks } from "@findloot/chest";
 import { NETWORK } from "@/lib/config";
+import { withRpcUrl } from "@/lib/rpc";
 import { requireAdmin } from "@/lib/admin-auth";
 
 /**
@@ -17,7 +18,10 @@ export async function POST(
   try {
     const secret = process.env.CREATOR_SECRET || process.env.RELAYER_SECRET;
     if (!secret) {
-      return NextResponse.json({ error: "CREATOR_SECRET missing" }, { status: 500 });
+      return NextResponse.json(
+        { error: "CREATOR_SECRET missing" },
+        { status: 500 },
+      );
     }
     const { id } = await ctx.params;
     const chestId = Number(id);
@@ -27,23 +31,26 @@ export async function POST(
 
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
-    const client = new Client({
-      ...networks.testnet,
-      rpcUrl: NETWORK.rpcUrl,
-      allowHttp: true,
-      publicKey: kp.publicKey(),
-      signTransaction,
-    });
+    const sent = await withRpcUrl(
+      async (rpcUrl) => {
+        const client = new Client({
+          ...networks.testnet,
+          rpcUrl,
+          allowHttp: true,
+          publicKey: kp.publicKey(),
+          signTransaction,
+        });
 
-    const tx = await client.close_chest(
-      { chest_id: BigInt(chestId) },
-      { fee: "10000000", timeoutInSeconds: 120 },
+        const tx = await client.close_chest(
+          { chest_id: BigInt(chestId) },
+          { fee: "10000000", timeoutInSeconds: 120 },
+        );
+        return tx.signAndSend();
+      },
+      { write: true },
     );
-    const sent = await tx.signAndSend();
     const raw = sent.result as
-      | { unwrap?: () => bigint; value?: bigint }
-      | bigint
-      | null;
+      { unwrap?: () => bigint; value?: bigint } | bigint | null;
     let refunded = BigInt(0);
     if (raw && typeof raw === "object" && typeof raw.unwrap === "function") {
       refunded = BigInt(raw.unwrap());

@@ -280,7 +280,7 @@ export function ChestSolve({ badge }: { badge?: React.ReactNode }) {
                 </button>
               </div>
               <p className="font-mono text-[12px] text-[var(--dim)]">
-                Passkeys via Smart Account Kit. Gas is paid by the relayer — you
+                Passkey smart account. Gas is paid by the relayer — you
                 need 0 XLM.
               </p>
             </div>
@@ -311,7 +311,7 @@ export function ChestSolve({ badge }: { badge?: React.ReactNode }) {
                 spellCheck={false}
               />
               <p className="font-mono text-[12px] text-[var(--dim)]">
-                Normalized on device. Never sent to any server until you prove.
+                Normalized on this device. Never sent to any server.
               </p>
             </div>
           </section>

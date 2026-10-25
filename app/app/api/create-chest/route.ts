@@ -4,6 +4,7 @@ import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client, networks } from "@findloot/chest";
 import { CONTRACTS, NETWORK, xlmToStroops } from "@/lib/config";
 import { saveChestMeta } from "@/lib/chest-store";
+import { withRpcUrl } from "@/lib/rpc";
 import { requireAdmin } from "@/lib/admin-auth";
 
 type Body = {
@@ -55,7 +56,10 @@ export async function POST(req: NextRequest) {
   try {
     const secret = process.env.CREATOR_SECRET || process.env.RELAYER_SECRET;
     if (!secret) {
-      return NextResponse.json({ error: "CREATOR_SECRET missing" }, { status: 500 });
+      return NextResponse.json(
+        { error: "CREATOR_SECRET missing" },
+        { status: 500 },
+      );
     }
 
     const parsed = (await req.json().catch(() => null)) as Partial<Body> | null;
@@ -66,27 +70,33 @@ export async function POST(req: NextRequest) {
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
 
-    const client = new Client({
-      ...networks.testnet,
-      rpcUrl: NETWORK.rpcUrl,
-      allowHttp: true,
-      publicKey: kp.publicKey(),
-      signTransaction,
-    });
+    // Escritura: RPC primario; fallback solo ante error de red (ver lib/rpc.ts).
+    const sent = await withRpcUrl(
+      async (rpcUrl) => {
+        const client = new Client({
+          ...networks.testnet,
+          rpcUrl,
+          allowHttp: true,
+          publicKey: kp.publicKey(),
+          signTransaction,
+        });
 
-    const tx = await client.create_chest(
-      {
-        creator: kp.publicKey(),
-        fingerprint: Buffer.from(body.fingerprintHex, "hex"),
-        token: CONTRACTS.token,
-        prize: xlmToStroops(body.prize),
-        max_claims: body.maxClaims,
-        deadline: BigInt(body.deadline ?? 0),
+        const tx = await client.create_chest(
+          {
+            creator: kp.publicKey(),
+            fingerprint: Buffer.from(body.fingerprintHex, "hex"),
+            token: CONTRACTS.token,
+            prize: xlmToStroops(body.prize),
+            max_claims: body.maxClaims,
+            deadline: BigInt(body.deadline ?? 0),
+          },
+          { fee: "10000000", timeoutInSeconds: 120 },
+        );
+
+        return tx.signAndSend();
       },
-      { fee: "10000000", timeoutInSeconds: 120 },
+      { write: true },
     );
-
-    const sent = await tx.signAndSend();
     const raw = sent.result as
       | { unwrap?: () => bigint | number; value?: bigint | number }
       | bigint
