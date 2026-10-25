@@ -9,7 +9,7 @@ export function SiteNav() {
   return (
     <nav className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-6 py-4 backdrop-blur-md">
       <Link href="/" className="font-semibold tracking-[-0.03em]">
-        ChestZK
+        Loot
       </Link>
       <ul className="flex flex-wrap gap-4 font-mono text-xs tracking-[0.04em] text-muted-foreground">
         {links.map((l) => (

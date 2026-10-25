@@ -1,24 +1,25 @@
 {
-  "name": "chestzk",
+  "name": "loot",
   "version": "0.1.0",
-  "description": "ChestZK SDK — create, read, and claim puzzle chests on Stellar (XLM, ZK proofs).",
+  "description": "Loot SDK — create, read, and claim puzzle chests on Stellar (XLM, ZK proofs).",
   "type": "module",
   "license": "MIT",
-  "author": "ChestZK",
+  "author": "Loot",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Klorenn/ChestZK.git",
+    "url": "https://github.com/Klorenn/LOOT.git",
     "directory": "packages/sdk"
   },
-  "homepage": "https://github.com/Klorenn/ChestZK",
+  "homepage": "https://github.com/Klorenn/LOOT",
   "bugs": {
-    "url": "https://github.com/Klorenn/ChestZK/issues"
+    "url": "https://github.com/Klorenn/LOOT/issues"
   },
   "keywords": [
     "stellar",
     "soroban",
     "zk",
     "groth16",
+    "loot",
     "chestzk",
     "xlm"
   ],

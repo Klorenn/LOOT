@@ -1,11 +1,11 @@
-# chestzk
+# loot
 
-SDK for [ChestZK](https://github.com/Klorenn/ChestZK) — puzzle chests on Stellar with ZK proofs sealed to the solver’s address.
+SDK for [Loot](https://github.com/Klorenn/LOOT) — puzzle chests on Stellar with ZK proofs sealed to the solver’s address.
 
-Prize token for the demo: **native XLM** (no swaps).
+(Formerly ChestZK.) Prize token for the demo: **native XLM** (no swaps).
 
 ```bash
-npm i chestzk
+npm i loot
 ```
 
 ```ts
@@ -14,23 +14,16 @@ import {
   fingerprintAnswer,
   CONTRACTS,
   NETWORK,
-} from "chestzk";
+} from "loot";
 
 const { fingerprintHex } = await fingerprintAnswer("alexandria", 7n);
 const client = createChestClient({
   rpcUrl: NETWORK.rpcUrl,
   networkPassphrase: NETWORK.passphrase,
-  publicKey: "G…", // or C… smart account
+  publicKey: "G…",
 });
 
-// client.create_chest / get_chest / claim / close — via generated bindings
 console.log(fingerprintHex, CONTRACTS.xlm);
 ```
 
-## Notes
-
-- Answers are normalized (`trim`, lowercase, strip accents/spaces) before hashing.
-- Full browser `claim` (snarkjs + passkey/wallet) lives in the app; this package ships config, fingerprint helpers, and the Soroban client.
-- Scoped `@chestzk/sdk` can replace this name once the npm org exists.
-
-MIT · https://github.com/Klorenn/ChestZK
+MIT · https://github.com/Klorenn/LOOT

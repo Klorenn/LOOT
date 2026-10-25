@@ -7,6 +7,6 @@ type CreateOpts = {
     publicKey?: string;
     allowHttp?: boolean;
 };
-/** Contract client for the ChestZK registry on testnet. */
+/** Contract client for the Loot registry on testnet. */
 export declare function createChestClient(opts?: CreateOpts): Client;
 export { networks };

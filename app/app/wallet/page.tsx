@@ -187,8 +187,8 @@ export default function WalletPage() {
                       recuperarla.{" "}
                     </strong>
                   )}
-                  Tu clave secreta de jugador (la que evita cobrar dos veces el
-                  mismo cofre) vive solo en este dispositivo y no sale de él: si
+                  Tu clave secreta de jugador (de ella sale el nullifier de tus
+                  pruebas) vive solo en este dispositivo y no sale de él: si
                   limpiás los datos del navegador se pierde.
                 </p>
                 <div className="flex flex-wrap gap-2">

@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     push(`bot apunta a ${body.botRecipient.slice(0, 8)}…`);
     push("copia proof + nullifier de la víctima");
     push("cambia recipient → cuenta del bot");
-    push("enviando claim a ChestZK…");
+    push("enviando claim a Loot…");
 
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);

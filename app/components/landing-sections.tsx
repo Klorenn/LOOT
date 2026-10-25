@@ -75,7 +75,7 @@ const AUDIENCE: {
     color: "var(--proof)",
     h: "A pattern you can ship today.",
     b: "Address-bound proofs on Soroban. Open circuits, open contracts, MIT.",
-    href: "https://github.com/Klorenn/ChestZK",
+    href: "https://github.com/Klorenn/LOOT",
     cta: "Read the docs →",
   },
 ];
@@ -234,7 +234,7 @@ const STEPS = [
   },
   {
     n: "04",
-    t: "Spent once, forever",
+    t: "Each proof works once",
     b: "Every claim burns a nullifier. Replaying the same proof hits a spent nullifier and reverts.",
     Visual: StepSpent,
   },
@@ -322,7 +322,7 @@ export function AttackSection() {
           >
             With a plain-text answer, anyone who sees your transaction (relayer,
             validators, explorers) or the ledger after the first claim can copy
-            it and claim too. On ChestZK a copied proof only pays the address
+            it and claim too. On Loot a copied proof only pays the address
             sealed inside it.
           </p>
           <ul data-fade className="mt-8 space-y-3">
@@ -378,7 +378,7 @@ export function AttackSection() {
           </div>
           <pre className="overflow-x-auto p-5 font-mono text-[12px] leading-[2] text-[var(--muted)] md:p-6 md:text-[13px]">
             <span data-term-line className="block">
-              $ chestzk attack --replay case-0421
+              $ loot attack --replay case-0421
             </span>
             <span data-term-line className="block">
               $ watch ledger --chest 0421
@@ -479,9 +479,9 @@ const SECURITY_ITEMS: { k: string; h: string; hc: string; b: string }[] = [
   },
   {
     k: "Replay",
-    h: "One nullifier per player",
+    h: "Each proof works once",
     hc: "",
-    b: "Every claim spends a nullifier on-chain. Replaying the same proof reverts.",
+    b: "Every claim spends a nullifier on-chain and only pays the address the proof was made for. Replaying the same proof reverts.",
   },
   {
     k: "Funds",

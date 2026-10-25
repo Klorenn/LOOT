@@ -69,19 +69,51 @@ imported into `security/kuyfi/` with `--import`.
 
 ## Per-new-chest scan step
 
-Every contract the factory deploys must be scanned on creation. In practice:
+Every chest the factory deploys must be scanned on creation: after each
+`create_chest`, run
 
-1. Deploy the chest, note its contract id.
-2. `scripts/kuyfi-scan.sh <CHEST_ID>` right away (OSINT, read-only): the badge shows
-   "mapped, fuzzing pending" instead of nothing.
-3. Chaos Monkey does **not** run against a chest that holds funds. The factory
-   deploys the same scanned WASM, so fuzz one throwaway chest per WASM hash
-   (`--chaos`) and re-run when the WASM changes. Chests with the same hash share
-   that result; say so in the UI instead of implying each chest was fuzzed.
+```bash
+scripts/kuyfi-scan.sh <CHEST_ADDRESS>     # OSINT, read-only; address from the factory's create_chest result
+```
+
+1. The badge then shows "functions mapped, fuzzing pending" instead of nothing.
+2. Chaos Monkey does **not** run against a chest that holds funds. Factory chests
+   are instances of the same WASM (`chest_wasm_hash`), so `--chaos` is run once per
+   WASM hash on a throwaway chest and repeated when the hash changes
+   (`set_chest_wasm`). Say "same code as the fuzzed throwaway" in the UI; do not imply
+   each chest was fuzzed.
+3. Fuzzing a closed chest with balance 0 (as the throwaway below) covers fewer paths:
+   `claim` fails early on `ChestClosed`, so the proof / nullifier / payout branches
+   are not reached. Prefer a fresh funded throwaway chest for the next WASM hash.
 4. Commit `security/kuyfi/` and `app/public/security/kuyfi/` so the deploy ships them.
 
-Pending until the factory exists: the throwaway deployment for `--chaos` on the
-normal chest and on factory-made chests.
+**Blocker found (Kuyfi, not the contract):** Kuyfi v0.1.0 bundles stellar-sdk 14.6.1,
+which cannot decode a contract spec whose function has more than 10 inputs. The
+chest's `__constructor` has 11, so both OSINT and `--chaos` fail on every factory
+chest with `XDR_ALIGN_FAILURE` (the scanner reports it generically; the cause was
+confirmed by parsing the same WASM with stellar-sdk 16, which decodes it, and with 14.6.1,
+which stops at `__constructor`). Until the chest constructor takes 10 or fewer
+parameters (for example packing fee settings into one struct), the per-chest step above
+cannot produce a report for factory chests.
+
+## Scan log
+
+| Date | Contract | Mode | Result |
+| --- | --- | --- | --- |
+| 2026-10-25 | chest `CCOIK76O...GBHYZ` | Chaos Monkey (imported from `audits/`) | 0 findings, 48 vectors |
+| 2026-10-25 | verifier `CCUF6M5Y...HXTIE` | Chaos Monkey (imported) | 0 findings, 9 vectors |
+| 2026-10-25 | ChestFactory `CBLPZMXO...VN3EU` | OSINT + Chaos Monkey | 0 findings; 9 functions, 89 vectors, 13 testnet tx; 0 critical / 0 high / 0 medium / 0 low |
+| 2026-10-25 | factory throwaway chest `CAR4DMZC...NSPRK` (closed, balance 0) | OSINT + Chaos Monkey | Not scanned: `XDR_ALIGN_FAILURE` (see blocker above) |
+| 2026-10-25 | normal chests (`CDMYX46W...`, `CAAHCYL5...`) | OSINT only | surface mapped; never fuzzed: live for the attack demo |
+
+ChestFactory coverage notes: admin functions (`set_fees`, `set_treasury`,
+`set_chest_wasm`) take no `Address` argument that Kuyfi can swap, so the
+`UNAUTHORIZED_ADDR_CALL` vector does not apply to them (`set_chest_wasm`: "Access done
+(0 invocations)" in the run log). Their protection is `cfg.admin.require_auth()`,
+checked by reading `contracts/factory/src/lib.rs` (factory branch), not by Kuyfi.
+`create_chest` and `close` are likewise gated by `creator.require_auth()` /
+`client.creator().require_auth()`. The factory's `__constructor` was fuzzed but runs once
+at deploy.
 
 ## Manual triage of HIGH / CRITICAL signals
 
@@ -103,7 +135,7 @@ source in `contracts/`, before the contract is shown as scanned clean.
 
 ### Open: none from a real scan
 
-Current Chaos Monkey reports have 0 findings (chest and verifier). That is a
+Current Chaos Monkey reports have 0 findings (chest, verifier and factory). That is a
 statement about the vectors Kuyfi generated, not proof of absence of bugs.
 
 ### Pre-registered expectations (predictions, NOT findings)

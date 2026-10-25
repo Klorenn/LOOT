@@ -1,0 +1,262 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "kyf-20261025T162637Z-8139d591",
+  "generatedAt": "2026-10-25T16:26:37.816Z",
+  "tool": {
+    "name": "kuyfi",
+    "version": "0.1.0"
+  },
+  "target": {
+    "contractId": "CBLPZMXOGB2AAXQ6WCEEQVNMOE3P3UC66B6Z6LKGXFPROVLGDSTVN3EU",
+    "network": "testnet",
+    "rpcUrl": "https://soroban-testnet.stellar.org",
+    "bytecodeSize": 9554
+  },
+  "scan": {
+    "totalFunctions": 9,
+    "functions": [
+      {
+        "name": "close",
+        "parameters": [
+          {
+            "name": "chest",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "set_fees",
+        "parameters": [
+          {
+            "name": "creation_fee",
+            "type": "I128"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "max_duration_days",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "get_config",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "chest_count",
+        "parameters": [],
+        "hasReturn": true
+      },
+      {
+        "name": "list_chests",
+        "parameters": [
+          {
+            "name": "start",
+            "type": "U32"
+          },
+          {
+            "name": "limit",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "create_chest",
+        "parameters": [
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "question",
+            "type": "String"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "amount_per_slot",
+            "type": "I128"
+          },
+          {
+            "name": "slots",
+            "type": "U32"
+          },
+          {
+            "name": "duration_days",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "set_treasury",
+        "parameters": [
+          {
+            "name": "treasury",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": false
+      },
+      {
+        "name": "__constructor",
+        "parameters": [
+          {
+            "name": "admin",
+            "type": "Address"
+          },
+          {
+            "name": "treasury",
+            "type": "Address"
+          },
+          {
+            "name": "chest_wasm_hash",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "creation_fee",
+            "type": "I128"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "max_duration_days",
+            "type": "U32"
+          }
+        ],
+        "hasReturn": false
+      },
+      {
+        "name": "set_chest_wasm",
+        "parameters": [
+          {
+            "name": "chest_wasm_hash",
+            "type": "BytesN<32>"
+          }
+        ],
+        "hasReturn": false
+      }
+    ],
+    "udts": [
+      {
+        "kind": "struct",
+        "name": "Config",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "Address"
+          },
+          {
+            "name": "chest_wasm_hash",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "creation_fee",
+            "type": "I128"
+          },
+          {
+            "name": "daily_fee_bps",
+            "type": "U32"
+          },
+          {
+            "name": "max_duration_days",
+            "type": "U32"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "treasury",
+            "type": "Address"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          }
+        ]
+      },
+      {
+        "kind": "union",
+        "name": "DataKey",
+        "cases": [
+          {
+            "name": "Config",
+            "valueTypes": []
+          },
+          {
+            "name": "Count",
+            "valueTypes": []
+          },
+          {
+            "name": "ChestAt",
+            "valueTypes": [
+              "U32"
+            ]
+          },
+          {
+            "name": "IsChest",
+            "valueTypes": [
+              "Address"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "execution": {
+    "vectorsExecuted": 89,
+    "broadcastTransactions": 13,
+    "transactionsWithHash": 13,
+    "verificationTransactions": [
+      {
+        "functionName": "list_chests",
+        "vectorName": "start::ZERO",
+        "broadcasted": true,
+        "hash": "40aa5e30dd79879dd7d28c7412ed9b2ceb1bc1affccf704a684548e2175ccf8e",
+        "ledger": 5384389,
+        "explorerUrl": "https://stellar.expert/explorer/testnet/tx/40aa5e30dd79879dd7d28c7412ed9b2ceb1bc1affccf704a684548e2175ccf8e"
+      },
+      {
+        "functionName": "set_fees",
+        "vectorName": "max_duration_days::ONE",
+        "broadcasted": true,
+        "hash": "5b37865b274c256abc5e411071e572b89a8d826e9fc60e533dfa508aa18ce18b",
+        "ledger": 5384386,
+        "explorerUrl": "https://stellar.expert/explorer/testnet/tx/5b37865b274c256abc5e411071e572b89a8d826e9fc60e533dfa508aa18ce18b"
+      }
+    ]
+  },
+  "summary": {
+    "totalFindings": 0,
+    "bySeverity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "info": 0,
+      "preconditionFail": 0
+    },
+    "findingsBySignal": {}
+  },
+  "findings": []
+}

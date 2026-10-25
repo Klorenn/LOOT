@@ -1,9 +1,9 @@
 /**
- * ChestZK SDK — puzzle chests on Stellar with address-bound ZK proofs.
+ * Loot SDK — puzzle chests on Stellar with address-bound ZK proofs.
  *
  * @example
  * ```ts
- * import { createChestClient, fingerprintAnswer, CONTRACTS, NETWORK } from "chestzk";
+ * import { createChestClient, fingerprintAnswer, CONTRACTS, NETWORK } from "loot";
  *
  * const { fingerprintHex } = await fingerprintAnswer("8", 7n);
  * const client = createChestClient({

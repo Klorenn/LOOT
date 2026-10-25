@@ -22,8 +22,7 @@ import { DEMO_CHEST, PRIZE, stroopsToXlm } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";
 
-/** Docs / GitHub: placeholder until the public repo URL is provided. */
-const DOCS_URL = "#";
+const DOCS_URL = "https://github.com/Klorenn/LOOT";
 
 const NO_STATS: Stats = { paid: "—", claims: "—", created: "—" };
 

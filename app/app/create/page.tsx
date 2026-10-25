@@ -300,7 +300,7 @@ export default function CreateChestPage() {
               {step === 1 && (
                 <Field
                   label="Answer"
-                  hint="Normalized to lowercase, no spaces. Never sent to any server."
+                  hint="Normalized to lowercase, no accents, no spaces. Never sent to any server. Security depends on the answer being hard to guess: the fingerprint is public, so short or common answers can be brute-forced offline."
                   error={fieldErr.answer}
                   ok={
                     hashOk && hashHex
@@ -385,7 +385,7 @@ export default function CreateChestPage() {
                   </Field>
                   <Field
                     label="Max claims"
-                    hint="One nullifier per account; first valid proof wins."
+                    hint="Each proof works once, but anyone who knows the answer can claim until the slots run out."
                   >
                     <Input
                       type="number"

@@ -1,4 +1,6 @@
-# ChestZK
+# Loot
+
+> Formerly **ChestZK**. Same product: puzzle chests with ZK proofs on Stellar.
 
 Prize chests on Stellar with ZK proofs (Groth16 / BN254). Knowledge pays. Copying does not.
 
@@ -24,7 +26,7 @@ Native BN254 verification + cheap claims → knowledge-gated airdrops/events tha
 
 **Answer secrecy depends on the answer.** Only `Poseidon(answer, salt)` is stored, but players need the salt to prove. Short answers (a number 0–1000) can be brute-forced; use phrases or rare words.
 
-**One claim per proof, not per human.** The nullifier stops replays. Account farms are bounded by the chest's slots (`max_claims`); proof-of-personhood is future work.
+**One claim per proof, not per human.** Each proof works once (nullifier) and only pays the address it was made for. The circuit does not bind the player secret to the recipient, so anyone who knows the answer can claim several slots with different secrets. Account farms are bounded by the chest's slots (`max_claims`); proof-of-personhood is future work.
 
 ## Run
 

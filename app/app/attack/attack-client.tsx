@@ -160,7 +160,7 @@ export function AttackClient({
             Copy the proof. <Em tone="red">Lose anyway.</Em>
           </>
         }
-        lead="Front-running bots copy π and bump the fee. On ChestZK the proof only verifies for the address that made it."
+        lead="Front-running bots copy π and bump the fee. On Loot the proof only verifies for the address that made it."
         right={
           <div className="flex flex-wrap gap-2">
             <button

@@ -1,4 +1,4 @@
-/** Stellar testnet defaults for ChestZK. */
+/** Stellar testnet defaults for Loot (ChestZK contracts). */
 export const NETWORK = {
   name: "TESTNET",
   passphrase: "Test SDF Network ; September 2015",

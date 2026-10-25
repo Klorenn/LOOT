@@ -133,7 +133,7 @@ export function BrandMark({ className }: { className?: string }) {
     <span className={cn("inline-flex items-center gap-2", className)}>
       <LogoChest className="h-8 w-7" deg={0} />
       <span className="text-[18px] font-semibold tracking-[-0.03em] text-[var(--text)]">
-        ChestZK
+        Loot
       </span>
     </span>
   );

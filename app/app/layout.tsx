@@ -5,7 +5,7 @@ import { AppChrome } from "@/components/app-chrome";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ChestZK — Puzzle chests that bots can’t rob",
+  title: "Loot — Puzzle chests that bots can’t rob",
   description:
     "Solve it, prove it in zero knowledge, claim the prize on Stellar. Proofs sealed to your address.",
   icons: {

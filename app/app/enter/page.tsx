@@ -48,7 +48,7 @@ function EnterInner() {
     <main className="mx-auto flex min-h-[80vh] w-full max-w-md flex-col items-center justify-center gap-6 px-6">
       <div className="text-center">
         <p className="font-mono text-xs tracking-[0.04em] text-muted-foreground">
-          ChestZK
+          Loot
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em]">
           Entra sin seed phrase
@@ -103,7 +103,7 @@ function EnterInner() {
         className="h-11 w-full text-muted-foreground"
       >
         <KeyRound className="mr-2 size-4" aria-hidden />
-        {busy === "passkey-existing" ? "Buscando passkey…" : "Ya tengo una passkey de ChestZK"}
+        {busy === "passkey-existing" ? "Buscando passkey…" : "Ya tengo una passkey de Loot"}
       </Button>
 
       <Button

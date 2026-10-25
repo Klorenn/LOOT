@@ -1,6 +1,7 @@
-# Prompt para Cursor: ChestZK — cierre antes del freeze (09:00)
+# Prompt para Cursor: Loot — cierre antes del freeze (09:00)
 
-**HackMeridian 2026 · Stellar testnet**
+**HackMeridian 2026 · Stellar testnet**  
+**Marca:** **Loot** (antes ChestZK). UI y copy = Loot. Repo: `Klorenn/LOOT`. Paquete npm = `loot`.
 
 Cofres con premio en **XLM nativo**. El jugador prueba con ZK (Groth16 BN254 en Soroban) que sabe la respuesta; la prueba lleva el `recipient` como entrada pública y un nullifier. Passkey-kit (C-address) + Stellar Wallets Kit (G). Relayer OZ Channels con fee-bump.
 
@@ -12,10 +13,11 @@ Revisa el repo real y reutiliza helpers; no inventes rutas. **No toques el circu
 
 | Tema | Decisión |
 |------|----------|
+| Nombre | **Loot** (no ChestZK en UI) |
 | Premio | **XLM nativo**, 10 XLM por cupo. SAC: `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` |
 | Swap / Soroswap / USDC en demo | **No.** |
 | Contrato por cofre (fábrica) | **No para el freeze.** Demo = contrato-registro actual (`ChestZk` + `id`). Fábrica = *siguiente paso* (rama `factory` solo si sobra tiempo y no toca main). |
-| Superficie para builders | **SDK `@chestzk/sdk` primero** (+ API HTTP mínima de solo lectura). El contrato on-chain es la fuente de verdad. |
+| Superficie para builders | **SDK `loot` primero** (+ API HTTP mínima de solo lectura). El contrato on-chain es la fuente de verdad. |
 | QR | Sí: en **Mi wallet**, modal con QR de la dirección. |
 
 ---
@@ -25,7 +27,7 @@ Revisa el repo real y reutiliza helpers; no inventes rutas. **No toques el circu
 1. **Commit de checkpoint** del estado actual. Mensaje convencional, sin Co-Authored-By.
 2. **`app/dashboard`, `app/explore`, `components/app`** — son pantallas v8 del mismo equipo (no las borres). Si hay conflictos de merge con otro agente, coordinar; no las excluyas “porque son de otro” sin preguntar.
 3. Verifica `ADMIN_KEY` en `app/.env.local`. Si falta, **avisá y pará** esa parte — **no la inventes ni la pegues en chats**.
-4. Repo: https://github.com/Klorenn/ChestZK — Docs/GitHub apuntan ahí.
+4. Repo: https://github.com/Klorenn/LOOT — Docs/GitHub apuntan ahí.
 
 ---
 
@@ -100,7 +102,7 @@ Si no llega: en la pitch decir “siguiente paso = factory + address por cofre�
 ## 6. Landing
 
 - Contadores **reales** desde eventos `claimed` / `rejected`, o quitarlos. Nada de 84.300 XLM ni 2.941 inventados.
-- Docs / GitHub → https://github.com/Klorenn/ChestZK
+- Docs / GitHub → https://github.com/Klorenn/LOOT
 - Sin copy de mempool/sender engañoso; botón **See the theft live →** a `/attack`.
 
 ---
@@ -123,6 +125,6 @@ Si no llega: en la pitch decir “siguiente paso = factory + address por cofre�
 ## Notas operativas para Pau
 
 1. **Poné vos** `ADMIN_KEY=…` en `app/.env.local` (hoy falta). Sin eso `/create` y panel admin dan 403.
-2. **Repo:** https://github.com/Klorenn/ChestZK (`origin` ya configurado).
+2. **Repo:** https://github.com/Klorenn/LOOT (`origin` ya configurado).
 3. Congelá features a las **09:00**. Checkpoint ya.
 4. Alguien **tiene** que abrir el browser antes del freeze.

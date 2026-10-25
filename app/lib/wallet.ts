@@ -174,7 +174,7 @@ async function enrollSmartWallet(): Promise<Player> {
     }
   }
 
-  const created = await kit.createWallet("ChestZK", `player-${Date.now()}`, {
+  const created = await kit.createWallet("Loot", `player-${Date.now()}`, {
     // Resident key so the binding-proof assertion (get) finds the credential
     // just created by create() — required for passkey-kit Genesis proof.
     authenticatorSelection: {
@@ -225,7 +225,7 @@ export async function reconnectPasskey(): Promise<Player> {
   const connected = await kit.connectWallet(
     existing?.kind === "passkey" && existing.keyId ? { keyId: existing.keyId } : undefined,
   );
-  if (!connected?.contractId) throw new Error("No encontramos una passkey de ChestZK en este dispositivo.");
+  if (!connected?.contractId) throw new Error("No encontramos una passkey de Loot en este dispositivo.");
   const player: Player = {
     kind: "passkey",
     publicKey: connected.contractId,
