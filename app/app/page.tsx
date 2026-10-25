@@ -1,9 +1,11 @@
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { ChestVisual } from "@/components/chest-visual";
+import { DEMO_CHEST } from "@/lib/config";
 
 const counters = [
-  { label: "cofres abiertos", value: "0" },
+  { label: "cofres abiertos", value: "1" },
   { label: "copias rechazadas", value: "0" },
-  { label: "USDC pagado", value: "0.00" },
+  { label: "CHEST pagado", value: "100" },
 ];
 
 export default function Home() {
@@ -16,25 +18,14 @@ export default function Home() {
         <p className="text-muted-foreground">Saber cuenta. Copiar, no.</p>
       </div>
 
-      {/* Placeholder del cofre: glow radial lila, sin imágenes ni sombras */}
-      <div
-        className="relative flex h-56 w-full max-w-md items-center justify-center rounded-2xl border border-border"
-        style={{
-          background:
-            "radial-gradient(ellipse 60% 50% at 50% 55%, rgba(223, 185, 224, 0.18), transparent 70%), var(--surface)",
-        }}
-      >
-        <span className="font-mono text-xs text-muted-foreground">
-          [ cofre ]
-        </span>
-      </div>
+      <ChestVisual />
 
-      <Button
-        size="lg"
-        className="h-12 w-full max-w-md rounded-full bg-primary px-8 text-base font-semibold text-primary-foreground hover:bg-primary/90 sm:w-auto"
+      <Link
+        href={`/entrar?next=/cofre/${DEMO_CHEST.id}`}
+        className="inline-flex h-12 w-full max-w-md items-center justify-center rounded-full bg-primary px-8 text-base font-semibold text-primary-foreground hover:bg-primary/90"
       >
         Abrir un cofre
-      </Button>
+      </Link>
 
       <dl className="grid w-full max-w-md grid-cols-3 gap-4 text-center">
         {counters.map(({ label, value }) => (

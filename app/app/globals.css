@@ -70,6 +70,20 @@
   --radius: 16px;
 }
 
+@keyframes chestzk-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.chestzk-spin {
+  animation: chestzk-spin 1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chestzk-spin {
+    animation: none;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -1,0 +1,263 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "kyf-20261025T114353Z-f5ab2e63",
+  "generatedAt": "2026-10-25T11:43:53.555Z",
+  "tool": {
+    "name": "kuyfi",
+    "version": "0.1.0"
+  },
+  "target": {
+    "contractId": "CC6Q4V6QVAG5EQTIYX6E34YFWKDLEWMVXSOZRT4DVUE3O24JODIU4YOT",
+    "network": "testnet",
+    "rpcUrl": "https://soroban-testnet.stellar.org",
+    "bytecodeSize": 8034
+  },
+  "scan": {
+    "totalFunctions": 6,
+    "functions": [
+      {
+        "name": "init",
+        "parameters": [
+          {
+            "name": "admin",
+            "type": "Address"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "claim",
+        "parameters": [
+          {
+            "name": "chest_id",
+            "type": "U64"
+          },
+          {
+            "name": "recipient",
+            "type": "Address"
+          },
+          {
+            "name": "nullifier",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "proof",
+            "type": "Proof"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "get_chest",
+        "parameters": [
+          {
+            "name": "chest_id",
+            "type": "U64"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "close_chest",
+        "parameters": [
+          {
+            "name": "chest_id",
+            "type": "U64"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "create_chest",
+        "parameters": [
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "prize",
+            "type": "I128"
+          },
+          {
+            "name": "max_claims",
+            "type": "U32"
+          },
+          {
+            "name": "deadline",
+            "type": "U64"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "recipient_field",
+        "parameters": [
+          {
+            "name": "recipient",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": true
+      }
+    ],
+    "udts": [
+      {
+        "kind": "struct",
+        "name": "Chest",
+        "fields": [
+          {
+            "name": "claims",
+            "type": "U32"
+          },
+          {
+            "name": "closed",
+            "type": "Bool"
+          },
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "deadline",
+            "type": "U64"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "max_claims",
+            "type": "U32"
+          },
+          {
+            "name": "prize",
+            "type": "I128"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          }
+        ]
+      },
+      {
+        "kind": "struct",
+        "name": "Proof",
+        "fields": [
+          {
+            "name": "a",
+            "type": "BytesN<64>"
+          },
+          {
+            "name": "b",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "c",
+            "type": "BytesN<64>"
+          }
+        ]
+      },
+      {
+        "kind": "union",
+        "name": "DataKey",
+        "cases": [
+          {
+            "name": "Verifier",
+            "valueTypes": []
+          },
+          {
+            "name": "NextId",
+            "valueTypes": []
+          },
+          {
+            "name": "Chest",
+            "valueTypes": [
+              "U64"
+            ]
+          },
+          {
+            "name": "Nullifier",
+            "valueTypes": [
+              "BytesN<32>"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "execution": {
+    "vectorsExecuted": 51,
+    "broadcastTransactions": 3,
+    "transactionsWithHash": 3,
+    "verificationTransactions": [
+      {
+        "functionName": "recipient_field",
+        "vectorName": "recipient::RANDOM_ADDR_A",
+        "broadcasted": true,
+        "hash": "5a2ace4af0cd6517aed4f9d5c775d55d476f1474f7d7114b57eb9addf974c9c0",
+        "ledger": 5381007,
+        "explorerUrl": "https://stellar.expert/explorer/testnet/tx/5a2ace4af0cd6517aed4f9d5c775d55d476f1474f7d7114b57eb9addf974c9c0"
+      }
+    ]
+  },
+  "summary": {
+    "totalFindings": 1,
+    "bySeverity": {
+      "critical": 0,
+      "high": 1,
+      "medium": 0,
+      "low": 0,
+      "info": 0,
+      "preconditionFail": 0
+    },
+    "findingsBySignal": {
+      "POTENTIAL_VULN": 1
+    }
+  },
+  "findings": [
+    {
+      "id": "KYF-001",
+      "functionName": "recipient_field",
+      "vectorName": "UNAUTHORIZED_ADDR_CALL",
+      "signal": "POTENTIAL_VULN",
+      "severity": "HIGH",
+      "details": "UNAUTHORIZED_ADDR_CALL: access control bypass — call was NOT rejected on recipient_field",
+      "evidence": {
+        "simulationFailed": false,
+        "transaction": {
+          "broadcasted": true,
+          "hash": "063ed634cbe520f8195dc7bf6a958fece03b849941abc2f29213676066ba3c01",
+          "ledger": 5381009,
+          "explorerUrl": "https://stellar.expert/explorer/testnet/tx/063ed634cbe520f8195dc7bf6a958fece03b849941abc2f29213676066ba3c01"
+        },
+        "trace": {
+          "rootCall": {
+            "kind": "fn_call",
+            "contractId": "bd0e57d0a80dd24268c5fc4df305b286b25995bc9d98cf83ad09b76b8970d14e",
+            "functionName": "recipient_field"
+          },
+          "nestedCallCount": 0,
+          "involvedContractIds": [
+            "bd0e57d0a80dd24268c5fc4df305b286b25995bc9d98cf83ad09b76b8970d14e"
+          ],
+          "errors": [],
+          "hasAuthError": false,
+          "failureLocation": "UNKNOWN",
+          "malformed": false
+        }
+      }
+    }
+  ]
+}

@@ -37,7 +37,7 @@ Horas en hora de Lisboa.
 
 - [x] Spike del verificador con go o no-go — dom 12:30 — **GO a las 11:24**: prueba verificada on-ledger, fee 11.786 stroops (~0,0012 XLM). Contrato `CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE` · [tx](https://stellar.expert/explorer/testnet/tx/570e6e2fdc0da4ae749e80b32ef6ea671d70f478b17dff6de80a86f5e710abfb)
 - [x] Contrato ChestZK con tests en verde — dom 17:00 — **hecho 11:35 / redeploy limpio 12:02**: 9/9 tests. Contrato `CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ` (alias `chestzk-chest`), initado con verifier `CCUF6M5Y…HXTIE`. Kuyfi 0 findings tras quitar el entrypoint `recipient_field` (el encoding va off-chain). Gotchas: `__constructor` y `contractimport!` → `init()` + `invoke_contract`.
-- [ ] Deploy v1 en testnet con un cofre abierto por Face ID — dom 20:00
+- [x] Deploy v1 en testnet con un cofre abierto por Face ID — dom 20:00 — **adelantado 12:20**: cofre #1 creado + claim e2e on-chain ([tx](https://stellar.expert/explorer/testnet/tx/b3bb388a1da6edc2115e13a5a18e544ba848c81bb5817c164a8542e10e62de1d)). Front pantallas 1–6 + snarkjs + `/api/claim` (relayer plan B). Face ID = WebAuthn gate + keypair local (passkey-kit full queda para pulido).
 - [ ] MVP completo y features congeladas — lun 00:30
 - [ ] Cofre público para jueces — lun 08:00
 - [ ] Código congelado — lun 09:00

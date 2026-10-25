@@ -10,7 +10,10 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "@noble/hashes": "^2.4.0",
     "@stellar/stellar-sdk": "^17.3.0",
+    "chestzk-chest": "file:../packages/chestzk-chest",
+    "circomlibjs": "^0.1.7",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.0",
     "geist": "^1.8.2",
@@ -28,6 +31,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/snarkjs": "^0.7.9",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",

@@ -1,0 +1,38 @@
+Scanning CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE...
+Scan complete — 2 function(s), 2 UDT type(s).
+Generating ephemeral keypair...
+Keypair funded: GDKAQ6ZLOA...
+Connected to RPC: https://soroban-testnet.stellar.org
+Starting fuzzing session on 2 function(s)...
+[verify_proof] Running math vectors (2 params)...
+[verify_proof] Math done (9 invocations)
+[verify_proof] Running access control vectors...
+[verify_proof] Access done (0 invocations)
+[vk_fingerprint] Running math vectors (0 params)...
+[vk_fingerprint] Math done (0 invocations)
+[vk_fingerprint] Running access control vectors...
+[vk_fingerprint] Access done (0 invocations)
+Checking for call-ordering sequence candidates...
+Building report...
+Scan complete — 0 finding(s) | CRITICAL: 0 HIGH: 0
+
+KUYFI AUDIT COMPLETE
+
+Contract: CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE
+Network: TESTNET
+Functions scanned: 2
+Vectors executed: 9
+Findings: 0
+  Critical: 0
+  High: 0
+  Medium: 0
+  Low: 0
+  Info: 9
+
+Evidence:
+  Broadcast transactions: 0
+  Transactions with hash: 0
+
+JSON report written to: kuyfi-report-kyf-20261025T114415Z-e00d2b9a.json
+
+PDF report written to: kuyfi-report-kyf-20261025T114415Z-e00d2b9a.pdf

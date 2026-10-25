@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Cache Components choca con useParams en rutas de cofre; lo apagamos para el MVP.
+  cacheComponents: false,
+  serverExternalPackages: ["chestzk-chest", "snarkjs", "circomlibjs"],
   turbopack: {
     rules: {
       "*.css": {
@@ -11,6 +11,16 @@ const nextConfig: NextConfig = {
         as: "*.css",
       },
     },
+  },
+  webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      path: false,
+      crypto: false,
+      stream: false,
+    };
+    return config;
   },
 };
 
