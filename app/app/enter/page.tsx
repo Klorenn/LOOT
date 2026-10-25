@@ -39,7 +39,8 @@ function EnterInner() {
           Entra sin seed phrase
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Face ID crea tu cuenta inteligente. Cero comisiones para vos.
+          Passkey despliega tu smart wallet en Stellar (C…). Las fees las
+          cubre el relayer. En desktop sin biometría usamos fallback de demo.
         </p>
       </div>
 

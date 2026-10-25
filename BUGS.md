@@ -2,12 +2,12 @@
 
 Priority for post-freeze (only fix if demo breaks):
 
-1. **Claim CLI hang** — `stellar contract invoke --send=yes` sometimes stalls >3min after simulation; API `/api/claim` preferred for UI.
-2. **Passkey** — Face ID is a gate; signing is still a local keypair in `localStorage`.
-3. **Relayer** — no OZ Docker; `RELAYER_SECRET` signs claims server-side.
-4. **Panel** — no on-chain close / withdraw UI yet.
+1. **Claim CLI hang** — prefer `/api/claim` over `stellar … --send=yes`.
+2. **Passkey** — ✅ passkey-kit smart wallet (C…); classic G… fallback if WebAuthn/deploy fails.
+3. **Relayer** — ✅ OZ Channels via `RELAYER_API_KEY` (no Docker); fee-bump fallback with `RELAYER_SECRET`. Claim still signed by RELAYER_SECRET.
+4. **Panel close** — ✅ `/api/chests/:id/close`.
 5. **Attack normal side** — theatrical simulation only.
-6. **CI** — not configured.
-7. **Home metrics** — hardcoded.
+6. **CI** — ✅ `.github/workflows/ci.yml` (app build + cargo test).
+7. **Home metrics** — still hardcoded.
 
 Won’t fix before form submit unless judges can’t open `/chest/2`.

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 type Row = {
   id: number;
@@ -15,13 +16,35 @@ type Row = {
 export default function PanelPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
-  useEffect(() => {
+  function reload() {
     fetch("/api/chests")
       .then((r) => r.json())
       .then((d) => setRows(d.chests || []))
       .catch((e) => setError(String(e)));
+  }
+
+  useEffect(() => {
+    reload();
   }, []);
+
+  async function closeChest(id: number) {
+    if (!confirm(`¿Cerrar cofre #${id} y retirar remanente?`)) return;
+    setBusyId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/chests/${id}/close`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "close failed");
+      alert(`Cerrado. Refund ${data.refunded} · ${data.hash?.slice(0, 12)}…`);
+      reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-10">
@@ -31,14 +54,14 @@ export default function PanelPage() {
             Panel
           </p>
           <h1 className="text-3xl font-semibold tracking-[-0.03em]">
-            Tus cofres
+            Your chests
           </h1>
         </div>
         <Link
           href="/create"
           className="inline-flex h-12 items-center rounded-full bg-primary px-6 font-semibold text-primary-foreground"
         >
-          Crear cofre
+          Create chest
         </Link>
       </div>
 
@@ -49,9 +72,9 @@ export default function PanelPage() {
           <thead className="border-b border-border font-mono text-xs tracking-[0.04em] text-muted-foreground">
             <tr>
               <th className="px-4 py-3">#</th>
-              <th className="px-4 py-3">Plantilla</th>
-              <th className="px-4 py-3">Pregunta</th>
-              <th className="px-4 py-3">Premio</th>
+              <th className="px-4 py-3">Template</th>
+              <th className="px-4 py-3">Question</th>
+              <th className="px-4 py-3">Prize</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -67,12 +90,24 @@ export default function PanelPage() {
                   {r.prize} CHEST
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Link
-                    href={`/chest/${r.id}`}
-                    className="text-[#4C8DFF] underline"
-                  >
-                    abrir
-                  </Link>
+                  <div className="flex justify-end gap-3">
+                    <Link
+                      href={`/chest/${r.id}`}
+                      className="text-[#4C8DFF] underline"
+                    >
+                      open
+                    </Link>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={busyId === r.id}
+                      onClick={() => closeChest(r.id)}
+                      className="h-8 text-destructive"
+                    >
+                      {busyId === r.id ? "…" : "close"}
+                    </Button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -82,18 +117,13 @@ export default function PanelPage() {
                   colSpan={5}
                   className="px-4 py-8 text-center text-muted-foreground"
                 >
-                  Todavía no hay cofres.
+                  No chests yet. Create one from /create.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-
-      <p className="text-xs text-muted-foreground">
-        Aperturas y copias rechazadas se leen de eventos on-chain en la versión
-        completa del panel.
-      </p>
     </main>
   );
 }

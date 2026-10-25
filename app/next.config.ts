@@ -26,7 +26,12 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  serverExternalPackages: ["chestzk-chest", "snarkjs", "circomlibjs"],
+  serverExternalPackages: [
+    "chestzk-chest",
+    "snarkjs",
+    "circomlibjs",
+    "passkey-kit",
+  ],
   turbopack: {
     rules: {
       "*.css": {

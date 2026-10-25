@@ -44,7 +44,10 @@ Horas en hora de Lisboa.
 - [ ] Video y deck listos — lun 10:30
 - [ ] README final y formulario enviado — lun 11:30
 
-> Estado al dom 25 ~13:00 Lisboa: **MVP frozen** (tag `mvp`). Siguiente: video + deck + ensayo pitch.
+> Estado al dom 25 ~13:25 Lisboa: passkey-kit smart wallet + OZ Channels/fee-bump + panel close + CI. Siguiente: video + deck + formulario.
+
+- [x] Passkey-kit real (C… smart wallet) + `/api/passkey/send` (OZ Channels o fee-bump) — **13:25**
+- [x] Panel close on-chain + GitHub Actions CI
 
 - [x] Bot + modo ataque + crear cofre + panel — **12:30**: `/attack` (split + log), `bot/attack.mjs` confirma InvalidProof (#6) al copiar prueba, `/create` plantillas+QR, `/panel`.
 - [x] Fix demo jueces — **12:55**: cofre #2 on-chain con Poseidon(8,7); UX InvalidProof = “respuesta incorrecta”; README con IDs.

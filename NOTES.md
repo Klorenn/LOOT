@@ -37,7 +37,7 @@ ES paths 301 → EN.
 - Recipient field = `sha256(ScVal Address XDR)` with byte[0]=0
 - Proof G2 limbs swapped (ethereum uncompressed)
 - No Docker → deployer/relayer pays fees (plan B)
-- Face ID = WebAuthn gate + local keypair (not full passkey-kit yet)
+- Passkey = **passkey-kit** smart wallet (C…); `/api/passkey/send` via OZ Channels (`RELAYER_API_KEY`) or fee-bump (`RELAYER_SECRET`). Classic G… fallback if WebAuthn fails.
 - `data/` chests meta is gitignored; demo #2 is hardcoded in `lib/config.ts`
 
 ## Bug list (known / non-blocking)
