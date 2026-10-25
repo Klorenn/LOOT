@@ -8,3 +8,13 @@ circuits/build/witness.wtns
 !.env.example
 .DS_Store
 .playwright-mcp/
+
+# generated / secrets
+.env
+.env.*
+!.env.example
+app/node_modules/
+app/.next/
+circuits/node_modules/
+contracts/*/target/
+.playwright-mcp/

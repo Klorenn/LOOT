@@ -36,7 +36,7 @@ Horas en hora de Lisboa.
 ### Checklist de hitos
 
 - [x] Spike del verificador con go o no-go — dom 12:30 — **GO a las 11:24**: prueba verificada on-ledger, fee 11.786 stroops (~0,0012 XLM). Contrato `CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE` · [tx](https://stellar.expert/explorer/testnet/tx/570e6e2fdc0da4ae749e80b32ef6ea671d70f478b17dff6de80a86f5e710abfb)
-- [ ] Contrato ChestZK con tests en verde — dom 17:00
+- [x] Contrato ChestZK con tests en verde — dom 17:00 — **hecho 11:35 / deploy+init 11:40**: 9/9 tests. Contrato `CC6Q4V6QVAG5EQTIYX6E34YFWKDLEWMVXSOZRT4DVUE3O24JODIU4YOT` (alias `chestzk-chest`), initado con verifier `CCUF6M5Y…HXTIE`. Gotchas: `__constructor` y `contractimport!` del verifier WASM daban "Missing Entry Proof" al invocar; se usa `init()` + `Env::invoke_contract`.
 - [ ] Deploy v1 en testnet con un cofre abierto por Face ID — dom 20:00
 - [ ] MVP completo y features congeladas — lun 00:30
 - [ ] Cofre público para jueces — lun 08:00
