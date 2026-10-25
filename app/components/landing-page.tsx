@@ -12,6 +12,7 @@ import {
   HeroStats,
   HowSection,
   SecuritySection,
+  UseCasesSection,
   type Stats,
 } from "@/components/landing-sections";
 import { ScrollProgress } from "@/components/scroll-progress";
@@ -186,6 +187,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
           <StackMarquee />
 
           <HowSection />
+          <UseCasesSection />
           <AttackSection />
           <AudienceSection docsUrl={DOCS_URL} />
 
