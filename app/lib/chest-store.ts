@@ -64,8 +64,12 @@ function backend(): Backend {
 
 // ---------- Blob ----------
 // El store es PRIVADO: los metadatos (y la sal de cofres públicos) solo se sirven vía nuestra API.
+// The SDK prefers Vercel OIDC + BLOB_STORE_ID over BLOB_READ_WRITE_TOKEN; a stale store id from an
+// integration then yields "Access denied". Passing the token explicitly makes it win.
+const auth = () => (process.env.BLOB_READ_WRITE_TOKEN ? { token: process.env.BLOB_READ_WRITE_TOKEN } : {});
+
 async function blobRead<T>(key: string): Promise<T | null> {
-  const r = await get(key, { access: "private", useCache: false }).catch(() => null);
+  const r = await get(key, { access: "private", useCache: false, ...auth() }).catch(() => null);
   if (!r || r.statusCode !== 200) return null;
   return (await new Response(r.stream).json().catch(() => null)) as T | null;
 }
@@ -78,6 +82,7 @@ async function blobWriteOnce(key: string, value: unknown): Promise<"ok" | "exist
       addRandomSuffix: false,
       allowOverwrite: false,
       contentType: "application/json",
+      ...auth(),
     });
     return "ok";
   } catch (e) {
@@ -133,7 +138,7 @@ export async function saveChestMeta(meta: ChestMeta): Promise<ChestMeta> {
   if (backend() === "blob") {
     const r = await blobWriteOnce(`chests/${meta.id}.json`, meta);
     if (r === "exists") return (await blobRead<ChestMeta>(`chests/${meta.id}.json`)) ?? meta;
-    await del(`pending/${meta.fingerprintHex}.json`).catch(() => {});
+    await del(`pending/${meta.fingerprintHex}.json`, auth()).catch(() => {});
     return meta;
   }
   const all = await fileReadAll<ChestMeta>(FILE);
@@ -153,7 +158,7 @@ export async function listPublicMetas(): Promise<ChestMeta[]> {
   if (publicCache && Date.now() - publicCache.at < 30_000) return publicCache.value;
   let metas: ChestMeta[] = Object.values(await fileReadAll<ChestMeta>(FILE));
   if (hasBlob()) {
-    const { blobs } = await list({ prefix: "chests/", limit: 500 });
+    const { blobs } = await list({ prefix: "chests/", limit: 500, ...auth() });
     const fetched = await Promise.all(blobs.map((b) => blobRead<ChestMeta>(b.pathname)));
     const byId = new Map(metas.map((m) => [m.id, m]));
     for (const m of fetched) if (m) byId.set(m.id, m);
