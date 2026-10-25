@@ -93,6 +93,7 @@ export type ChestRowData = {
   refundStroops: string | null;
   poolStroops: string;
   address: string | null;
+  closed: boolean;
 };
 
 export function toRowFromView(v: ChestView, index = 0): ChestRowData {
@@ -121,6 +122,7 @@ export function toRowFromView(v: ChestView, index = 0): ChestRowData {
     refundStroops: v.refundStroops ?? null,
     poolStroops: v.poolStroops,
     address: v.address ?? null,
+    closed: v.closed,
   };
 }
 

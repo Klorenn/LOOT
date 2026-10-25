@@ -7,12 +7,16 @@ import { CellsBackground } from "@/components/cells-background";
 import { Em } from "@/components/page-header";
 import { KV, Mono } from "@/components/kv";
 import { loadPlayer } from "@/lib/wallet";
+import { stroopsToXlm } from "@/lib/config";
+import { ordinal } from "@/lib/factory";
 
 type ClaimTx = {
   hash?: string;
   explorer?: string;
   nullifierHex?: string;
   ledger?: number | string;
+  place?: number | null;
+  amountStroops?: string | null;
 };
 
 function shortAddr(a: string) {
@@ -65,7 +69,12 @@ export function ClaimedClient({ code, label }: { code: string; label: string }) 
   }, [id]);
 
   const prover = addr ? shortAddr(addr) : "your address";
-  const amountDisplay = prizeLabel ? `+${prizeLabel}` : "+—";
+  // factory: el monto real de TU lugar (del evento de la tx); legacy: el premio del cofre
+  const amountDisplay = tx?.amountStroops
+    ? `+${stroopsToXlm(tx.amountStroops)} XLM`
+    : prizeLabel
+      ? `+${prizeLabel}`
+      : "+—";
   const txHash = tx?.hash;
   const nullifier = tx?.nullifierHex
     ? `${tx.nullifierHex.slice(0, 6)}…${tx.nullifierHex.slice(-4)}`
@@ -123,7 +132,7 @@ export function ClaimedClient({ code, label }: { code: string; label: string }) 
           <p className="mt-5 max-w-[36rem] text-[18px] leading-[1.55] text-[var(--muted)]">
             Your proof verified for{" "}
             <span className="font-mono text-[var(--text)]">{prover}</span> and
-            the prize was released to that address. The proof is bound to your address, and each
+            the {tx?.place ? `${ordinal(tx.place)} place ` : ""}prize was released to that address. The proof is bound to your address, and each
             proof works only once.
           </p>
 

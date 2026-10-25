@@ -85,10 +85,14 @@ export async function POST(req: NextRequest) {
         ],
         { cpuInstructions: 100_000_000 },
       );
+      // (receptor, lugar 1-based, monto) del evento `claimed` de ESTA tx
+      const won = r.events.find((e) => e.name === "claimed")?.data as unknown[] | undefined;
       return NextResponse.json({
         ok: true,
         hash: r.hash,
         ledger: r.ledger,
+        place: won ? Number(won[1]) : null,
+        amountStroops: won ? String(won[2]) : null,
         explorer: `https://stellar.expert/explorer/testnet/tx/${r.hash}`,
       });
     }

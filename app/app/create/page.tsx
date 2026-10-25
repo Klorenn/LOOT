@@ -23,7 +23,7 @@ const STEPS = [
   "Puzzle",
   "Answer hash",
   "Reward",
-  "Expiry",
+  "Duration",
   "Review & fund",
 ] as const;
 

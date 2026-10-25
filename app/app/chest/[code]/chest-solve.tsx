@@ -292,6 +292,8 @@ export function ChestSolve({
           explorer: data.explorer,
           nullifierHex: result.nullifierHex,
           ledger: data.ledger,
+          place: data.place,
+          amountStroops: data.amountStroops,
         }),
       );
       // la wallet (si está abierta) refresca saldo e historial

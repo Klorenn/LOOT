@@ -12,7 +12,7 @@ export async function invokeAsRelayer(
   method: string,
   args: xdr.ScVal[],
   opts: { cpuInstructions?: number } = {},
-): Promise<{ hash: string; ledger: number | null; returnValue: unknown }> {
+): Promise<{ hash: string; ledger: number | null; returnValue: unknown; events: { name: string; data: unknown }[] }> {
   const secret = process.env.RELAYER_SECRET;
   if (!secret) throw new Error("RELAYER_SECRET missing");
   const kp = Keypair.fromSecret(secret);
@@ -45,10 +45,21 @@ export async function invokeAsRelayer(
       for (;;) {
         const r = await server.getTransaction(hash);
         if (r.status === rpc.Api.GetTransactionStatus.SUCCESS) {
+          const events: { name: string; data: unknown }[] = [];
+          for (const ev of (r.events?.contractEventsXdr ?? []).flat()) {
+            try {
+              const v0 = ev.body().v0();
+              const first = scValToNative(v0.topics()[0]);
+              events.push({ name: String(first), data: scValToNative(v0.data()) });
+            } catch {
+              /* evento ilegible: se ignora */
+            }
+          }
           return {
             hash,
             ledger: r.ledger ?? null,
             returnValue: r.returnValue ? scValToNative(r.returnValue) : undefined,
+            events,
           };
         }
         if (r.status === rpc.Api.GetTransactionStatus.FAILED) {
