@@ -16,7 +16,12 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/cofre/:id/abierto",
-        destination: "/chest/:id/opened",
+        destination: "/chest/:id/claimed",
+        permanent: true,
+      },
+      {
+        source: "/chest/:id/opened",
+        destination: "/chest/:id/claimed",
         permanent: true,
       },
       {
@@ -24,6 +29,7 @@ const nextConfig: NextConfig = {
         destination: "/chest/:id/error",
         permanent: true,
       },
+      { source: "/panel", destination: "/dashboard", permanent: true },
     ];
   },
   serverExternalPackages: [

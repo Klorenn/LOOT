@@ -65,32 +65,38 @@ export function initLandingMotion(root: HTMLElement) {
     });
 
     const hero = root.querySelector("[data-hero]");
-    const chestSvg = root.querySelector<SVGSVGElement>(".hero .chest");
+    const chestSvg = root.querySelector<SVGSVGElement>(
+      "svg[data-hero-chest], .hero svg.chest",
+    );
     if (hero && chestSvg) {
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: hero,
-          start: "top top",
-          end: "bottom top",
-          scrub: 0.6,
+      // Open early: ~first 120px of scroll, ease-out so the lid moves right away.
+      ScrollTrigger.create({
+        trigger: hero,
+        start: "top top",
+        end: "+=120",
+        scrub: true,
+        onUpdate: (self) => {
+          const t = self.progress;
+          const eased = 1 - (1 - t) * (1 - t); // power2.out
+          setChest(chestSvg, 30 * eased);
         },
       });
-      const st = { a: 0 };
-      tl.to(
-        st,
-        {
-          a: 30,
-          ease: "power1.inOut",
-          onUpdate: () => setChest(chestSvg, st.a),
-        },
-        0,
-      )
+      // Parallax still tracks the full hero exit.
+      gsap
+        .timeline({
+          scrollTrigger: {
+            trigger: hero,
+            start: "top top",
+            end: "bottom top",
+            scrub: 0.2,
+          },
+        })
         .to(root.querySelectorAll("[data-chest-wrap]"), { y: 60, ease: "none" }, 0)
-        .to(root.querySelectorAll("[data-hero-copy]"), {
-          y: -60,
-          opacity: 0.2,
-          ease: "none",
-        }, 0);
+        .to(
+          root.querySelectorAll("[data-hero-copy]"),
+          { y: -60, opacity: 0.2, ease: "none" },
+          0,
+        );
     }
 
     root.querySelectorAll("[data-reveal-h2]").forEach((h) => {

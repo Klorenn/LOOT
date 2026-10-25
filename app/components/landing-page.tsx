@@ -2,19 +2,24 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
-import { CONTRACTS } from "@/lib/config";
 import { initLandingMotion } from "@/lib/landing-motion";
 import { BrandMark, LogoChest } from "@/components/logo-chest";
 import { CellsBackground } from "@/components/cells-background";
+import { SiteFooter } from "@/components/app/site-footer";
+import {
+  AttackSection,
+  CtaSection,
+  HeroStats,
+  HowSection,
+  WhoSection,
+} from "@/components/landing-sections";
 import { ScrollProgress } from "@/components/scroll-progress";
 import { SmoothScroll } from "@/components/smooth-scroll";
 import { StackMarquee } from "@/components/stack-marquee";
 
-const SHORT = `${CONTRACTS.chest.slice(0, 8)}…${CONTRACTS.chest.slice(-4)}`;
-
 /** Honest testnet stats from our own demo (not invented XLM). */
 const STATS = {
-  paid: 200,
+  paid: 5,
   rejected: 1,
   settle: 5,
 };
@@ -46,10 +51,10 @@ export function LandingPage() {
             </Link>
             <div className="hidden items-center gap-8 md:flex">
               {[
-                ["#how", "Product"],
+                ["/explore", "Explore"],
                 ["#how", "How it works"],
-                ["#attack", "Security"],
-                ["https://github.com", "Docs"],
+                ["/attack", "Security"],
+                ["https://github.com/Klorenn/ChestZK", "Docs"],
               ].map(([href, label]) => (
                 <a
                   key={label}
@@ -68,7 +73,7 @@ export function LandingPage() {
                 href="/enter?next=/chest/2"
                 className="btn-landing btn-landing-p btn-landing-sm"
               >
-                Launch app
+                Launch app →
               </Link>
             </div>
           </div>
@@ -99,7 +104,8 @@ export function LandingPage() {
                   className="max-w-[14ch] text-[clamp(52px,7vw,92px)] leading-[0.98] font-semibold tracking-[-0.04em]"
                 >
                   Puzzle chests that bots{" "}
-                  <span className="text-[var(--proof)]">can’t rob.</span>
+                  <span className="text-[var(--proof)]">can’t</span>{" "}
+                  <span className="text-[var(--proof-d)]">rob.</span>
                 </h1>
                 <p
                   data-hero-fade
@@ -119,7 +125,11 @@ export function LandingPage() {
                   <a href="#how" className="btn-landing btn-landing-s">
                     How it works
                   </a>
+                  <Link href="/attack" className="btn-landing btn-landing-s">
+                    See the theft live →
+                  </Link>
                 </div>
+                <HeroStats stats={STATS} />
               </div>
               <div
                 data-chest-wrap
@@ -132,6 +142,7 @@ export function LandingPage() {
                   className="w-[240px] lg:w-[340px]"
                   deg={0}
                   showInside
+                  data-hero-chest
                 />
               </div>
             </div>
@@ -139,169 +150,9 @@ export function LandingPage() {
 
           <StackMarquee />
 
-          {/* How */}
-          <section
-            id="how"
-            aria-labelledby="how-h"
-            className="border-b border-[var(--line)] py-32"
-          >
-            <div className="mx-auto max-w-[1200px] px-6">
-              <p
-                data-fade
-                className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)]"
-              >
-                01 — How it works
-              </p>
-              <h2
-                id="how-h"
-                data-reveal-h2
-                className="mt-4 max-w-[16ch] text-[clamp(36px,4.5vw,56px)] leading-[1.02] font-semibold tracking-[-0.04em]"
-              >
-                Four steps. One rightful owner.
-              </h2>
-              <p
-                data-fade
-                className="mt-5 max-w-[40rem] text-[18px] leading-[1.55] text-[var(--muted)]"
-              >
-                The answer never leaves your device. The proof carries your
-                address. The contract only pays the address inside the proof.
-              </p>
-              <div className="mt-16 grid grid-cols-1 border-t border-[var(--line)] sm:grid-cols-2 lg:grid-cols-4">
-                {[
-                  {
-                    n: "01",
-                    t: "Solve locally",
-                    b: "Crack the riddle in your browser. Only a hash of the answer exists.",
-                    d: "hash → 0x5c1e…a77f",
-                    c: "text-[var(--muted)]",
-                  },
-                  {
-                    n: "02",
-                    t: "Seal it to you",
-                    b: "A ZK proof binds the answer to your Stellar address as a public input.",
-                    d: "prover: GA7Q…X4ZK",
-                    c: "text-[var(--proof)]",
-                  },
-                  {
-                    n: "03",
-                    t: "Claim the prize",
-                    b: "Soroban checks the proof against the recipient in one call, then pays out.",
-                    d: "+100 CHEST",
-                    c: "text-[var(--gold)]",
-                  },
-                  {
-                    n: "04",
-                    t: "Spent once",
-                    b: "Every claim burns a nullifier. Replaying the same proof reverts.",
-                    d: "replay → reverted",
-                    c: "text-[var(--red)]",
-                  },
-                ].map((s, i) => (
-                  <div
-                    key={s.n}
-                    data-fade
-                    className={`pt-8 pr-0 pb-4 ${i ? "border-[var(--line)] sm:border-l sm:pl-7" : ""}`}
-                  >
-                    <div className="font-mono text-[12px] text-[var(--dim)]">
-                      {s.n}
-                    </div>
-                    <h3 className="mt-3 text-[22px] font-semibold tracking-[-0.02em]">
-                      {s.t}
-                    </h3>
-                    <p className="mt-3 text-[15px] leading-[1.55] text-[var(--muted)]">
-                      {s.b}
-                    </p>
-                    <code
-                      className={`mt-4 block font-mono text-[12px] ${s.c}`}
-                    >
-                      {s.d}
-                    </code>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Attack */}
-          <section
-            id="attack"
-            data-attack
-            aria-labelledby="attack-h"
-            className="flex min-h-screen items-center border-b border-[var(--line)] py-0"
-          >
-            <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 items-center gap-12 px-6 lg:grid-cols-2">
-              <div>
-                <p
-                  data-fade
-                  className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)]"
-                >
-                  02 — Attack demo
-                </p>
-                <h2
-                  id="attack-h"
-                  data-reveal-h2
-                  className="mt-4 text-[clamp(36px,4.5vw,56px)] leading-[1.02] font-semibold tracking-[-0.04em]"
-                >
-                  Copy the proof. Lose the race anyway.
-                </h2>
-                <p
-                  data-fade
-                  className="mt-5 text-[18px] leading-[1.55] text-[var(--muted)]"
-                >
-                  On a normal chest the answer travels in plain text. Anyone who
-                  sees your transaction (the relayer, a validator, an explorer)
-                  can copy it, and after the first claim it sits on the ledger
-                  for every remaining slot. On ChestZK the copy fails, because
-                  the proof only pays the address sealed inside it.
-                </p>
-                <Link
-                  href="/attack"
-                  data-fade
-                  className="btn-landing btn-landing-s mt-8 inline-flex"
-                >
-                  Run the demo
-                </Link>
-              </div>
-              <pre
-                data-term
-                aria-label="Attack replay log"
-                className="overflow-x-auto rounded-[14px] border border-[var(--line)] bg-[var(--s1)] p-6 font-mono text-[13px] leading-[2.1] text-[var(--muted)] md:text-[14px] md:p-7"
-              >
-                <span data-term-line className="block">
-                  $ watch ledger --chest 0421
-                </span>
-                <span data-term-line className="block">
-                  00.00{" "}
-                  <span className="text-[var(--proof)]">you</span> submit π
-                  sealed to GA7Q…X4ZK
-                </span>
-                <span data-term-line className="block">
-                  00.41 <span className="text-[var(--red)]">bot</span> copy π
-                  from your tx, resend to GBOT…7Q1
-                </span>
-                <span data-term-line className="block">
-                  00.80 chain verify(π, recipient=GBOT…7Q1)
-                </span>
-                <span
-                  data-term-line="rejected"
-                  className="block text-[var(--red)]"
-                >
-                  REJECTED recipient ≠ proof · bound to GA7Q…X4ZK
-                </span>
-                <span data-term-line className="block">
-                  01.20 chain verify(π, recipient=GA7Q…X4ZK)
-                </span>
-                <span data-term-line className="block">
-                  <span className="text-[var(--ok)]">VERIFIED</span> prize
-                  released{" "}
-                  <span className="text-[var(--gold)]">100 CHEST</span>
-                </span>
-                <span data-term-line className="block">
-                  $ <span className="cursor-blink">▌</span>
-                </span>
-              </pre>
-            </div>
-          </section>
+          <WhoSection />
+          <HowSection />
+          <AttackSection />
 
           {/* Stellar × ZK */}
           <section
@@ -373,7 +224,7 @@ export function LandingPage() {
                   <b className="font-mono text-[44px] font-medium tracking-[-0.03em]">
                     <span data-count={STATS.paid}>{STATS.paid}</span>{" "}
                     <small className="text-[20px] text-[var(--gold)]">
-                      CHEST
+                      USDC
                     </small>
                   </b>
                   <div className="mt-2 text-[15px] text-[var(--muted)]">
@@ -412,155 +263,10 @@ export function LandingPage() {
             </div>
           </section>
 
-          {/* CTA */}
-          <section className="border-b border-[var(--line)] py-[180px] text-center">
-            <div className="mx-auto max-w-[1200px] px-6">
-              <h2
-                data-reveal-h2
-                className="text-[clamp(36px,4.5vw,56px)] leading-[1.02] font-semibold tracking-[-0.04em]"
-              >
-                The next chest is waiting.
-              </h2>
-              <p
-                data-fade
-                className="mx-auto mt-5 max-w-[28rem] text-[18px] leading-[1.55] text-[var(--muted)]"
-              >
-                Bring a wallet and a sharp mind. We bring the bots that will
-                fail.
-              </p>
-              <div
-                data-fade
-                className="mt-10 flex flex-wrap justify-center gap-3"
-              >
-                <Link
-                  href="/enter?next=/chest/2"
-                  className="btn-landing btn-landing-p"
-                >
-                  Open a chest →
-                </Link>
-                <Link href="/create" className="btn-landing btn-landing-s">
-                  Create a chest
-                </Link>
-              </div>
-            </div>
-          </section>
+          <CtaSection />
         </main>
 
-        {/* Footer */}
-        <footer
-          data-footer
-          className="relative overflow-hidden border-t border-[var(--line)] pt-24"
-        >
-          <CellsBackground variant="footer" />
-          <div className="relative z-10 mx-auto max-w-[1200px] px-6">
-            <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-[1.4fr_repeat(4,1fr)] lg:gap-10">
-              <div data-fade className="md:col-span-2 lg:col-span-1">
-                <BrandMark />
-                <p className="mt-4 max-w-[300px] text-[15px] leading-[1.55] text-[var(--muted)]">
-                  Puzzle chests with prizes only the rightful solver can claim.
-                  Proofs sealed to your address.
-                </p>
-                <p className="mt-5 flex items-center gap-2 font-mono text-[12px] whitespace-nowrap text-[var(--muted)]">
-                  <span
-                    className="status-dot inline-block size-[7px] rounded-full bg-[var(--ok)]"
-                    aria-hidden
-                  />
-                  Testnet · contract {SHORT}
-                </p>
-              </div>
-              {(
-                [
-                  [
-                    "Product",
-                    [
-                      ["/chest/2", "Open chests"],
-                      ["/create", "Create a chest"],
-                      ["/panel", "Leaderboard"],
-                      ["/attack", "Attack demo"],
-                    ],
-                  ],
-                  [
-                    "Developers",
-                    [
-                      ["https://developers.stellar.org", "Docs"],
-                      ["/create", "Circuits"],
-                      [
-                        `https://stellar.expert/explorer/testnet/contract/${CONTRACTS.chest}`,
-                        "Soroban contract",
-                      ],
-                      ["https://github.com", "GitHub"],
-                    ],
-                  ],
-                  [
-                    "Stellar",
-                    [
-                      ["https://stellar.expert/explorer/testnet", "Stellar Expert"],
-                      ["https://freighter.app", "Freighter wallet"],
-                      ["https://developers.stellar.org/docs/build", "Soroban docs"],
-                      ["https://friendbot.stellar.org", "Testnet faucet"],
-                    ],
-                  ],
-                  [
-                    "Community",
-                    [
-                      ["https://x.com", "X / Twitter"],
-                      ["https://discord.com", "Discord"],
-                      ["https://meridian.stellar.org", "HackMeridian 2026"],
-                      ["mailto:hello@chestzk.dev", "Contact"],
-                    ],
-                  ],
-                ] as const
-              ).map(([title, links]) => (
-                <div key={title} data-fade>
-                  <div className="font-mono text-[12px] font-medium tracking-[0.1em] text-[var(--dim)] uppercase">
-                    {title}
-                  </div>
-                  <ul className="mt-4">
-                    {links.map(([href, label]) => (
-                      <li key={label} className="leading-[2.2]">
-                        <a
-                          href={href}
-                          className="focus-landing text-[14px] text-[var(--muted)] hover:text-[var(--text)]"
-                        >
-                          {label}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-[72px] flex flex-col justify-between gap-3 border-t border-[var(--line)] py-[22px] text-[13px] text-[var(--dim)] sm:flex-row">
-              <span>© 2026 ChestZK · Built on Stellar for HackMeridian 2026</span>
-              <span className="flex gap-4">
-                <a href="#main" className="hover:text-[var(--text)]">
-                  Terms
-                </a>
-                <a href="#main" className="hover:text-[var(--text)]">
-                  Privacy
-                </a>
-                <a href="#attack" className="hover:text-[var(--text)]">
-                  Security
-                </a>
-              </span>
-            </div>
-
-            <div
-              data-wordmark
-              aria-hidden
-              className="select-none overflow-hidden text-center font-semibold text-[var(--wordmark)]"
-              style={{
-                fontSize: "23.5vw",
-                lineHeight: 0.74,
-                letterSpacing: "-1.2vw",
-                height: "0.6em",
-              }}
-            >
-              CHESTZK
-            </div>
-          </div>
-        </footer>
+        <SiteFooter />
       </div>
     </SmoothScroll>
   );

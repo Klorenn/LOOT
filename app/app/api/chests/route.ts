@@ -1,6 +1,28 @@
 import { NextResponse } from "next/server";
-import { DEMO_CHEST } from "@/lib/config";
+import { Keypair } from "@stellar/stellar-sdk";
+import { Client, networks } from "chestzk-chest";
+import { DEMO_CHEST, NETWORK } from "@/lib/config";
 import { listChests } from "@/lib/chest-store";
+
+/** true = exists on-chain, false = ChestNotFound (#1), null = could not verify. */
+async function existsOnChain(id: number): Promise<boolean | null> {
+  const secret = process.env.RELAYER_SECRET;
+  if (!secret) return null;
+  try {
+    const client = new Client({
+      ...networks.testnet,
+      rpcUrl: NETWORK.rpcUrl,
+      allowHttp: true,
+      publicKey: Keypair.fromSecret(secret).publicKey(),
+    });
+    const tx = await client.get_chest({ chest_id: BigInt(id) });
+    return tx.result.isOk();
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (/Error\(Contract,\s*#1\)|ChestNotFound/i.test(message)) return false;
+    return null;
+  }
+}
 
 export async function GET() {
   const stored = await listChests();
@@ -10,10 +32,13 @@ export async function GET() {
     question: DEMO_CHEST.question,
     hint: DEMO_CHEST.hint,
     prize: DEMO_CHEST.prize,
-    maxClaims: 5,
+    maxClaims: DEMO_CHEST.slots,
     createdAt: "2026-10-25T12:00:00Z",
   };
   const ids = new Set(stored.map((c) => c.id));
   const all = ids.has(demo.id) ? stored : [demo, ...stored];
-  return NextResponse.json({ chests: all });
+  const chests = await Promise.all(
+    all.map(async (c) => ({ ...c, onchain: await existsOnChain(c.id) })),
+  );
+  return NextResponse.json({ chests });
 }

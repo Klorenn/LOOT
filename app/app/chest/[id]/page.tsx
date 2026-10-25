@@ -1,110 +1,423 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ChestVisual } from "@/components/chest-visual";
-import { loadPlayer } from "@/lib/wallet";
+import { useEffect, useMemo, useState } from "react";
+import { LogoChest } from "@/components/logo-chest";
+import { PageHeader, Em } from "@/components/app/page-header";
+import { KV, Mono } from "@/components/app/kv";
+import { StatusLabel } from "@/components/app/status-label";
+import { DifficultyBars } from "@/components/app/difficulty-bars";
+import { ExampleTag } from "@/components/app/example-tag";
+import { InlineAlert } from "@/components/app/inline-alert";
+import { DEMO_CHEST } from "@/lib/config";
+import { getChest } from "@/lib/chests-demo";
+import {
+  enrollClassic,
+  enrollWithPasskey,
+  loadPlayer,
+  PasskeyUnavailableError,
+  type Player,
+} from "@/lib/wallet";
 
-type Meta = {
-  id: number;
-  question: string;
-  hint?: string;
-  salt: string;
-  prizeLabel: string;
-  prize: number;
-};
-
-export default function ChestPage() {
+export default function ChestSolvePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const chestId = Number(id);
+  const catalog = getChest(chestId);
+
+  const [player, setPlayer] = useState<Player | null>(null);
   const [answer, setAnswer] = useState("");
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [meta, setMeta] = useState<{
+    question: string;
+    hint?: string;
+    salt: string;
+    prizeLabel: string;
+    fingerprint?: string;
+  } | null>(null);
 
   useEffect(() => {
-    if (!loadPlayer()) {
-      router.replace(`/enter?next=/chest/${id}`);
+    setPlayer(loadPlayer());
+  }, []);
+
+  useEffect(() => {
+    if (!Number.isFinite(chestId)) return;
+    if (catalog && !catalog.live) {
+      setMeta({
+        question: catalog.question,
+        salt: "7",
+        prizeLabel: catalog.reward,
+        fingerprint: "0x…example",
+      });
       return;
     }
-    fetch(`/api/chests/${id}`)
+    fetch(`/api/chests/${chestId}`)
       .then(async (r) => {
-        if (!r.ok) throw new Error("Cofre no encontrado");
+        if (!r.ok) throw new Error("Chest not found");
         return r.json();
       })
       .then((m) => {
-        setMeta(m);
-        sessionStorage.setItem(`chestzk.salt.${id}`, m.salt);
+        setMeta({
+          question: m.question,
+          hint: m.hint,
+          salt: m.salt,
+          prizeLabel: m.prizeLabel || `${m.prize} CHEST`,
+          fingerprint: m.fingerprintHex,
+        });
+        sessionStorage.setItem(`chestzk.salt.${chestId}`, m.salt);
       })
-      .catch((e) => setError(String(e.message || e)));
-  }, [id, router]);
+      .catch(() => {
+        if (chestId === DEMO_CHEST.id) {
+          setMeta({
+            question: DEMO_CHEST.question,
+            hint: DEMO_CHEST.hint,
+            salt: DEMO_CHEST.salt,
+            prizeLabel: DEMO_CHEST.prizeLabel,
+            fingerprint: DEMO_CHEST.fingerprintHex,
+          });
+          sessionStorage.setItem(`chestzk.salt.${chestId}`, DEMO_CHEST.salt);
+        } else {
+          setErr("Chest not found");
+        }
+      });
+  }, [chestId, catalog]);
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!answer.trim() || !meta) return;
-    sessionStorage.setItem(`chestzk.answer.${id}`, answer.trim());
-    router.push(`/chest/${id}/proving`);
+  const connected = !!player;
+  const canProve = connected && answer.trim().length > 0;
+
+  const titleWord = useMemo(() => {
+    const n = catalog?.name || `Chest #${chestId}`;
+    const parts = n.split(" ");
+    return { head: parts.slice(0, -1).join(" "), last: parts.at(-1) || n };
+  }, [catalog, chestId]);
+
+  async function connectPasskey() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const p = await enrollWithPasskey();
+      setPlayer(p);
+    } catch (e) {
+      if (e instanceof PasskeyUnavailableError) {
+        setErr("WebAuthn unavailable — try Freighter demo (classic) below.");
+      } else {
+        setErr(e instanceof Error ? e.message : String(e));
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
-  if (error) {
-    return (
-      <main className="mx-auto max-w-md px-6 py-16 text-center">
-        <p className="text-destructive">{error}</p>
-      </main>
-    );
+  async function connectClassic() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const p = await enrollClassic();
+      setPlayer(p);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  if (!meta) {
+  function startProve() {
+    if (!canProve || !meta) return;
+    // Live demo: wrong answer detected before prove for chest #2
+    if (
+      catalog?.live &&
+      chestId === DEMO_CHEST.id &&
+      answer.trim() !== DEMO_CHEST.answer
+    ) {
+      setErr("wrong-answer");
+      return;
+    }
+    if (!catalog?.live && catalog) {
+      // Example chests: alexandria demo from proto
+      if (answer.trim().toLowerCase().replace(/\s+/g, "") !== "alexandria") {
+        setErr("wrong-answer");
+        return;
+      }
+      setErr("example-only");
+      return;
+    }
+    sessionStorage.setItem(`chestzk.answer.${chestId}`, answer.trim());
+    router.push(`/chest/${chestId}/proving`);
+  }
+
+  if (err === "Chest not found") {
     return (
-      <main className="mx-auto max-w-md px-6 py-16 text-center text-muted-foreground">
-        Cargando cofre…
+      <main className="mx-auto max-w-[720px] px-6 py-20">
+        <InlineAlert
+          tone="dim"
+          title="Not found"
+          body="This chest id is not on the catalogue."
+          actions={[
+            { href: "/explore", label: "Explore chests", primary: true },
+            { href: `/chest/${DEMO_CHEST.id}`, label: "Open demo chest" },
+          ]}
+        />
       </main>
     );
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-col gap-8 px-6 py-12">
-      <ChestVisual size="sm" />
-
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <p className="font-mono text-xs tracking-[0.04em] text-muted-foreground">
-          Cofre #{id} · {meta.prizeLabel}
-        </p>
-        <h1 className="mt-3 text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-          {meta.question}
-        </h1>
-        {meta.hint && (
-          <p className="mt-2 text-sm text-muted-foreground">Pista: {meta.hint}</p>
-        )}
-        <p className="mt-4 font-mono text-2xl text-gold">{meta.prizeLabel}</p>
-      </div>
-
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-2">
-          <span className="font-mono text-xs tracking-[0.04em] text-muted-foreground">
-            Tu respuesta
+    <main>
+      <PageHeader
+        eyebrow={
+          <span>
+            <Link href="/explore" className="hover:text-[var(--text)]">
+              Explore
+            </Link>
+            {" / "}#{String(chestId).padStart(4, "0")}
+            {!catalog?.live && (
+              <>
+                {" · "}
+                <ExampleTag />
+              </>
+            )}
           </span>
-          <Input
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder="Escribila acá"
-            className="h-12 rounded-2xl border-input bg-background text-base focus-visible:ring-2 focus-visible:ring-ring"
-            autoComplete="off"
-            autoFocus
-          />
-        </label>
-        <p className="text-xs text-muted-foreground">
-          Tu respuesta nunca sale de este teléfono. Solo viaja una prueba ZK.
-        </p>
-        <Button
-          type="submit"
-          size="lg"
-          className="h-12 w-full rounded-full bg-primary font-semibold text-primary-foreground"
-        >
-          Probar conocimiento
-        </Button>
-      </form>
+        }
+        title={
+          <>
+            {titleWord.head ? `${titleWord.head} ` : ""}
+            <Em>{titleWord.last}</Em>
+          </>
+        }
+        lead={
+          meta ? (
+            <span className="italic">&ldquo;{meta.question}&rdquo;</span>
+          ) : (
+            "Loading…"
+          )
+        }
+      />
+
+      <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-12 px-6 py-12 lg:grid-cols-[1fr_1.15fr] lg:gap-[72px]">
+        <div>
+          <LogoChest className="w-[200px] lg:w-[240px]" />
+          {meta && (
+            <div className="mt-10">
+              <KV
+                rows={[
+                  {
+                    label: "Reward",
+                    value: meta.prizeLabel,
+                    valueClass: "text-[var(--gold)]",
+                  },
+                  {
+                    label: "Difficulty",
+                    value: (
+                      <DifficultyBars
+                        level={catalog?.difficulty ?? 1}
+                      />
+                    ),
+                  },
+                  {
+                    label: "Status",
+                    value: (
+                      <span className="inline-flex flex-wrap items-center gap-2">
+                        <StatusLabel status={catalog?.status ?? "open"} />
+                        {catalog?.expires && catalog.expires !== "—" && (
+                          <span className="text-[var(--dim)]">
+                            expires in {catalog.expires}
+                          </span>
+                        )}
+                      </span>
+                    ),
+                  },
+                  {
+                    label: "Answer hash",
+                    value: (
+                      <span>
+                        poseidon →{" "}
+                        <Mono>
+                          {meta.fingerprint || DEMO_CHEST.fingerprintHex}
+                        </Mono>
+                      </span>
+                    ),
+                  },
+                  {
+                    label: "Circuit",
+                    value: "chest_v1.circom · Groth16 · BN254",
+                  },
+                ]}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {/* 01 Connect */}
+          <section className="rounded-[14px] border border-[var(--line)] bg-[var(--s1)]">
+            <header className="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
+              <span className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)] uppercase">
+                01 · Connect
+              </span>
+              <span className="font-mono text-[12px]">
+                {connected ? (
+                  <span className="inline-flex items-center gap-2 text-[var(--ok)]">
+                    <span className="size-[6px] rounded-full bg-[var(--ok)]" />
+                    <Mono>{player!.publicKey}</Mono>
+                  </span>
+                ) : (
+                  <span className="text-[var(--dim)]">not connected</span>
+                )}
+              </span>
+            </header>
+            <div className="space-y-4 p-5">
+              <p className="text-[15px] leading-[1.5] text-[var(--muted)]">
+                Your address becomes a public input of the proof. Only it can
+                claim.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={busy || connected}
+                  onClick={connectPasskey}
+                  className="btn-landing btn-landing-p"
+                >
+                  Continue with passkey
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || connected}
+                  onClick={connectClassic}
+                  className="btn-landing btn-landing-s"
+                >
+                  Use Freighter / demo wallet
+                </button>
+              </div>
+              <p className="font-mono text-[12px] text-[var(--dim)]">
+                Passkeys via Smart Account Kit. Gas is paid by the relayer — you
+                need 0 XLM.
+              </p>
+            </div>
+          </section>
+
+          {/* 02 Answer */}
+          <section className="rounded-[14px] border border-[var(--line)] bg-[var(--s1)]">
+            <header className="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
+              <span className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)] uppercase">
+                02 · Your answer
+              </span>
+              <span className="font-mono text-[12px] text-[var(--dim)]">
+                stays on this device
+              </span>
+            </header>
+            <div className="space-y-3 p-5">
+              <label className="block font-mono text-[12px] tracking-[0.06em] text-[var(--dim)] uppercase">
+                {meta?.hint || "Answer"}
+              </label>
+              <input
+                value={answer}
+                onChange={(e) => {
+                  setAnswer(e.target.value);
+                  if (err === "wrong-answer") setErr(null);
+                }}
+                className="h-11 w-full rounded-[10px] border border-[var(--line)] bg-[var(--bg)] px-3 font-mono text-[15px] outline-none focus:border-[var(--proof)]"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <p className="font-mono text-[12px] text-[var(--dim)]">
+                Normalized on device. Never sent to any server until you prove.
+              </p>
+            </div>
+          </section>
+
+          {/* 03 Prove */}
+          <section className="rounded-[14px] border border-[var(--line)] bg-[var(--s1)]">
+            <header className="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
+              <span className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)] uppercase">
+                03 · Prove & claim
+              </span>
+              <span className="font-mono text-[12px] text-[var(--dim)]">
+                ~4 s in browser
+              </span>
+            </header>
+            <div className="p-5">
+              {err === "wrong-answer" ? (
+                <div className="space-y-4">
+                  <InlineAlert
+                    tone="red"
+                    title="Wrong answer"
+                    body="That answer doesn't open this chest. Hash mismatch — nothing was sent on-chain."
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn-landing btn-landing-p"
+                      onClick={() => {
+                        setErr(null);
+                        setAnswer("");
+                      }}
+                    >
+                      Try again
+                    </button>
+                    <Link href="/explore" className="btn-landing btn-landing-s">
+                      Back to chests
+                    </Link>
+                  </div>
+                </div>
+              ) : err === "example-only" ? (
+                <InlineAlert
+                  tone="gold"
+                  title="Example chest"
+                  body="This row is sample data. Solve the live demo chest #0002 (answer: bits in a byte)."
+                  actions={[
+                    {
+                      href: `/chest/${DEMO_CHEST.id}`,
+                      label: "Open live demo",
+                      primary: true,
+                    },
+                  ]}
+                />
+              ) : err && err !== "wrong-answer" ? (
+                <InlineAlert tone="red" title="Error" body={err} />
+              ) : (
+                <>
+                  <ol className="space-y-2 font-mono text-[13px] text-[var(--muted)]">
+                    {[
+                      "Load circuit + zkey",
+                      "Compute witness (answer, address)",
+                      "Generate Groth16 proof",
+                      "Submit to Soroban via relayer",
+                    ].map((s, i) => (
+                      <li
+                        key={s}
+                        className="flex justify-between border-b border-[var(--line)] py-2"
+                      >
+                        <span>
+                          {String.fromCharCode(97 + i)}. {s}
+                        </span>
+                        <span className="text-[var(--dim)]">—</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="mt-4 h-1 overflow-hidden rounded-sm bg-[var(--line)]">
+                    <div className="h-full w-0 bg-[var(--proof)]" />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!canProve || busy}
+                    onClick={startProve}
+                    className="btn-landing btn-landing-p mt-5 w-full disabled:opacity-40"
+                  >
+                    Generate proof and claim
+                  </button>
+                  <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
+                    {canProve
+                      ? `Proof binds: answer hash + ${player!.publicKey.slice(0, 4)}… + chest #${chestId} nullifier.`
+                      : "Connect and enter an answer to continue."}
+                  </p>
+                </>
+              )}
+            </div>
+          </section>
+        </div>
+      </div>
     </main>
   );
 }

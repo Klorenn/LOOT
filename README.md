@@ -12,8 +12,18 @@ Native BN254 verification + cheap claims → knowledge-gated airdrops/events tha
 |---|---|
 | Chest | `CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ` |
 | Verifier | `CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE` |
-| Token CHEST | `CD3RI5RAQX4CB62IVD5XD6HIE5TZWJ55VF7GKAT23NPBVW3JLP6TP4AA` |
-| Judge chest | **#2** — “How many bits in a byte?” → **`8`** |
+| Prize token (testnet USDC SAC) | `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA` |
+| Test token CHEST (fallback chest #2) | `CD3RI5RAQX4CB62IVD5XD6HIE5TZWJ55VF7GKAT23NPBVW3JLP6TP4AA` |
+| Judge chest | **#3** (1 USDC) — “How many bits in a byte?” → **`8`** |
+| Normal chest (attack demo, no ZK) | `CAAHCYL56HSHLD7CYX7ESJXRLZG47HVJZ7QTL4MUD4L5H2A5PR4B4HSV` · chest **#1** · 15 slots · USDC · answer in plain text |
+
+## Threat model
+
+**Protects against copying.** On a normal chest the answer travels in plain text: anyone who sees the transaction (relayer, validators, explorers, a failed tx on the ledger) can copy it, and after the first claim it is public for every remaining slot. In ChestZK the recipient address is a public input of the Groth16 proof, so a copied proof only pays the original solver (`InvalidProof #6`).
+
+**Answer secrecy depends on the answer.** Only `Poseidon(answer, salt)` is stored, but players need the salt to prove. Short answers (a number 0–1000) can be brute-forced; use phrases or rare words.
+
+**One claim per proof, not per human.** The nullifier stops replays. Account farms are bounded by the chest's slots (`max_claims`); proof-of-personhood is future work.
 
 ## Run
 
@@ -56,6 +66,12 @@ cd app && node ../bot/attack.mjs --live
 ```
 
 Expect contract error `#6` InvalidProof.
+
+Normal-chest side (real theft, answer read from the ledger):
+
+```bash
+node --env-file app/.env.local bot/steal-normal.mjs
+```
 
 ## Stack
 

@@ -17,7 +17,7 @@ export const TEMPLATES: ChestTemplate[] = [
     question: "¿Cuál es el ticker del dólar en Stellar?",
     hint: "Tres letras, estable",
     answer: "USDC",
-    prize: 50,
+    prize: 1,
     maxClaims: 100,
   },
   {
@@ -27,7 +27,7 @@ export const TEMPLATES: ChestTemplate[] = [
     question: "¿En qué ciudad es Meridian 2026?",
     hint: "Capital de Portugal",
     answer: "Lisboa",
-    prize: 100,
+    prize: 1,
     maxClaims: 50,
   },
   {
@@ -37,7 +37,7 @@ export const TEMPLATES: ChestTemplate[] = [
     question: "¿Cuántos bits tiene un byte?",
     hint: "Potencia de dos, entre 4 y 16",
     answer: "8",
-    prize: 100,
+    prize: 1,
     maxClaims: 5,
   },
   {
@@ -47,7 +47,7 @@ export const TEMPLATES: ChestTemplate[] = [
     question: "¿Qué prueba Stellar nativo en Protocol 25/26?",
     hint: "Curva BN…",
     answer: "BN254",
-    prize: 25,
+    prize: 1,
     maxClaims: 200,
   },
 ];

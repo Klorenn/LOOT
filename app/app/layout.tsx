@@ -8,6 +8,11 @@ export const metadata: Metadata = {
   title: "ChestZK — Puzzle chests that bots can’t rob",
   description:
     "Solve it, prove it in zero knowledge, claim the prize on Stellar. Proofs sealed to your address.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: "/favicon.ico",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

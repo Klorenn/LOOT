@@ -8,19 +8,37 @@ import { ChestVisual } from "@/components/chest-visual";
 function ErrorInner() {
   const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
-  const raw = params.get("reason") || "No se pudo abrir el cofre";
-  const isCopy = /nullifier/i.test(raw);
-  const isWrong = /invalid.?proof/i.test(raw);
-  const title = isCopy
-    ? "Copia rechazada"
-    : isWrong
-      ? "Respuesta incorrecta"
-      : "No fue esta vez";
-  const detail = isCopy
-    ? "Ese nullifier ya se usó. Una prueba no se puede reenviar a otra cuenta."
-    : isWrong
-      ? "La huella no coincide con el cofre. Revisá la respuesta e intentá de nuevo."
-      : raw;
+  const code = params.get("code") || "generic";
+  const raw = params.get("detail") || "";
+  const COPY: Record<string, { title: string; detail: string }> = {
+    wrong: {
+      title: "Esa no es la respuesta",
+      detail:
+        "La huella de tu respuesta no coincide con la del cofre. Revisala e intentá de nuevo.",
+    },
+    claimed: {
+      title: "Ya cobraste este cofre",
+      detail: "Esta cuenta ya reclamó su cupo. Cada jugador cobra una sola vez.",
+    },
+    soldout: {
+      title: "Se agotaron los cupos",
+      detail: "Otros jugadores ya reclamaron todos los premios de este cofre.",
+    },
+    closed: {
+      title: "Este cofre ya no está disponible",
+      detail: "El cofre fue cerrado, venció o no existe en la red.",
+    },
+    notfound: {
+      title: "Cofre no encontrado",
+      detail: "No encontramos ese cofre. Revisá el enlace.",
+    },
+    generic: {
+      title: "No se pudo completar el cobro",
+      detail: "Hubo un problema de red o del servidor. Probá de nuevo en unos segundos.",
+    },
+  };
+  const { title, detail } = COPY[code] ?? COPY.generic;
+  const isUserError = code === "wrong" || code === "claimed" || code === "soldout";
 
   return (
     <main className="mx-auto flex min-h-[80vh] w-full max-w-md flex-col items-center justify-center gap-8 px-6">
@@ -28,10 +46,20 @@ function ErrorInner() {
       <div className="rounded-2xl border border-border bg-card p-6 text-center">
         <h1 className="text-2xl font-semibold tracking-[-0.03em]">{title}</h1>
         <p
-          className={`mt-3 text-sm ${isCopy || isWrong ? "text-destructive" : "text-muted-foreground"}`}
+          className={`mt-3 text-sm ${isUserError ? "text-destructive" : "text-muted-foreground"}`}
         >
           {detail}
         </p>
+        {raw && (
+          <details className="mt-4 text-left">
+            <summary className="cursor-pointer font-mono text-xs text-muted-foreground">
+              detalle técnico
+            </summary>
+            <p className="mt-2 break-words font-mono text-xs text-muted-foreground">
+              {raw}
+            </p>
+          </details>
+        )}
       </div>
       <Link
         href={`/chest/${id}`}

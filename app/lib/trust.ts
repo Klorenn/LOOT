@@ -1,53 +1,62 @@
 "use client";
 
 import {
-  Contract,
+  Asset,
+  Horizon,
   Keypair,
-  Networks,
+  Operation,
   TransactionBuilder,
-  rpc as StellarRpc,
-  nativeToScVal,
-  xdr,
 } from "@stellar/stellar-sdk";
-import { CONTRACTS, NETWORK } from "./config";
+import { NETWORK, USDC } from "./config";
 
-/** Crea trustline al token CHEST firmando con la keypair del jugador. */
-export async function ensureTrustline(secretKey: string): Promise<string> {
+export class UsdcTrustlineError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UsdcTrustlineError";
+  }
+}
+
+/**
+ * Cuentas G… necesitan trustline a USDC para recibir el premio (los C… no).
+ * La cuenta existe vía Friendbot y paga su propia fee/reserva; idempotente.
+ */
+export async function ensureTrustline(secretKey: string): Promise<string | null> {
   const kp = Keypair.fromSecret(secretKey);
-  const server = new StellarRpc.Server(NETWORK.rpcUrl);
-  const account = await server.getAccount(kp.publicKey());
+  const horizon = new Horizon.Server(NETWORK.horizonUrl);
 
-  const contract = new Contract(CONTRACTS.token);
+  let account: Awaited<ReturnType<Horizon.Server["loadAccount"]>>;
+  try {
+    account = await horizon.loadAccount(kp.publicKey());
+  } catch {
+    throw new UsdcTrustlineError(
+      "Tu cuenta no existe en testnet todavía. Volvé a entrar con “Demo sin passkey” para crearla.",
+    );
+  }
+
+  const has = account.balances.some(
+    (b) =>
+      "asset_code" in b &&
+      b.asset_code === USDC.code &&
+      b.asset_issuer === USDC.issuer,
+  );
+  if (has) return null;
+
   const tx = new TransactionBuilder(account, {
-    fee: "100000",
+    fee: "10000",
     networkPassphrase: NETWORK.passphrase,
   })
-    .addOperation(
-      contract.call(
-        "trust",
-        nativeToScVal(kp.publicKey(), { type: "address" }),
-      ),
-    )
-    .setTimeout(180)
+    .addOperation(Operation.changeTrust({ asset: new Asset(USDC.code, USDC.issuer) }))
+    .setTimeout(60)
     .build();
+  tx.sign(kp);
 
-  const prepared = await server.prepareTransaction(tx);
-  prepared.sign(kp);
-  const result = await server.sendTransaction(prepared);
-  if (result.status === "ERROR") {
-    throw new Error(`trust send error: ${JSON.stringify(result)}`);
+  try {
+    const res = await horizon.submitTransaction(tx);
+    return res.hash;
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    throw new UsdcTrustlineError(
+      `Tu cuenta no puede recibir USDC todavía: no se pudo crear la trustline (${detail}). Reintentá o usá la passkey.`,
+    );
   }
-
-  // Esperar confirmación breve
-  for (let i = 0; i < 20; i++) {
-    await new Promise((r) => setTimeout(r, 1000));
-    const st = await server.getTransaction(result.hash);
-    if (st.status === StellarRpc.Api.GetTransactionStatus.SUCCESS) {
-      return result.hash;
-    }
-    if (st.status === StellarRpc.Api.GetTransactionStatus.FAILED) {
-      throw new Error(`trust failed: ${result.hash}`);
-    }
-  }
-  return result.hash;
 }

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client, networks } from "chestzk-chest";
-import { CONTRACTS, NETWORK } from "@/lib/config";
+import { CONTRACTS, NETWORK, usdcToStroops } from "@/lib/config";
 import { saveChestMeta } from "@/lib/chest-store";
+import { requireAdmin } from "@/lib/admin-auth";
 
 type Body = {
   fingerprintHex: string;
@@ -19,11 +20,13 @@ type Body = {
 };
 
 /**
- * Crea un cofre on-chain firmando como CREATOR (tiene CHEST + trustline).
+ * Crea un cofre on-chain firmando como CREATOR (tiene USDC + trustline; prize viene en USDC y se convierte a stroops).
  * La metadata (pregunta) se guarda off-chain en el response; el contrato
  * solo guarda la huella.
  */
 export async function POST(req: NextRequest) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
   try {
     const secret = process.env.CREATOR_SECRET || process.env.RELAYER_SECRET;
     if (!secret) {
@@ -47,7 +50,7 @@ export async function POST(req: NextRequest) {
         creator: kp.publicKey(),
         fingerprint: Buffer.from(body.fingerprintHex, "hex"),
         token: CONTRACTS.token,
-        prize: BigInt(body.prize),
+        prize: usdcToStroops(body.prize),
         max_claims: body.maxClaims,
         deadline: BigInt(body.deadline ?? 0),
       },

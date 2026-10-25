@@ -3,14 +3,17 @@ import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client, networks } from "chestzk-chest";
 import { NETWORK } from "@/lib/config";
+import { requireAdmin } from "@/lib/admin-auth";
 
 /**
  * Cierra el cofre y retira el remanente (creator auth).
  */
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
   try {
     const secret = process.env.CREATOR_SECRET || process.env.RELAYER_SECRET;
     if (!secret) {

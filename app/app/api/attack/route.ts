@@ -68,21 +68,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ rejected: false, logs });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      const rejected =
-        /InvalidProof|Error\(Contract,\s*#6\)|HostError|Unsuccessful/i.test(
-          message,
-        );
-      push(
-        rejected
-          ? "RECHAZADO — la prueba no es para esta cuenta"
-          : `falló: ${message.slice(0, 200)}`,
-      );
-      return NextResponse.json({
-        rejected: rejected || true,
-        reason: "la prueba no es para esta cuenta",
-        error: message,
-        logs,
-      });
+      // Soroban simulation surfaces contract errors as `Error(Contract, #N)`; #6 = InvalidProof.
+      const rejected = /Error\(Contract,\s*#6\)|InvalidProof/i.test(message);
+      if (rejected) {
+        push("RECHAZADO — la prueba no es para esta cuenta");
+        return NextResponse.json({
+          rejected: true,
+          reason: "la prueba no es para esta cuenta",
+          error: message,
+          logs,
+        });
+      }
+      const envError = message.replace(/\s+/g, " ").slice(0, 160);
+      push(`error de entorno: ${envError}`);
+      return NextResponse.json({ rejected: false, envError, logs });
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

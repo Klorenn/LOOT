@@ -148,6 +148,15 @@
   outline-offset: 3px;
 }
 
+/* Subtle graph-paper panel (Attack + CTA) */
+.landing-panel-grid {
+  background-color: var(--s1);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
 /* Lid transforms come from chest-hinge matrix() — no CSS rotate/translate. */
 
 /* BUILT ON logo marquee */

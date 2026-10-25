@@ -6,9 +6,31 @@ import { ChestVisual } from "@/components/chest-visual";
 import { DEMO_CHEST } from "@/lib/config";
 import { recipientField } from "@/lib/recipient";
 import { proveChest } from "@/lib/zk";
+import { ensureTrustline } from "@/lib/trust";
 import { loadPlayer } from "@/lib/wallet";
 
 type Step = "calc" | "prove" | "send" | "done" | "error";
+
+/** Contract enum (contracts/chest/src/lib.rs): 1 NotFound, 2 Closed, 3 Expired, 4 SoldOut, 5 NullifierUsed, 6 InvalidProof. */
+function classifyClaimError(raw: string): string {
+  const n = raw.match(/Error\(Contract,\s*#(\d+)\)/)?.[1];
+  if (n === "5" || /NullifierUsed/i.test(raw)) return "claimed";
+  if (n === "6" || /InvalidProof/i.test(raw)) return "wrong";
+  if (n === "4" || /SoldOut/i.test(raw)) return "soldout";
+  if (n === "1" || n === "2" || n === "3" || /ChestNotFound|ChestClosed|ChestExpired/i.test(raw))
+    return "closed";
+  return "generic";
+}
+
+function goError(
+  router: ReturnType<typeof useRouter>,
+  id: string,
+  raw: string,
+) {
+  router.replace(
+    `/chest/${id}/error?code=${classifyClaimError(raw)}&detail=${encodeURIComponent(raw.slice(0, 400))}`,
+  );
+}
 
 export default function ProvingPage() {
   const { id } = useParams<{ id: string }>();
@@ -36,8 +58,19 @@ export default function ProvingPage() {
           return;
         }
         if (!salt) {
-          const meta = await fetch(`/api/chests/${id}`).then((r) => r.json());
+          const metaRes = await fetch(`/api/chests/${id}`);
+          if (metaRes.status === 404) {
+            router.replace(`/chest/${id}/error?code=notfound`);
+            return;
+          }
+          if (!metaRes.ok) throw new Error(`HTTP ${metaRes.status} al leer el cofre`);
+          const meta = await metaRes.json();
           salt = meta.salt || DEMO_CHEST.salt;
+        }
+
+        if (player.kind === "classic" && player.secretKey) {
+          setDetail("Verificando trustline USDC…");
+          await ensureTrustline(player.secretKey);
         }
 
         const { decimal: recipient } = recipientField(player.publicKey);
@@ -70,16 +103,10 @@ export default function ProvingPage() {
             proof: result.proof,
           }),
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const msg = data.error || "Claim rechazado";
-          if (/NullifierUsed|InvalidProof|SoldOut|Chest/i.test(JSON.stringify(data))) {
-            router.replace(
-              `/chest/${id}/error?reason=${encodeURIComponent(msg)}`,
-            );
-            return;
-          }
-          throw new Error(msg);
+          goError(router, id, String(data.error || `HTTP ${res.status}`));
+          return;
         }
 
         setStep("done");
@@ -87,10 +114,9 @@ export default function ProvingPage() {
           `chestzk.claim.${id}`,
           JSON.stringify({ hash: data.hash, explorer: data.explorer }),
         );
-        router.replace(`/chest/${id}/opened`);
+        router.replace(`/chest/${id}/claimed`);
       } catch (e) {
-        setStep("error");
-        setDetail(e instanceof Error ? e.message : String(e));
+        goError(router, id, e instanceof Error ? e.message : String(e));
       }
     })();
   }, [id, router]);

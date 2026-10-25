@@ -5,36 +5,81 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { ChestVisual } from "@/components/chest-visual";
-import { DEMO_CHEST } from "@/lib/config";
 
 export default function OpenedPage() {
   const { id } = useParams<{ id: string }>();
   const [explorer, setExplorer] = useState<string | null>(null);
   const [amount, setAmount] = useState(0);
+  const [label, setLabel] = useState("USDC");
+  const [state, setState] = useState<"loading" | "ok" | "missing">("loading");
 
   useEffect(() => {
-    const raw = sessionStorage.getItem(`chestzk.claim.${id}`);
-    if (raw) {
-      try {
-        const j = JSON.parse(raw);
-        setExplorer(j.explorer || null);
-      } catch {
-        /* ignore */
-      }
-    }
-    // contador del premio
-    const target = DEMO_CHEST.prize;
-    const start = performance.now();
-    const dur = 600;
     let raf = 0;
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - start) / dur);
-      setAmount(Math.round(target * p));
-      if (p < 1) raf = requestAnimationFrame(tick);
+    let cancelled = false;
+    let hash = "";
+    try {
+      const raw = sessionStorage.getItem(`chestzk.claim.${id}`);
+      if (raw) {
+        const j = JSON.parse(raw);
+        hash = j.hash || "";
+        setExplorer(j.explorer || null);
+      }
+    } catch {
+      /* ignore */
+    }
+    if (!hash) {
+      setState("missing");
+      return;
+    }
+    fetch(`/api/chests/${id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((meta) => {
+        if (cancelled) return;
+        if (!meta) {
+          setState("missing");
+          return;
+        }
+        const target = Number(meta.prize) || 0;
+        const unit = String(meta.prizeLabel || "").replace(/^[\d.,\s]+/, "") || "USDC";
+        setLabel(unit);
+        setState("ok");
+        const start = performance.now();
+        const dur = 600;
+        const tick = (t: number) => {
+          const p = Math.min(1, (t - start) / dur);
+          setAmount(Math.round(target * p));
+          if (p < 1) raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      })
+      .catch(() => !cancelled && setState("missing"));
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
   }, [id]);
+
+  if (state === "loading") {
+    return (
+      <main className="mx-auto max-w-md px-6 py-16 text-center text-muted-foreground">
+        Cargando…
+      </main>
+    );
+  }
+
+  if (state === "missing") {
+    return (
+      <main className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-muted-foreground">No encontramos tu cobro.</p>
+        <Link href={`/chest/${id}`} className="text-sm text-primary underline">
+          Volver al cofre
+        </Link>
+        <Link href="/" className="text-sm text-muted-foreground underline">
+          Inicio
+        </Link>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-[80vh] w-full max-w-md flex-col items-center justify-center gap-8 px-6">
@@ -47,7 +92,7 @@ export default function OpenedPage() {
         </span>
       </div>
 
-      <p className="font-mono text-5xl font-semibold text-gold">{amount} CHEST</p>
+      <p className="font-mono text-5xl font-semibold text-gold">{amount} {label}</p>
 
       {explorer && (
         <a

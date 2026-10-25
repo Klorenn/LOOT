@@ -1,43 +1,63 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { ChestVisual } from "@/components/chest-visual";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { PageHeader, Em } from "@/components/app/page-header";
+import { ExampleTag } from "@/components/app/example-tag";
+import { Terminal } from "@/components/app/terminal";
 import { DEMO_CHEST } from "@/lib/config";
-import { loadPlayer, enrollWithPasskey } from "@/lib/wallet";
+import { loadPlayer, enrollPreferPasskey } from "@/lib/wallet";
 import { recipientField } from "@/lib/recipient";
 import { proveChest } from "@/lib/zk";
 
-type LogLine = { t: string; msg: string; side: "normal" | "zk" | "sys" };
+type Side = "you" | "bot" | "sys";
+type LogLine = { t: string; msg: string; side: Side };
+
+const EXPLORER_TX = "https://stellar.expert/explorer/testnet/tx/";
 
 export default function AttackModePage() {
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<LogLine[]>([]);
-  const [normalStolen, setNormalStolen] = useState(false);
-  const [zkRejected, setZkRejected] = useState(false);
+  const [youStatus, setYouStatus] = useState("idle");
+  const [botStatus, setBotStatus] = useState("idle");
+  const [youBorder, setYouBorder] = useState<"line" | "ok" | "proof">("line");
+  const [botBorder, setBotBorder] = useState<"line" | "red">("line");
+  const [youAddr, setYouAddr] = useState("GA7Q…X4ZK");
+  const autoRan = useRef(false);
 
-  function push(msg: string, side: LogLine["side"]) {
+  const push = useCallback((msg: string, side: Side) => {
     setLogs((prev) => [
       ...prev,
       { t: new Date().toISOString().slice(11, 19), msg, side },
     ]);
-  }
+  }, []);
 
-  async function runDemo() {
+  const reset = useCallback(() => {
+    setLogs([]);
+    setRunning(false);
+    setYouStatus("idle");
+    setBotStatus("idle");
+    setYouBorder("line");
+    setBotBorder("line");
+  }, []);
+
+  const runDemo = useCallback(async () => {
     setRunning(true);
     setLogs([]);
-    setNormalStolen(false);
-    setZkRejected(false);
+    setYouStatus("computing…");
+    setBotStatus("watching mempool");
+    setYouBorder("proof");
+    setBotBorder("line");
 
     try {
       let player = loadPlayer();
       if (!player) {
-        push("creando cuenta demo…", "sys");
-        player = await enrollWithPasskey();
+        push("creating demo account…", "sys");
+        player = await enrollPreferPasskey();
       }
+      const short = `${player.publicKey.slice(0, 4)}…${player.publicKey.slice(-4)}`;
+      setYouAddr(short);
 
-      push("jugador responde en el teléfono…", "sys");
+      push("compute witness (answer, address)…", "you");
       const { decimal: recipient } = recipientField(player.publicKey);
       const proved = await proveChest({
         answer: DEMO_CHEST.answer,
@@ -46,22 +66,29 @@ export default function AttackModePage() {
         chestId: String(DEMO_CHEST.id),
         recipientField: recipient,
       });
-      push(`prueba lista (${Math.round(proved.timings.proveMs)}ms)`, "zk");
+      push(`π generated (${Math.round(proved.timings.proveMs)}ms)`, "you");
+      setYouStatus("submitting…");
+      push("submit via relayer…", "you");
 
-      // --- Cofre normal (simulado): la respuesta viaja en claro ---
-      push("cofre normal: respuesta visible en el ledger", "normal");
-      await sleep(400);
-      push(`bot copia la respuesta '${DEMO_CHEST.answer}'`, "normal");
-      await sleep(300);
-      push("bot reclama primero → PREMIO ROBADO", "normal");
-      setNormalStolen(true);
+      // Normal chest front-run (real testnet) — shown on bot side as context
+      push("bot sees plaintext answer on classic chest…", "bot");
+      try {
+        const nres = await fetch("/api/attack/normal", { method: "POST" });
+        const ndata = await nres.json();
+        for (const line of ndata.logs || []) {
+          push(String(line).replace(/^\[[^\]]+\]\s*/, ""), "bot");
+        }
+        if (nres.ok && !ndata.error) {
+          push("classic chest: prize stolen (fee ×12)", "bot");
+        }
+      } catch {
+        /* non-fatal for ZK half */
+      }
 
-      // --- ChestZK: copia la prueba, cambia la cuenta ---
-      push("ChestZK: bot copia la prueba ZK", "zk");
-      await sleep(300);
+      push("bot copies π, sender := GBOT…7Q1", "bot");
+      setBotStatus("resubmitting…");
       const botRecipient =
         "GAVLW5IKB7VFBRJ3EHBE4BRZ5OX3AOW3ICMLMB6KVKCQDO6WJ2SPHDN3";
-      push(`bot cambia receptor → ${botRecipient.slice(0, 8)}…`, "zk");
 
       const res = await fetch("/api/attack", {
         method: "POST",
@@ -75,123 +102,169 @@ export default function AttackModePage() {
       });
       const data = await res.json();
       for (const line of data.logs || []) {
-        push(String(line).replace(/^\[[^\]]+\]\s*/, ""), "zk");
+        push(String(line).replace(/^\[[^\]]+\]\s*/, ""), "bot");
       }
-      if (data.rejected !== false) {
-        setZkRejected(true);
-        push("RECHAZADO — la prueba no es para esta cuenta", "zk");
+
+      if (data.rejected === true) {
+        push("REJECTED sender ≠ prover", "bot");
+        push("reverted · fee lost", "bot");
+        setBotStatus("rejected");
+        setBotBorder("red");
+        push("VERIFIED nullifier spent", "you");
+        push("prize released to you", "you");
+        setYouStatus("verified");
+        setYouBorder("ok");
+      } else if (typeof data.envError === "string" || !res.ok) {
+        const envMsg = String(
+          data.envError ?? data.error ?? `HTTP ${res.status}`,
+        ).slice(0, 160);
+        push(`env: ${envMsg}`, "sys");
+        setBotStatus("error");
+        setYouStatus("error");
       }
     } catch (e) {
       push(e instanceof Error ? e.message : String(e), "sys");
+      setYouStatus("error");
+      setBotStatus("idle");
     } finally {
       setRunning(false);
     }
-  }
+  }, [push]);
+
+  useEffect(() => {
+    if (autoRan.current) return;
+    autoRan.current = true;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setYouStatus("verified");
+      setBotStatus("rejected");
+      setYouBorder("ok");
+      setBotBorder("red");
+      setLogs([
+        { t: "00:00:00", msg: "π generated · submitted", side: "you" },
+        { t: "00:00:01", msg: "REJECTED sender ≠ prover", side: "bot" },
+        { t: "00:00:01", msg: "VERIFIED nullifier spent", side: "you" },
+      ]);
+      return;
+    }
+    const t = setTimeout(() => {
+      void runDemo();
+    }, 600);
+    return () => clearTimeout(t);
+  }, [runDemo]);
+
+  const youLines = logs.filter((l) => l.side === "you" || l.side === "sys");
+  const botLines = logs.filter((l) => l.side === "bot");
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-10">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="font-mono text-xs tracking-[0.04em] text-muted-foreground">
-            Modo ataque
-          </p>
-          <h1 className="text-3xl font-semibold tracking-[-0.03em]">
-            Copiar no sirve
-          </h1>
-        </div>
-        <div className="flex gap-3">
-          <Button
-            onClick={runDemo}
-            disabled={running}
-            className="h-12 rounded-full bg-primary px-6 font-semibold text-primary-foreground"
-          >
-            {running ? "Atacando…" : "Correr el ataque"}
-          </Button>
-          <Link
-            href="/"
-            className="inline-flex h-12 items-center rounded-full border border-border px-6 text-sm"
-          >
-            Inicio
-          </Link>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <section
-          className={`rounded-2xl border p-5 ${
-            normalStolen ? "border-danger" : "border-border"
-          } bg-card`}
-        >
-          <p className="font-mono text-xs tracking-[0.04em] text-muted-foreground">
-            Cofre normal
-          </p>
-          <ChestVisual size="sm" className="mt-3" open={normalStolen} />
-          {normalStolen && (
-            <p className="mt-4 font-mono text-sm font-semibold text-danger">
-              ROBADO por el bot
-            </p>
-          )}
-        </section>
-
-        <section
-          className={`relative rounded-2xl border p-5 ${
-            zkRejected ? "border-primary" : "border-border"
-          } bg-card`}
-        >
-          <p className="font-mono text-xs tracking-[0.04em] text-muted-foreground">
-            ChestZK
-          </p>
-          <ChestVisual size="sm" className="mt-3" />
-          {zkRejected && (
-            <div
-              className="pointer-events-none absolute inset-0 flex items-center justify-center"
-              aria-live="polite"
+    <main>
+      <PageHeader
+        tint="red"
+        eyebrow={
+          <span className="inline-flex items-center gap-2 text-[var(--red)]">
+            <span className="size-[6px] rounded-full bg-[var(--red)]" />
+            Live demo · testnet
+          </span>
+        }
+        title={
+          <>
+            Copy the proof. <Em tone="red">Lose anyway.</Em>
+          </>
+        }
+        lead="Front-running bots copy π and bump the fee. On ChestZK the proof only verifies for the address that made it."
+        right={
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void runDemo()}
+              disabled={running}
+              className="btn-landing btn-landing-p"
             >
-              <span
-                className="rotate-[-12deg] border-2 border-danger px-4 py-2 font-mono text-2xl font-bold tracking-[0.08em] text-danger"
-                style={{
-                  animation: running
-                    ? undefined
-                    : "chestzk-spin 0.3s linear 0s 3",
-                }}
-              >
-                RECHAZADO
-              </span>
-            </div>
-          )}
-          {zkRejected && (
-            <p className="mt-4 font-mono text-sm text-primary">
-              la prueba no es para esta cuenta
-            </p>
-          )}
-        </section>
-      </div>
+              {running ? "Running…" : "Run the attack"}
+            </button>
+            <button
+              type="button"
+              onClick={reset}
+              disabled={running}
+              className="btn-landing btn-landing-s"
+            >
+              Reset
+            </button>
+          </div>
+        }
+      />
 
-      <div className="max-h-64 overflow-auto rounded-2xl border border-border bg-background p-4 font-mono text-xs leading-relaxed">
-        {logs.length === 0 && (
-          <p className="text-muted-foreground">
-            El log del bot aparece acá en vivo.
-          </p>
-        )}
-        {logs.map((l, i) => (
-          <p
-            key={`${l.t}-${i}`}
-            className={
-              l.side === "normal"
-                ? "text-danger"
-                : l.side === "zk"
-                  ? "text-primary"
-                  : "text-muted-foreground"
-            }
+      <div className="mx-auto max-w-[1200px] px-6 py-10">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Terminal
+            tone="proof"
+            borderTone={youBorder}
+            label={`You · ${youAddr}`}
+            status={youStatus}
+            lines={youLines}
+          />
+          <Terminal
+            tone="red"
+            borderTone={botBorder}
+            label="Bot · GBOT…7Q1"
+            status={botStatus}
+            lines={botLines}
+          />
+        </div>
+
+        <div className="mt-10 grid grid-cols-1 border border-[var(--line)] sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              k: "Public input",
+              v: "Your address is bound into π",
+              c: "text-[var(--proof)]",
+            },
+            {
+              k: "Nullifier",
+              v: "Spent once · replays revert",
+              c: "text-[var(--red)]",
+            },
+            {
+              k: "Soroban",
+              v: "BN254 host fns · Protocol 25/26",
+              c: "text-[var(--ok)]",
+            },
+            {
+              k: "Prize",
+              v: "Released only to the prover",
+              c: "text-[var(--gold)]",
+            },
+          ].map((cell, i) => (
+            <div
+              key={cell.k}
+              className={`p-5 ${i ? "border-[var(--line)] sm:border-l" : ""} ${
+                i > 1 ? "border-t lg:border-t-0" : ""
+              } border-[var(--line)]`}
+            >
+              <p className={`font-mono text-[12px] tracking-[0.06em] uppercase ${cell.c}`}>
+                {cell.k}
+              </p>
+              <p className="mt-2 text-[14px] leading-[1.45] text-[var(--muted)]">
+                {cell.v}
+              </p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4">
+          <ExampleTag>timings and fee multiplier are illustrative</ExampleTag>
+        </div>
+        <p className="mt-6 font-mono text-[12px] text-[var(--dim)]">
+          Live txs →{" "}
+          <a
+            href={EXPLORER_TX}
+            className="underline underline-offset-2"
+            target="_blank"
+            rel="noreferrer"
           >
-            <span className="opacity-60">{l.t}</span> {l.msg}
-          </p>
-        ))}
+            Stellar Expert testnet
+          </a>
+        </p>
       </div>
     </main>
   );
-}
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
 }

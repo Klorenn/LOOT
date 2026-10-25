@@ -11,12 +11,31 @@ type Row = {
   prize: number;
   maxClaims: number;
   createdAt: string;
+  onchain?: boolean | null;
 };
 
 export default function PanelPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [adminKey, setAdminKey] = useState("");
+
+  useEffect(() => {
+    try {
+      setAdminKey(sessionStorage.getItem("chestzk.adminKey") || "");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function saveKey(v: string) {
+    setAdminKey(v);
+    try {
+      sessionStorage.setItem("chestzk.adminKey", v);
+    } catch {
+      /* ignore */
+    }
+  }
 
   function reload() {
     fetch("/api/chests")
@@ -34,8 +53,12 @@ export default function PanelPage() {
     setBusyId(id);
     setError(null);
     try {
-      const res = await fetch(`/api/chests/${id}/close`, { method: "POST" });
-      const data = await res.json();
+      const res = await fetch(`/api/chests/${id}/close`, {
+        method: "POST",
+        headers: { "x-admin-key": adminKey },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 403) throw new Error("Clave de admin inválida o ausente (403)");
       if (!res.ok) throw new Error(data.error || "close failed");
       alert(`Cerrado. Refund ${data.refunded} · ${data.hash?.slice(0, 12)}…`);
       reload();
@@ -65,6 +88,19 @@ export default function PanelPage() {
         </Link>
       </div>
 
+      <label className="flex flex-col gap-2">
+        <span className="font-mono text-xs tracking-[0.04em] text-muted-foreground">
+          Clave de admin (para cerrar cofres)
+        </span>
+        <input
+          type="password"
+          value={adminKey}
+          onChange={(e) => saveKey(e.target.value)}
+          autoComplete="off"
+          className="h-10 rounded-2xl border border-input bg-background px-4 text-sm"
+        />
+      </label>
+
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="overflow-hidden rounded-2xl border border-border">
@@ -87,7 +123,12 @@ export default function PanelPage() {
                   {r.question}
                 </td>
                 <td className="px-4 py-3 font-mono text-gold">
-                  {r.prize} CHEST
+                  {r.prize} USDC
+                  {r.onchain === false && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      no creado
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-3">
@@ -101,7 +142,7 @@ export default function PanelPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      disabled={busyId === r.id}
+                      disabled={busyId === r.id || r.onchain === false}
                       onClick={() => closeChest(r.id)}
                       className="h-8 text-destructive"
                     >

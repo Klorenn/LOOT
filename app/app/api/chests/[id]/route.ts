@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DEMO_CHEST } from "@/lib/config";
+import { DEMO_CHEST, DEMO_CHEST_FALLBACK } from "@/lib/config";
 import { getChestMeta } from "@/lib/chest-store";
 
 export async function GET(
@@ -9,16 +9,17 @@ export async function GET(
   const { id } = await ctx.params;
   const n = Number(id);
 
-  if (n === DEMO_CHEST.id) {
+  if (n === DEMO_CHEST.id || n === DEMO_CHEST_FALLBACK.id) {
+    const fallback = n === DEMO_CHEST_FALLBACK.id;
     return NextResponse.json({
-      id: DEMO_CHEST.id,
+      id: n,
       question: DEMO_CHEST.question,
       hint: DEMO_CHEST.hint,
       salt: DEMO_CHEST.salt,
       fingerprintHex: DEMO_CHEST.fingerprintHex,
-      prize: DEMO_CHEST.prize,
-      prizeLabel: DEMO_CHEST.prizeLabel,
-      maxClaims: 5,
+      prize: fallback ? 100 : DEMO_CHEST.prize,
+      prizeLabel: fallback ? DEMO_CHEST_FALLBACK.prizeLabel : DEMO_CHEST.prizeLabel,
+      maxClaims: DEMO_CHEST.slots,
       template: "bounty",
     });
   }
@@ -45,6 +46,6 @@ export async function GET(
   }
   return NextResponse.json({
     ...meta,
-    prizeLabel: `${meta.prize} CHEST`,
+    prizeLabel: `${meta.prize} USDC`,
   });
 }

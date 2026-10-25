@@ -1,0 +1,56 @@
+{
+  "name": "chestzk",
+  "version": "0.1.0",
+  "description": "ChestZK SDK — create, read, and claim puzzle chests on Stellar (XLM, ZK proofs).",
+  "type": "module",
+  "license": "MIT",
+  "author": "ChestZK",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Klorenn/ChestZK.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/Klorenn/ChestZK",
+  "bugs": {
+    "url": "https://github.com/Klorenn/ChestZK/issues"
+  },
+  "keywords": [
+    "stellar",
+    "soroban",
+    "zk",
+    "groth16",
+    "chestzk",
+    "xlm"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^16.0.1",
+    "chestzk-chest": "file:../chestzk-chest",
+    "circomlibjs": "^0.1.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

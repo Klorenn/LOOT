@@ -19,6 +19,13 @@ export type Player = {
   keyId?: string;
 };
 
+export class PasskeyUnavailableError extends Error {
+  constructor(message = "WebAuthn unavailable on this device") {
+    super(message);
+    this.name = "PasskeyUnavailableError";
+  }
+}
+
 export function loadPlayer(): Player | null {
   if (typeof window === "undefined") return null;
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -37,6 +44,10 @@ export function loadPlayer(): Player | null {
 
 export function savePlayer(p: Player) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+}
+
+export function clearPlayer() {
+  localStorage.removeItem(STORAGE_KEY);
 }
 
 function secretFromBytes(label: string): string {
@@ -60,50 +71,85 @@ async function submitPasskeyTx(xdr: string): Promise<string> {
 }
 
 /**
- * Passkey smart wallet (C…) via passkey-kit + fee-sponsored deploy.
- * Falls back to classic G… + Friendbot if WebAuthn / deploy fails (desktop demo).
+ * Passkey smart wallet (C…) via passkey-kit + sponsored deploy.
+ * Does NOT silently fall back — callers choose classic explicitly.
  */
 export async function enrollWithPasskey(): Promise<Player> {
+  if (typeof window === "undefined" || !window.PublicKeyCredential) {
+    throw new PasskeyUnavailableError();
+  }
+  return enrollSmartWallet();
+}
+
+/**
+ * Prefer passkey; only auto-fallback when WebAuthn is missing.
+ * Deploy / confirm failures surface — they must not become a silent G… wallet.
+ */
+export async function enrollPreferPasskey(): Promise<Player> {
   try {
-    return await enrollSmartWallet();
+    return await enrollWithPasskey();
   } catch (e) {
-    console.warn("passkey smart wallet failed, classic fallback:", e);
-    return enrollClassic();
+    if (e instanceof PasskeyUnavailableError) {
+      console.warn("WebAuthn missing → classic demo wallet");
+      return enrollClassic();
+    }
+    throw e;
   }
 }
 
 async function enrollSmartWallet(): Promise<Player> {
-  if (typeof window === "undefined" || !window.PublicKeyCredential) {
-    throw new Error("WebAuthn unavailable");
-  }
-
   const kit = getPasskeyKit();
+  const existing = loadPlayer();
 
-  // Returning user (IndexedDB / indexer)
-  try {
-    const existing = loadPlayer();
-    const connected = await kit.connectWallet(
-      existing?.keyId ? { keyId: existing.keyId } : undefined,
-    );
-    if (connected?.contractId) {
-      const player: Player = {
-        kind: "passkey",
-        publicKey: connected.contractId,
-        keyId: connected.keyIdBase64,
-        playerSecret: secretFromBytes(`pk:${connected.keyIdBase64}`),
-      };
-      savePlayer(player);
-      return player;
+  // Only reconnect when we already have a known keyId from a prior successful
+  // session. Blind connectWallet() hits IndexedDB leftovers / Mercury and can
+  // prompt WebAuthn auth that fails before we ever create a wallet.
+  if (existing?.kind === "passkey" && existing.keyId && existing.publicKey.startsWith("C")) {
+    try {
+      const connected = await kit.connectWallet({ keyId: existing.keyId });
+      if (connected?.contractId) {
+        const player: Player = {
+          kind: "passkey",
+          publicKey: connected.contractId,
+          keyId: connected.keyIdBase64,
+          playerSecret: secretFromBytes(`pk:${connected.keyIdBase64}`),
+        };
+        savePlayer(player);
+        return player;
+      }
+    } catch (e) {
+      // passkey-kit 0.19: null signer expiration → ".toString()" crash.
+      // Session already has a deployed C… — reuse it for this demo.
+      console.warn("connectWallet failed, reusing stored passkey player:", e);
+      return existing;
     }
-  } catch {
-    // no existing wallet — create
   }
 
-  const created = await kit.createWallet("ChestZK", `player-${Date.now()}`);
-  const hashTx = await submitPasskeyTx(created.signedTx);
-  await kit.confirmWalletCreation(created, hashTx);
-  await kit.connectWallet({ keyId: created.keyIdBase64 });
+  const created = await kit.createWallet("ChestZK", `player-${Date.now()}`, {
+    // Resident key so the binding-proof assertion (get) finds the credential
+    // just created by create() — required for passkey-kit Genesis proof.
+    authenticatorSelection: {
+      residentKey: "required",
+      requireResidentKey: true,
+      userVerification: "preferred",
+      authenticatorAttachment: "platform",
+    },
+  });
+  if (!created?.signedTx || !created.contractId) {
+    throw new Error("passkey-kit createWallet returned an incomplete result");
+  }
 
+  const hashTx = await submitPasskeyTx(created.signedTx);
+  try {
+    await kit.confirmWalletCreation(created, hashTx);
+  } catch (e) {
+    // Birth verify can choke on fee-bump envelope XDR shape from some RPC
+    // clients; the deploy already succeeded on-chain — keep going.
+    console.warn("confirmWalletCreation:", e);
+  }
+  // Skip connectWallet after fresh create: passkey-kit 0.19 treats a null
+  // signer expiration as defined and calls null.toString() (crash). We already
+  // have contractId + keyId from createWallet; reconnect path uses connectWallet.
   const player: Player = {
     kind: "passkey",
     publicKey: created.contractId,
@@ -114,7 +160,8 @@ async function enrollSmartWallet(): Promise<Player> {
   return player;
 }
 
-async function enrollClassic(): Promise<Player> {
+/** Classic G… + Friendbot + USDC trustline (demo / no biometrics). */
+export async function enrollClassic(): Promise<Player> {
   const kp = Keypair.random();
   const rnd = crypto.getRandomValues(new Uint8Array(31));
   const playerSecret = BigInt(
