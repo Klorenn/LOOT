@@ -3,9 +3,9 @@ import { ChestVisual } from "@/components/chest-visual";
 import { DEMO_CHEST } from "@/lib/config";
 
 const counters = [
-  { label: "cofres abiertos", value: "1" },
+  { label: "cofres abiertos", value: "2" },
   { label: "copias rechazadas", value: "1" },
-  { label: "CHEST pagado", value: "100" },
+  { label: "CHEST pagado", value: "200" },
 ];
 
 export default function Home() {
