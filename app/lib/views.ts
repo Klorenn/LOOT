@@ -1,4 +1,3 @@
-import { hash } from "@stellar/stellar-sdk";
 import { type ChestRef, encodeRef, refPath } from "./chest-code";
 import { readChest, type OnChainChest } from "./chain";
 import { getChestMeta, type ChestMeta } from "./chest-store";
@@ -29,6 +28,8 @@ export type ChestView = {
   /** Solo cofres públicos (o sin metadatos: sal derivada de la pregunta). Los privados no la tienen. */
   salt?: string;
   saltRequired?: boolean;
+  /** sin metadatos: la sal puede ser la derivada de la pregunta (cofres de SDK) */
+  saltDerivable?: boolean;
   /** premio por lugar en orden de reclamo (XLM) */
   prizes: string[];
   maxClaims: number;
@@ -56,13 +57,6 @@ export function statusOf(
   return "open";
 }
 
-/** Sal derivada de la pregunta (cofres creados por SDK/scripts sin metadatos): sha256(utf8) con byte[0]=0. */
-export function saltFromQuestion(question: string): string {
-  const arr = Buffer.from(hash(Buffer.from(question, "utf8")));
-  arr[0] = 0;
-  return BigInt("0x" + arr.toString("hex")).toString();
-}
-
 const fmt = (n: bigint) => stroopsToXlm(n);
 
 export function factoryView(c: FactoryChest, meta: ChestMeta | null): ChestView {
@@ -80,8 +74,11 @@ export function factoryView(c: FactoryChest, meta: ChestMeta | null): ChestView 
     difficulty: isDemo ? 3 : meta?.difficulty,
     creator: c.creator,
     fingerprintHex: c.fingerprintHex,
-    salt: isDemo ? DEMO_CHEST.salt : priv ? undefined : (meta?.salt ?? saltFromQuestion(c.question)),
+    // Sin metadatos no se sirve ninguna sal: el cliente prueba la derivada de la pregunta (cofres de
+    // SDK) y, si la huella no coincide, pide el link con #s=. Con metadatos privados, nunca hay sal.
+    salt: isDemo ? DEMO_CHEST.salt : priv ? undefined : meta?.salt,
     saltRequired: priv || undefined,
+    saltDerivable: !isDemo && !meta ? true : undefined,
     prizes: c.prizes.map(fmt),
     maxClaims: c.slots,
     claims: c.claims,

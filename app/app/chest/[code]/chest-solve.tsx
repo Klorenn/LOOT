@@ -18,6 +18,7 @@ import { DEMO_CHEST, PRIZE, ZK_ASSETS } from "@/lib/config";
 import { getChest } from "@/lib/chests-demo";
 import { recipientField } from "@/lib/recipient";
 import { ordinal } from "@/lib/factory";
+import { saltFromQuestion } from "@/lib/answer";
 import { useSession } from "@/lib/session";
 import { PasskeyUnavailableError } from "@/lib/wallet";
 
@@ -31,6 +32,7 @@ type Meta = {
   /** ausente en cofres privados: viaja en el #s= del link */
   salt?: string;
   saltRequired?: boolean;
+  saltDerivable?: boolean;
   difficulty?: 1 | 2 | 3 | 4;
   prizeLabel: string;
   fingerprint?: string;
@@ -140,6 +142,7 @@ export function ChestSolve({
           hint: m.hint,
           salt: m.salt,
           saltRequired: m.saltRequired,
+          saltDerivable: m.saltDerivable,
           name: m.name,
           prizes: m.prizes,
           nextPlace: m.nextPlace,
@@ -166,8 +169,10 @@ export function ChestSolve({
       });
   }, [code, legacyId, catalog]);
 
-  const salt = meta?.salt ?? fragSalt ?? undefined;
-  const needsInvite = !!meta?.saltRequired && !fragSalt;
+  // El #s= del link manda sobre cualquier otra sal; sin metadatos se prueba la derivada de la pregunta.
+  const derivedSalt = meta?.saltDerivable && meta.question ? saltFromQuestion(meta.question) : undefined;
+  const salt = fragSalt ?? meta?.salt ?? derivedSalt;
+  const needsInvite = !!meta && !salt;
   const connected = !!player;
   const canProve = connected && answer.trim().length > 0 && !running && !needsInvite;
 

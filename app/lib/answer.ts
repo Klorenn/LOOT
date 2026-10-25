@@ -29,3 +29,13 @@ export function randomSalt(): bigint {
     "0x" + [...rnd].map((b) => b.toString(16).padStart(2, "0")).join(""),
   );
 }
+
+/**
+ * Sal derivada de la pregunta (cofres creados por SDK/scripts, sin metadatos): sha256(utf8 pregunta)
+ * con byte[0]=0. Igual que `saltFromQuestion` del SDK. Decimal.
+ */
+export function saltFromQuestion(question: string): string {
+  const arr = Buffer.from(hash(Buffer.from(question, "utf8")));
+  arr[0] = 0;
+  return BigInt("0x" + arr.toString("hex")).toString();
+}
