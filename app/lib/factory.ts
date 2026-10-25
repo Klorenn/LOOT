@@ -81,11 +81,46 @@ export type Quote = {
 
 export const FALLBACK_NETWORK_STROOPS = BigInt(5_000_000); // 0,5 XLM
 
-export function quoteLocal(prizes: bigint[], days: number, network = FALLBACK_NETWORK_STROOPS): Quote {
+/** Config on-chain de la factory (manda sobre las constantes de config.ts, que son solo fallback). */
+export type FactoryCfg = { creationFee: bigint; dailyFeeBps: number; maxDurationDays: number; treasury: string };
+
+export const FALLBACK_CFG: FactoryCfg = {
+  creationFee: FACTORY.creationFeeStroops,
+  dailyFeeBps: FACTORY.dailyFeeBps,
+  maxDurationDays: FACTORY.maxDurationDays,
+  treasury: FACTORY.treasury,
+};
+
+let cfgCache: { at: number; v: FactoryCfg } | null = null;
+
+/** get_config con caché de 60 s; si el RPC falla devuelve el fallback (sin cachearlo). */
+export async function readFactoryConfig(): Promise<FactoryCfg & { live: boolean }> {
+  if (cfgCache && Date.now() - cfgCache.at < 60_000) return { ...cfgCache.v, live: true };
+  try {
+    const c = (await simulateRead(FACTORY.contract, "get_config", [])) as Record<string, unknown>;
+    const v: FactoryCfg = {
+      creationFee: BigInt(c.creation_fee as bigint),
+      dailyFeeBps: Number(c.daily_fee_bps),
+      maxDurationDays: Number(c.max_duration_days),
+      treasury: String(c.treasury),
+    };
+    cfgCache = { at: Date.now(), v };
+    return { ...v, live: true };
+  } catch {
+    return { ...FALLBACK_CFG, live: false };
+  }
+}
+
+export function quoteLocal(
+  prizes: bigint[],
+  days: number,
+  network = FALLBACK_NETWORK_STROOPS,
+  cfg: FactoryCfg = FALLBACK_CFG,
+): Quote {
   const prize = prizes.reduce((a, b) => a + b, BigInt(0));
-  const reserve = (prize * BigInt(FACTORY.dailyFeeBps) * BigInt(days)) / BigInt(10_000);
-  const funded = prize + FACTORY.creationFeeStroops + reserve;
-  return { prizes, prize, creationFee: FACTORY.creationFeeStroops, reserve, network, funded, total: funded + network, days };
+  const reserve = (prize * BigInt(cfg.dailyFeeBps) * BigInt(days)) / BigInt(10_000);
+  const funded = prize + cfg.creationFee + reserve;
+  return { prizes, prize, creationFee: cfg.creationFee, reserve, network, funded, total: funded + network, days };
 }
 
 /** Valida el calendario: 1..50 lugares, todos > 0. Devuelve un mensaje o null. */

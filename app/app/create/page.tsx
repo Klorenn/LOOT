@@ -13,7 +13,7 @@ import { answerToField, normalizeAnswer, randomSalt } from "@/lib/answer";
 import { poseidon2, fieldToHex } from "@/lib/zk";
 import { useSession } from "@/lib/session";
 import { FACTORY, NETWORK, stroopsToXlm } from "@/lib/config";
-import { factoryIndexOf, quoteLocal } from "@/lib/factory";
+import { FALLBACK_CFG, factoryIndexOf, quoteLocal, readFactoryConfig, type FactoryCfg } from "@/lib/factory";
 import { encodeRef } from "@/lib/chest-code";
 import { PrizeEditor } from "./prize-editor";
 import { balanceInfo, parseXlmAmount, SendError } from "@/lib/send";
@@ -42,6 +42,10 @@ export default function CreateChestPage() {
     setPrizeErr(e);
   }, []);
   const [days, setDays] = useState(7);
+  const [cfg, setCfg] = useState<FactoryCfg>(FALLBACK_CFG);
+  useEffect(() => {
+    void readFactoryConfig().then(({ live: _l, ...c }) => (void _l, setCfg(c)));
+  }, []);
   const [difficulty, setDifficulty] = useState(2);
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -64,6 +68,12 @@ export default function CreateChestPage() {
   const [copied, setCopied] = useState(false);
   // la sal se genera una vez por intento: un reintento reusa la misma huella (la reserva es idempotente)
   const attempt = useRef<{ salt: bigint } | null>(null);
+  // otra pregunta, pista, visibilidad o respuesta = otra huella: la sal del intento anterior no se reusa
+  useEffect(() => {
+    attempt.current = null;
+    if (answer.trim()) void hashAnswer(); // la huella mostrada siempre es la del intento vigente
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question, hint, listed, answer]);
 
   async function hashAnswer() {
     const n = normalizeAnswer(answer);
@@ -91,7 +101,7 @@ export default function CreateChestPage() {
 
   const isPasskey = player?.kind === "passkey";
   // Passkey: el relayer paga la fee de red. Cuenta G: la paga el creador (tope estimado).
-  const quote = prizes ? quoteLocal(prizes, days, isPasskey ? BigInt(0) : undefined) : null;
+  const quote = prizes ? quoteLocal(prizes, days, isPasskey ? BigInt(0) : undefined, cfg) : null;
   const short = !!(quote && bal && (isPasskey ? bal.balance : bal.max) < quote.total);
 
   useEffect(() => {
@@ -127,8 +137,8 @@ export default function CreateChestPage() {
       e.question = `At most ${FACTORY.maxQuestionLen} characters (it is stored on-chain).`;
     if (step === 1 && !hashOk) e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
     if (step === 2 && (!prizes || prizeErr)) e.prize = prizeErr ?? "Set the prizes.";
-    if (step === 3 && (!Number.isInteger(days) || days < 1 || days > FACTORY.maxDurationDays))
-      e.days = `Pick between 1 and ${FACTORY.maxDurationDays} days.`;
+    if (step === 3 && (!Number.isInteger(days) || days < 1 || days > cfg.maxDurationDays))
+      e.days = `Pick between 1 and ${cfg.maxDurationDays} days.`;
     setFieldErr(e);
     return Object.keys(e).length === 0;
   }
@@ -505,7 +515,7 @@ export default function CreateChestPage() {
               {step === 3 && (
                 <Field
                   label="Duration (days)"
-                  hint={`1 to ${FACTORY.maxDurationDays} days. A fee of ${FACTORY.dailyFeeBps / 100}% of the prize per day is prepaid and the unused part is refunded when the chest closes. You can close it any time; anyone can close it after it expires and the refund still goes to you.`}
+                  hint={`1 to ${cfg.maxDurationDays} days. A fee of ${cfg.dailyFeeBps / 100}% of the prize per day is prepaid and the unused part is refunded when the chest closes. You can close it any time; anyone can close it after it expires and the refund still goes to you.`}
                   error={fieldErr.days}
                 >
                   <Input
@@ -545,7 +555,7 @@ export default function CreateChestPage() {
                       <Line k={`Prizes (${prizes.length} ${prizes.length === 1 ? "place" : "places"})`} v={quote.prize} gold />
                       <Line k="Creation fee (to Loot treasury)" v={quote.creationFee} />
                       <Line
-                        k={`Fee reserve (${FACTORY.dailyFeeBps / 100}%/day × ${days})`}
+                        k={`Fee reserve (${cfg.dailyFeeBps / 100}%/day × ${days})`}
                         v={quote.reserve}
                         note="Refundable: the unused part comes back when you close the chest."
                       />

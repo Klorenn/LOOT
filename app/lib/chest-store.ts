@@ -141,6 +141,23 @@ export async function reserveChestMeta(p: PendingMeta): Promise<"ok" | "exists">
   return "ok";
 }
 
+/** Sustituye una reserva existente (solo la llama la ruta tras comprobar que no hay cofre con esa huella). */
+export async function replacePendingMeta(p: PendingMeta): Promise<void> {
+  if (backend() === "blob") {
+    await put(`pending/${p.fingerprintHex}.json`, JSON.stringify(p), {
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: "application/json",
+      ...auth(),
+    });
+    return;
+  }
+  const all = await fileReadAll<PendingMeta>(PENDING_FILE);
+  all[p.fingerprintHex] = p;
+  await fileWriteAll(PENDING_FILE, all);
+}
+
 export async function getPending(fingerprintHex: string): Promise<PendingMeta | null> {
   if (backend() === "blob") return blobRead<PendingMeta>(`pending/${fingerprintHex}.json`);
   return (await fileReadAll<PendingMeta>(PENDING_FILE))[fingerprintHex] ?? null;

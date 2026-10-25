@@ -3,11 +3,12 @@ import { StrKey } from "@stellar/stellar-sdk";
 import {
   StorageNotConfiguredError,
   getPending,
+  replacePendingMeta,
   reserveChestMeta,
   saveChestMeta,
   type PendingMeta,
 } from "@/lib/chest-store";
-import { factoryIndexOf, readFactoryChest } from "@/lib/factory";
+import { allFactoryAddresses, factoryIndexOf, readFactoryChest } from "@/lib/factory";
 
 /**
  * Metadatos off-chain de un cofre, en dos pasos (reserve-then-confirm):
@@ -71,6 +72,14 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
   };
 }
 
+/** ¿Ya hay en la factory un cofre con esta huella? (lectura fresca de la lista y de cada cofre reciente) */
+async function chestExistsWithFingerprint(fp: string): Promise<boolean> {
+  const addrs = await allFactoryAddresses(true);
+  const recent = addrs.slice(-40);
+  const infos = await Promise.all(recent.map((a) => readFactoryChest(a).catch(() => null)));
+  return infos.some((c) => c?.fingerprintHex === fp);
+}
+
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   if (limited(ip)) return NextResponse.json({ error: "too many requests" }, { status: 429 });
@@ -83,10 +92,17 @@ export async function POST(req: NextRequest) {
       if (typeof p === "string") return NextResponse.json({ error: p }, { status: 400 });
       const r = await reserveChestMeta(p);
       if (r === "exists") {
-        // reintento legítimo del mismo creador: idempotente; otro creador: conflicto
         const cur = await getPending(p.fingerprintHex);
         if (!cur || cur.creator !== p.creator)
           return NextResponse.json({ error: "fingerprint already reserved" }, { status: 409 });
+        const same = (a: PendingMeta, c: PendingMeta) =>
+          JSON.stringify({ ...a, reservedAt: 0 }) === JSON.stringify({ ...c, reservedAt: 0 });
+        if (!same(cur, p)) {
+          // Reintento con otros datos: solo se sobrescribe si el cofre con esa huella todavía no existe.
+          if (await chestExistsWithFingerprint(p.fingerprintHex))
+            return NextResponse.json({ error: "fingerprint already reserved" }, { status: 409 });
+          await replacePendingMeta(p);
+        }
       }
       return NextResponse.json({ ok: true });
     }
