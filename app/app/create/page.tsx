@@ -25,6 +25,21 @@ const STEPS = [
   "Review & fund",
 ] as const;
 
+const MIN_EXPIRY_S = 5 * 60;
+const MAX_EXPIRY_S = 90 * 24 * 3600;
+
+/** Vencimiento obligatorio y futuro: con deadline 0 el cofre nunca se podría cerrar (premio bloqueado). */
+function expiryError(expires: string): string | null {
+  const t = new Date(expires).getTime();
+  const now = Date.now() / 1000;
+  const sec = Math.floor(t / 1000);
+  if (!expires || !Number.isFinite(t))
+    return "Pick an expiry date — unclaimed prize can only be recovered after it.";
+  if (sec < now + MIN_EXPIRY_S) return "Expiry must be at least 5 minutes from now.";
+  if (sec > now + MAX_EXPIRY_S) return "Expiry can be at most 90 days from now.";
+  return null;
+}
+
 export default function CreateChestPage() {
   const [step, setStep] = useState(0);
   const [tpl, setTpl] = useState<ChestTemplate>(TEMPLATES[2]);
@@ -62,7 +77,11 @@ export default function CreateChestPage() {
     if (!expires) {
       const d = new Date();
       d.setDate(d.getDate() + 7);
-      setExpires(d.toISOString().slice(0, 16));
+      // datetime-local es hora LOCAL: toISOString() daría UTC y corrido el vencimiento
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setExpires(
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      );
     }
   }, [expires]);
 
@@ -131,7 +150,10 @@ export default function CreateChestPage() {
     if (step === 1 && !hashOk) e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
     if (step === 2 && !prizeStroops) e.prize = "Enter a reward greater than 0 (up to 7 decimals).";
     if (step === 3 && (!Number.isSafeInteger(maxClaims) || maxClaims < 1)) e.maxClaims = "At least 1 claim.";
-    if (step === 3 && !expires) e.expires = "Pick an expiry.";
+    if (step === 3) {
+      const ee = expiryError(expires);
+      if (ee) e.expires = ee;
+    }
     setFieldErr(e);
     return Object.keys(e).length === 0;
   }
@@ -156,7 +178,13 @@ export default function CreateChestPage() {
       const n = normalizeAnswer(answer);
       const fp = await poseidon2(answerToField(n), salt);
       const fingerprintHex = fieldToHex(fp);
-      const deadline = Math.floor(new Date(expires).getTime() / 1000) || 0;
+      const ee = expiryError(expires);
+      if (ee) {
+        setStep(3);
+        setFieldErr({ expires: ee });
+        return;
+      }
+      const deadline = Math.floor(new Date(expires).getTime() / 1000);
       const input = { fingerprintHex, prizeStroops, maxClaims, deadline };
 
       setPhase("Saving chest details…");
@@ -518,7 +546,7 @@ export default function CreateChestPage() {
                 <>
                   <Field
                     label="Expires"
-                    hint="After expiry nobody can claim. Unclaimed prize stays escrowed until you close the chest."
+                    hint="Unclaimed prize returns when you close the chest from your dashboard after it expires. The contract only allows closing after expiry."
                     error={fieldErr.expires}
                   >
                     <Input

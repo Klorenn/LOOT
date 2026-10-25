@@ -117,6 +117,8 @@ export async function createChestOnChain(
   input: CreateInput,
   onPhase?: Phase,
 ): Promise<{ chestId: number; hash: string }> {
+  if (!Number.isSafeInteger(input.deadline) || input.deadline <= Math.floor(Date.now() / 1000))
+    throw new SendError("The chest needs an expiry in the future; otherwise the prize could never be recovered.");
   const hash = await invokeAsCreator(player, (c, o) => c.create_chest(createArgs(player, input), o) as never, onPhase);
   return { chestId: Number(await returnValueFromTx(hash)), hash };
 }
@@ -149,14 +151,14 @@ async function invokeAsCreator(player: Player, build: Build, onPhase?: Phase): P
   }
 
   const client = newClient(player.publicKey, signTransaction);
-  const at = await client.create_chest(createArgs(player, input), { fee: "10000000", timeoutInSeconds: 120 });
+  const at = await build(client, { fee: "10000000", timeoutInSeconds: 120 });
   onPhase?.("signing");
   await at.sign();
   onPhase?.("pending");
   const sent = await at.send();
   const hash = (sent as unknown as { sendTransactionResponse?: { hash?: string } }).sendTransactionResponse?.hash;
   if (!hash) throw new SendError("The network didn’t return a transaction hash.");
-  return { chestId: Number(await returnValueFromTx(hash)), hash };
+  return hash;
 }
 
 async function invokePasskey(player: Player, build: Build, onPhase?: Phase): Promise<string> {
@@ -179,5 +181,5 @@ async function invokePasskey(player: Player, build: Build, onPhase?: Phase): Pro
   if (!xdrStr) throw new SendError("Couldn’t build the signed transaction.");
   onPhase?.("pending");
   const hash = await submitPasskeyTx(xdrStr);
-  return { chestId: Number(await returnValueFromTx(hash)), hash };
+  return hash;
 }

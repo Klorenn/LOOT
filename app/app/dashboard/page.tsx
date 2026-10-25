@@ -10,25 +10,50 @@ import { PRIZE, stroopsToXlm } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import type { DashboardData } from "@/lib/listing";
 import { useSession } from "@/lib/session";
+import { closeChestOnChain } from "@/lib/create-chest";
 
 type Load = { s: "loading" } | { s: "ok"; v: DashboardData } | { s: "error" };
 
 export default function DashboardPage() {
-  const { address } = useSession();
+  const { address, player } = useSession();
   const [data, setData] = useState<Load>({ s: "loading" });
+  const [reload, setReload] = useState(0);
+  const [closing, setClosing] = useState<number | null>(null);
+  const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string; hash?: string } | null>(null);
+
+  async function closeAndRefund(r: DashboardData["rows"][number]) {
+    if (!player || closing !== null) return;
+    const back = BigInt(r.prizeStroops) * BigInt(Math.max(0, r.maxClaims - r.claims));
+    const ok = window.confirm(
+      `Close chest ${r.code} and take back ${stroopsToXlm(back)} XLM?\n\n` +
+        `(${r.maxClaims - r.claims} unclaimed × ${r.prizeLabel}). This can't be undone.`,
+    );
+    if (!ok) return;
+    setClosing(r.id);
+    setNotice(null);
+    try {
+      const { hash, refunded } = await closeChestOnChain(player, r.id);
+      setNotice({ tone: "ok", text: `Closed. ${stroopsToXlm(refunded)} XLM returned to your account.`, hash });
+      setReload((n) => n + 1);
+    } catch (e) {
+      setNotice({ tone: "err", text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setClosing(null);
+    }
+  }
 
   useEffect(() => {
     if (!address) return;
     let live = true;
     setData({ s: "loading" });
-    fetch(`/api/dashboard?address=${encodeURIComponent(address)}`)
+    fetch(`/api/dashboard?address=${encodeURIComponent(address)}${reload ? "&fresh=1" : ""}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((v: DashboardData) => live && setData({ s: "ok", v }))
       .catch(() => live && setData({ s: "error" }));
     return () => {
       live = false;
     };
-  }, [address]);
+  }, [address, reload]);
 
   if (!address) return null;
   const rows = data.s === "ok" ? data.v.rows : [];
@@ -114,6 +139,28 @@ export default function DashboardPage() {
               ))}
             </section>
 
+            {notice && (
+              <p
+                className={`mt-6 text-[14px] ${notice.tone === "ok" ? "text-[var(--ok)]" : "text-[var(--red)]"}`}
+                role="alert"
+              >
+                {notice.text}
+                {notice.hash && (
+                  <>
+                    {" "}
+                    <a
+                      href={`https://stellar.expert/explorer/${process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "public" : "testnet"}/tx/${notice.hash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline underline-offset-2"
+                    >
+                      View transaction ↗
+                    </a>
+                  </>
+                )}
+              </p>
+            )}
+
             <div className="mt-8 overflow-x-auto">
               <table className="w-full min-w-[720px] border-collapse text-left">
                 <thead>
@@ -145,7 +192,17 @@ export default function DashboardPage() {
                       <td className="py-4 pl-6 font-mono text-[13px]">
                         {r.claims} / {r.maxClaims}
                       </td>
-                      <td className="py-4 text-right">
+                      <td className="py-4 text-right whitespace-nowrap">
+                        {r.status === "expired" && (
+                          <button
+                            type="button"
+                            disabled={closing !== null}
+                            onClick={() => void closeAndRefund(r)}
+                            className="btn-landing btn-landing-p btn-landing-sm mr-2 disabled:opacity-40"
+                          >
+                            {closing === r.id ? "Closing…" : "Close & refund"}
+                          </button>
+                        )}
                         <Link href={r.href} className="btn-landing btn-landing-s btn-landing-sm">
                           View
                         </Link>

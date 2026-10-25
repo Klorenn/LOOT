@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
   try {
-    return NextResponse.json(await dashboardFor(address));
+    return NextResponse.json(await dashboardFor(address, req.nextUrl.searchParams.get("fresh") === "1"));
   } catch (e) {
     console.error("dashboard", e);
     return NextResponse.json({ error: "chain read failed" }, { status: 502 });

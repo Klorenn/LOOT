@@ -2,7 +2,7 @@ import { chestPath } from "./chest-code";
 import { readChest, readClaimedEvents, type ClaimedEvent, type OnChainChest } from "./chain";
 import { getChest as demoMeta } from "./chests-demo";
 import { getChestMeta, listPublicMetas } from "./chest-store";
-import { CONTRACTS, DEMO_CHEST, LISTED_CHEST_IDS, stroopsToXlm, tokenDecimals, tokenLabel } from "./config";
+import { CONTRACTS, DEMO_CHEST, HIDDEN_CHEST_IDS, LISTED_CHEST_IDS, stroopsToXlm, tokenDecimals, tokenLabel } from "./config";
 
 /** Solo servidor. Lecturas de cadena con failover (lib/rpc.ts) y caché en memoria de 30 s. */
 
@@ -18,8 +18,8 @@ const isMissing = (e: unknown) =>
   );
 
 /** Todos los cofres del contrato principal (ids 1.. hasta el primero que no existe). */
-export async function readAllChests(): Promise<OnChainChest[]> {
-  if (chestsCache && Date.now() - chestsCache.at < TTL) return chestsCache.value;
+export async function readAllChests(fresh = false): Promise<OnChainChest[]> {
+  if (!fresh && chestsCache && Date.now() - chestsCache.at < TTL) return chestsCache.value;
   const out: OnChainChest[] = [];
   const CHUNK = 6;
   for (let start = 1; start <= MAX_SCAN; start += CHUNK) {
@@ -107,7 +107,9 @@ export async function listExploreRows(): Promise<ChestRowData[]> {
   const publicIds = new Set(
     (await listPublicMetas().catch(() => [])).filter((m) => m.listed === true).map((m) => m.id),
   );
-  const listed = all.filter((c) => LISTED_CHEST_IDS.includes(c.id) || publicIds.has(c.id));
+  const listed = all.filter(
+    (c) => (LISTED_CHEST_IDS.includes(c.id) || publicIds.has(c.id)) && !HIDDEN_CHEST_IDS.includes(c.id),
+  );
   return Promise.all(listed.map(toRow));
 }
 
@@ -119,8 +121,8 @@ export type DashboardData = {
   paidStroops: string;
 };
 
-export async function dashboardFor(address: string): Promise<DashboardData> {
-  const all = await readAllChests();
+export async function dashboardFor(address: string, fresh = false): Promise<DashboardData> {
+  const all = await readAllChests(fresh);
   const mine = all.filter((c) => c.creator === address);
   const ids = new Set(mine.map((c) => c.id));
   let escrow = BigInt(0);

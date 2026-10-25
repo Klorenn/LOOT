@@ -88,6 +88,9 @@ export const DEMO_CHEST = {
  */
 export const LISTED_CHEST_IDS: readonly number[] = [DEMO_CHEST.id];
 
+/** Cofres de prueba públicos (#9, #10, #11) que no se listan en /explore; sus páginas siguen funcionando. */
+export const HIDDEN_CHEST_IDS: readonly number[] = [9, 10, 11];
+
 /**
  * Cofre dedicado al modo ataque (#7: 100 cupos × 0.1 XLM). La respuesta es PÚBLICA a propósito:
  * solo sirve para armar una prueba válida que el bot copia y el contrato rechaza.
