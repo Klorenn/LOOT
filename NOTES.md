@@ -26,7 +26,7 @@ Handoff for the other person. Lisboa time context: freeze ~dom 25 afternoon (ade
 
 ```bash
 cd app && pnpm install && pnpm dev
-# secrets: app/.env.local  CREATOR_SECRET + RELAYER_SECRET
+# secrets: app/.env.local  RELAYER_SECRET (+ CREATOR_SECRET for bot/ only) + BLOB_READ_WRITE_TOKEN (chest metadata; dev falls back to data/*.json)
 ```
 
 Routes (EN): `/enter` `/chest/:id` `/proving` `/opened` `/attack` `/create` `/panel`  

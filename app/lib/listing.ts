@@ -1,7 +1,7 @@
 import { chestPath } from "./chest-code";
 import { readChest, readClaimedEvents, type ClaimedEvent, type OnChainChest } from "./chain";
 import { getChest as demoMeta } from "./chests-demo";
-import { getChestMeta } from "./chest-store";
+import { getChestMeta, listPublicMetas } from "./chest-store";
 import { CONTRACTS, DEMO_CHEST, LISTED_CHEST_IDS, stroopsToXlm, tokenDecimals, tokenLabel } from "./config";
 
 /** Solo servidor. Lecturas de cadena con failover (lib/rpc.ts) y caché en memoria de 30 s. */
@@ -76,9 +76,11 @@ export async function toRow(c: OnChainChest): Promise<ChestRowData> {
   const demo = demoMeta(c.id);
   let name = demo?.name;
   let question = c.id === DEMO_CHEST.id ? DEMO_CHEST.question : demo?.question;
+  let difficulty = demo?.difficulty ?? null;
   if (!question) {
     const meta = await getChestMeta(c.id).catch(() => null);
     question = meta?.question;
+    difficulty = meta?.difficulty ?? difficulty;
   }
   const amount = stroopsToXlm(c.prize, tokenDecimals(c.token));
   return {
@@ -87,7 +89,7 @@ export async function toRow(c: OnChainChest): Promise<ChestRowData> {
     href: chestPath(c.id),
     name: name ?? `Chest #${String(c.id).padStart(4, "0")}`,
     question: question ?? "—",
-    difficulty: demo?.difficulty ?? null,
+    difficulty,
     status: statusOf(c),
     claims: c.claims,
     maxClaims: c.maxClaims,
@@ -99,10 +101,13 @@ export async function toRow(c: OnChainChest): Promise<ChestRowData> {
   };
 }
 
-/** Cofres listados en /explore (LISTED_CHEST_IDS), leídos de la cadena. */
+/** Cofres listados en /explore: LISTED_CHEST_IDS + cofres públicos (listed:true) del almacén de metadatos. */
 export async function listExploreRows(): Promise<ChestRowData[]> {
   const all = await readAllChests();
-  const listed = all.filter((c) => LISTED_CHEST_IDS.includes(c.id));
+  const publicIds = new Set(
+    (await listPublicMetas().catch(() => [])).filter((m) => m.listed === true).map((m) => m.id),
+  );
+  const listed = all.filter((c) => LISTED_CHEST_IDS.includes(c.id) || publicIds.has(c.id));
   return Promise.all(listed.map(toRow));
 }
 

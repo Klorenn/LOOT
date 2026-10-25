@@ -87,8 +87,12 @@ export async function GET(
     });
   }
 
+  // Cofre privado: la sal nunca se guarda ni se sirve; viaja solo en el #s= del link.
+  const { salt, ...rest } = meta!;
+  const priv = meta!.listed === false;
   return NextResponse.json({
-    ...meta,
+    ...rest,
+    ...(priv ? { saltRequired: true } : { salt }),
     ...live,
     prizeLabel: "prizeLabel" in live ? live.prizeLabel : null,
   });

@@ -28,7 +28,8 @@ async function existsOnChain(id: number): Promise<boolean | null> {
 }
 
 export async function GET() {
-  const stored = await listChests();
+  // Solo cofres públicos; la sal no sale en el listado.
+  const stored = (await listChests()).map(({ salt: _s, ...c }) => (void _s, c));
   const demo = {
     id: DEMO_CHEST.id,
     template: "bounty",

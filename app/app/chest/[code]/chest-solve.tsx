@@ -22,7 +22,10 @@ import { PasskeyUnavailableError } from "@/lib/wallet";
 type Meta = {
   question: string;
   hint?: string;
-  salt: string;
+  /** ausente en cofres privados: viaja en el #s= del link */
+  salt?: string;
+  saltRequired?: boolean;
+  difficulty?: 1 | 2 | 3 | 4;
   prizeLabel: string;
   fingerprint?: string;
   creator?: string;
@@ -90,6 +93,17 @@ export function ChestSolve({
   const [steps, setSteps] = useState<StepState[]>(["idle", "idle", "idle", "idle"]);
   const [running, setRunning] = useState(false);
   const [fail, setFail] = useState<Fail | null>(null);
+  // Cofre privado: la sal vive solo en el fragmento de la URL (nunca llega al servidor).
+  const [fragSalt, setFragSalt] = useState<string | null>(null);
+  useEffect(() => {
+    const read = () => {
+      const m = window.location.hash.match(/[#&]s=(\d{1,80})(?:&|$)/);
+      setFragSalt(m ? m[1] : null);
+    };
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
 
   useEffect(() => {
     if (!Number.isFinite(chestId)) return;
@@ -112,6 +126,8 @@ export function ChestSolve({
           question: m.question,
           hint: m.hint,
           salt: m.salt,
+          saltRequired: m.saltRequired,
+          difficulty: m.difficulty,
           prizeLabel: m.prizeLabel ?? "—",
           fingerprint: m.fingerprintHex,
           creator: m.creator,
@@ -134,8 +150,10 @@ export function ChestSolve({
       });
   }, [chestId, catalog]);
 
+  const salt = meta?.salt ?? fragSalt ?? undefined;
+  const needsInvite = !!meta?.saltRequired && !fragSalt;
   const connected = !!player;
-  const canProve = connected && answer.trim().length > 0 && !running;
+  const canProve = connected && answer.trim().length > 0 && !running && !needsInvite;
 
   const titleWord = useMemo(() => {
     const n = catalog?.name || `Chest #${chestId}`;
@@ -176,7 +194,7 @@ export function ChestSolve({
     setSteps((prev) => prev.map((v, j) => (j === i ? s : v)));
 
   async function prove() {
-    if (!canProve || !meta || !player) return;
+    if (!canProve || !meta || !player || !salt) return;
     setFail(null);
     if (!catalog?.live && catalog) {
       setFail({ kind: "example" });
@@ -194,7 +212,7 @@ export function ChestSolve({
         const fp = fieldToHex(
           await poseidon2(
             answerToField(normalizeAnswer(secretAnswer)),
-            BigInt(meta.salt),
+            BigInt(salt ?? "0"),
           ),
         );
         if (fp !== meta.fingerprint) {
@@ -212,7 +230,7 @@ export function ChestSolve({
       try {
         result = await proveChest({
           answer: secretAnswer,
-          salt: meta.salt,
+          salt: salt ?? "0",
           playerSecret: player.playerSecret,
           chestId: String(chestId),
           recipientField: recipient,
@@ -362,7 +380,7 @@ export function ChestSolve({
                     },
                     {
                       label: "Difficulty",
-                      value: <DifficultyBars level={catalog?.difficulty ?? 1} />,
+                      value: <DifficultyBars level={catalog?.difficulty ?? meta?.difficulty ?? 1} />,
                     },
                     {
                       label: "Status",
@@ -488,6 +506,12 @@ export function ChestSolve({
               <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
                 Normalized on this device. Never sent to any server.
               </p>
+              {needsInvite && (
+                <p className="mt-3 text-[13px] text-[var(--gold)]" role="alert">
+                  This chest needs its full invite link. Ask the creator for the link that ends in
+                  #s=…; without it nobody can build a proof.
+                </p>
+              )}
             </Panel>
 
             <Panel

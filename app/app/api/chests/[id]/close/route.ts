@@ -16,7 +16,7 @@ export async function POST(
   const denied = requireAdmin(req);
   if (denied) return denied;
   try {
-    const secret = process.env.CREATOR_SECRET || process.env.RELAYER_SECRET;
+    const secret = process.env.CREATOR_SECRET;
     if (!secret) {
       return NextResponse.json(
         { error: "CREATOR_SECRET missing" },

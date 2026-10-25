@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const secret = process.env.RELAYER_SECRET || process.env.CREATOR_SECRET;
+    const secret = process.env.RELAYER_SECRET;
     if (!secret) {
       return NextResponse.json(
         {

@@ -46,14 +46,18 @@ Open http://localhost:3000 → **Abrir un cofre** → answer `8`.
 | `/chest/:id` | Answer + claim |
 | `/chest/:id/proving` | Groth16 + submit |
 | `/attack` | Stolen-proof demo → rejected |
-| `/create` | Templates + QR |
+| `/create` | Create a chest from your own account (you fund the prize) · public or private-link |
 | `/panel` | List + **close** chest |
 
 Spanish URLs 301 → English.
 
 ### Env
 
-- `RELAYER_SECRET` / `CREATOR_SECRET` — claim + create + fee-bump fallback
+- `RELAYER_SECRET` — relayer key (claims, passkey fee-bump). Must be its own low-balance account, never the prize-funding one; no fallback to `CREATOR_SECRET`. On Vercel set `RELAYER_SECRET` (or `RELAYER_API_KEY` + `RELAYER_BASE_URL`).
+- `CREATOR_SECRET` — local only: closing legacy server-created chests from `/panel` (`/api/chests/:id/close`, no fallback to the relayer key) and `bot/` scripts. Creators now sign `create_chest` with their own account.
+- `ADMIN_KEY` — only for `/panel` and `/api/chests/:id/close`; not needed to create chests.
+- `BLOB_READ_WRITE_TOKEN` — Vercel Blob (PRIVATE store: written with access:"private", read server-side only; blob URLs never reach the client) for chest metadata (question, hint, difficulty, salt of public chests). **Required in production/Vercel**: without it `/api/chests/meta` returns 503. Local dev without a token falls back to `data/chests.json` + `data/pending.json`. Metadata is write-once: reserved by fingerprint before creation, confirmed against `get_chest` (creator + fingerprint) after.
+- Private-link chests: the salt is never stored; it travels only in the URL fragment (`/chest/<code>#s=<salt>`). Lose the link, lose the chest.
 - `RELAYER_API_KEY` — [OZ Channels testnet](https://channels.openzeppelin.com/testnet/gen) (preferred; no Docker)
 
 ## Demo script (2 min)

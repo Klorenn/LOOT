@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,10 @@ import { TEMPLATES, type ChestTemplate } from "@/lib/templates";
 import { answerToField, normalizeAnswer, randomSalt } from "@/lib/answer";
 import { poseidon2, fieldToHex } from "@/lib/zk";
 import { chestPath } from "@/lib/chest-code";
+import { useSession } from "@/lib/session";
+import { NETWORK, stroopsToXlm } from "@/lib/config";
+import { balanceInfo, parseXlmAmount, SendError } from "@/lib/send";
+import { confirmMeta, createChestOnChain, reserveMeta } from "@/lib/create-chest";
 
 const STEPS = [
   "Puzzle",
@@ -29,7 +33,7 @@ export default function CreateChestPage() {
   const [answer, setAnswer] = useState("");
   const [hashHex, setHashHex] = useState<string | null>(null);
   const [hashOk, setHashOk] = useState(false);
-  const [prize, setPrize] = useState(TEMPLATES[2].prize);
+  const [prize, setPrize] = useState(String(TEMPLATES[2].prize));
   const [difficulty, setDifficulty] = useState(2);
   const [expires, setExpires] = useState("");
   const [maxClaims, setMaxClaims] = useState(TEMPLATES[2].maxClaims);
@@ -39,9 +43,20 @@ export default function CreateChestPage() {
   const [result, setResult] = useState<{
     chestId: number;
     link: string;
-    widget: string;
     explorer: string | null;
+    priv: boolean;
+    saved: boolean;
+    fingerprintHex: string;
+    hash: string;
   } | null>(null);
+  const { player } = useSession();
+  const [listed, setListed] = useState(true);
+  const [phase, setPhase] = useState<string | null>(null);
+  const [bal, setBal] = useState<{ max: bigint; balance: bigint } | null>(null);
+  const [faucetBusy, setFaucetBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  // la sal se genera una vez por intento: un reintento reusa la misma huella (la reserva es idempotente)
+  const attempt = useRef<{ salt: bigint } | null>(null);
 
   useEffect(() => {
     if (!expires) {
@@ -58,8 +73,8 @@ export default function CreateChestPage() {
       setHashOk(false);
       return;
     }
-    const salt = BigInt(7);
-    const fp = await poseidon2(answerToField(n), salt);
+    attempt.current ??= { salt: randomSalt() };
+    const fp = await poseidon2(answerToField(n), attempt.current.salt);
     setHashHex(fieldToHex(fp));
     setHashOk(true);
     setFieldErr((e) => ({ ...e, answer: "" }));
@@ -70,18 +85,52 @@ export default function CreateChestPage() {
     setQuestion(t.question);
     setHint(t.hint);
     setAnswer("");
-    setPrize(t.prize);
+    setPrize(String(t.prize));
     setMaxClaims(t.maxClaims);
     setHashHex(null);
     setHashOk(false);
     setResult(null);
   }
 
+  const prizeStroops = parseXlmAmount(prize);
+  const totalStroops =
+    prizeStroops && Number.isSafeInteger(maxClaims) && maxClaims >= 1
+      ? prizeStroops * BigInt(maxClaims)
+      : null;
+  const short = !!(totalStroops && bal && bal.max < totalStroops);
+
+  useEffect(() => {
+    if (!player || step < 4) return;
+    let off = false;
+    balanceInfo(player)
+      .then((b) => !off && setBal({ max: b.max, balance: b.balance }))
+      .catch(() => !off && setBal(null));
+    return () => {
+      off = true;
+    };
+  }, [player, step, result]);
+
+  async function friendbot() {
+    if (!player) return;
+    setFaucetBusy(true);
+    setError(null);
+    try {
+      const r = await fetch(`${NETWORK.friendbotUrl}?addr=${encodeURIComponent(player.publicKey)}`);
+      if (!r.ok && r.status !== 400) throw new Error(`Friendbot returned ${r.status}`);
+      setBal(await balanceInfo(player));
+    } catch (e) {
+      setError(`Couldn’t get test XLM: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setFaucetBusy(false);
+    }
+  }
+
   function validateStep(): boolean {
     const e: Record<string, string> = {};
     if (step === 0 && !question.trim()) e.question = "Puzzle text is required.";
     if (step === 1 && !hashOk) e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
-    if (step === 2 && prize < 1) e.prize = "Reward must be ≥ 1.";
+    if (step === 2 && !prizeStroops) e.prize = "Enter a reward greater than 0 (up to 7 decimals).";
+    if (step === 3 && (!Number.isSafeInteger(maxClaims) || maxClaims < 1)) e.maxClaims = "At least 1 claim.";
     if (step === 3 && !expires) e.expires = "Pick an expiry.";
     setFieldErr(e);
     return Object.keys(e).length === 0;
@@ -98,56 +147,87 @@ export default function CreateChestPage() {
 
   async function onFund() {
     if (!validateStep()) return;
+    if (!player || !prizeStroops) return;
     setBusy(true);
     setError(null);
     try {
-      const salt = randomSalt();
+      attempt.current ??= { salt: randomSalt() };
+      const salt = attempt.current.salt;
       const n = normalizeAnswer(answer);
       const fp = await poseidon2(answerToField(n), salt);
       const fingerprintHex = fieldToHex(fp);
       const deadline = Math.floor(new Date(expires).getTime() / 1000) || 0;
+      const input = { fingerprintHex, prizeStroops, maxClaims, deadline };
 
-      let adminKey = sessionStorage.getItem("chestzk.adminKey") || "";
-      if (!adminKey) {
-        adminKey = window.prompt("Admin key") || "";
-        if (adminKey) sessionStorage.setItem("chestzk.adminKey", adminKey);
-      }
-      const res = await fetch("/api/create-chest", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-key": adminKey,
-        },
-        body: JSON.stringify({
-          fingerprintHex,
-          salt: salt.toString(),
-          prize,
-          maxClaims,
-          deadline,
-          meta: {
-            template: tpl.id,
-            question,
-            hint,
-            difficulty,
-          },
-        }),
+      setPhase("Saving chest details…");
+      await reserveMeta(player, input, {
+        template: tpl.id,
+        question,
+        hint: hint || undefined,
+        difficulty,
+        prize: Number(stroopsToXlm(prizeStroops)),
+        listed,
+        salt: salt.toString(),
       });
-      const data = await res.json();
-      if (res.status === 403) {
-        sessionStorage.removeItem("chestzk.adminKey");
-        throw new Error("Invalid admin key (403)");
+
+      const { chestId, hash } = await createChestOnChain(player, input, (p) =>
+        setPhase(p === "signing" ? "Approve in your wallet…" : "Waiting for the network…"),
+      );
+
+      setPhase("Publishing…");
+      let saved = true;
+      try {
+        await confirmMeta(chestId, fingerprintHex, hash);
+      } catch {
+        saved = false;
       }
-      if (!res.ok) throw new Error(data.error || "Could not create");
+      const base = `${window.location.origin}${chestPath(chestId)}`;
       setResult({
-        chestId: data.chestId,
-        link: data.link,
-        widget: data.widget,
-        explorer: data.explorer,
+        chestId,
+        link: listed ? base : `${base}#s=${salt.toString()}`,
+        explorer: `https://stellar.expert/explorer/${process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "public" : "testnet"}/tx/${hash}`,
+        priv: !listed,
+        saved,
+        fingerprintHex,
+        hash,
       });
+      attempt.current = null;
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(
+        err instanceof SendError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : String(err),
+      );
     } finally {
       setBusy(false);
+      setPhase(null);
+    }
+  }
+
+  async function retrySave() {
+    if (!result) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await confirmMeta(result.chestId, result.fingerprintHex, result.hash);
+      setResult({ ...result, saved: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyLink() {
+    if (!result) return;
+    try {
+      await navigator.clipboard.writeText(result.link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* portapapeles bloqueado: el link está visible para copiarlo a mano */
     }
   }
 
@@ -168,26 +248,64 @@ export default function CreateChestPage() {
               Chest #{result.chestId} is <Em tone="ok">live.</Em>
             </>
           }
-          lead="Share the link. Solvers prove in-browser; only the hash sits on-chain."
+          lead={
+            result.priv
+              ? "Private chest. Only people with the full link can solve it."
+              : "Share the link. Solvers prove in-browser; only the hash sits on-chain."
+          }
         />
-        <div className="mx-auto flex max-w-[480px] flex-col items-center gap-6 px-6 py-12">
+        <div className="mx-auto flex max-w-[560px] flex-col items-center gap-6 px-6 py-12">
           <div className="rounded-[14px] bg-white p-3">
             <QRCodeSVG value={result.link} size={160} />
           </div>
-          <a
-            href={result.link}
-            className="break-all text-center text-sm text-[var(--proof)] underline"
-          >
+          <p className="w-full break-all rounded-[10px] border border-[var(--line)] bg-[var(--s1)] p-3 text-center font-mono text-[13px] text-[var(--proof)]">
             {result.link}
-          </a>
-          <div className="flex flex-wrap gap-3">
-            <Link href={chestPath(result.chestId)} className="btn-landing btn-landing-p">
-              Open chest →
+          </p>
+          {result.priv && (
+            <p className="text-center text-[14px] text-[var(--gold)]" role="alert">
+              Save this link now. The secret after # is never stored anywhere else: if you lose it,
+              nobody can solve this chest.
+            </p>
+          )}
+          {!result.saved && (
+            <div className="text-center text-[14px] text-[var(--gold)]" role="alert">
+              The chest is on-chain, but its details (question, hint) weren’t published yet.
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void retrySave()}
+                className="ml-2 underline underline-offset-2"
+              >
+                {busy ? "Retrying…" : "Retry"}
+              </button>
+            </div>
+          )}
+          {error && (
+            <p className="text-sm text-[var(--red)]" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="flex flex-wrap justify-center gap-3">
+            <button type="button" onClick={() => void copyLink()} className="btn-landing btn-landing-p">
+              {copied ? "Copied" : "Copy link"}
+            </button>
+            <Link href={chestPath(result.chestId)} className="btn-landing btn-landing-s">
+              Open chest
             </Link>
             <Link href="/dashboard" className="btn-landing btn-landing-s">
               Dashboard
             </Link>
           </div>
+          {result.explorer && (
+            <a
+              href={result.explorer}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-[12px] text-[var(--dim)] underline underline-offset-2"
+            >
+              View transaction ↗
+            </a>
+          )}
         </div>
       </main>
     );
@@ -274,7 +392,7 @@ export default function CreateChestPage() {
                   </div>
                   <Field
                     label="Puzzle"
-                    hint="Public on-chain metadata"
+                    hint="Public: shown to everyone who opens the chest"
                     error={fieldErr.question}
                   >
                     <textarea
@@ -329,18 +447,44 @@ export default function CreateChestPage() {
                 </Field>
               )}
 
+              {step === 1 && (
+                <div>
+                  <p className="mb-2 font-mono text-[12px] tracking-[0.06em] text-[var(--dim)] uppercase">
+                    Who can solve it
+                  </p>
+                  <div className="inline-flex overflow-hidden rounded-[10px] border border-[var(--line)]">
+                    {([true, false] as const).map((v, i) => (
+                      <button
+                        key={String(v)}
+                        type="button"
+                        onClick={() => setListed(v)}
+                        className={`px-3 py-2 font-mono text-[12px] ${
+                          listed === v ? "bg-[var(--s2)] text-[var(--text)]" : "text-[var(--muted)]"
+                        } ${i ? "border-l border-[var(--line)]" : ""}`}
+                      >
+                        {v ? "Public · in Explore" : "Private link"}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 font-mono text-[12px] leading-[1.5] text-[var(--dim)]">
+                    {listed
+                      ? "Anyone can try answers offline once the salt is public — pick an answer that’s hard to guess."
+                      : "The salt stays in the link (after #) and never reaches our servers. Only people with the full link can solve it. Not listed in Explore."}
+                  </p>
+                </div>
+              )}
+
               {step === 2 && (
                 <>
                   <Field
-                    label="Reward (XLM / units)"
-                    hint="Escrowed in the contract"
+                    label="Reward per claim (XLM)"
+                    hint="Decimals allowed, e.g. 0.1. Escrowed from your account when you create the chest."
                     error={fieldErr.prize}
                   >
                     <Input
-                      type="number"
-                      min={1}
+                      inputMode="decimal"
                       value={prize}
-                      onChange={(e) => setPrize(Number(e.target.value))}
+                      onChange={(e) => setPrize(e.target.value)}
                       className="h-11 rounded-[10px] font-mono"
                     />
                   </Field>
@@ -374,7 +518,7 @@ export default function CreateChestPage() {
                 <>
                   <Field
                     label="Expires"
-                    hint="Unclaimed prize returns to you after expiry."
+                    hint="After expiry nobody can claim. Unclaimed prize stays escrowed until you close the chest."
                     error={fieldErr.expires}
                   >
                     <Input
@@ -387,12 +531,13 @@ export default function CreateChestPage() {
                   <Field
                     label="Max claims"
                     hint="Each proof works once, but anyone who knows the answer can claim until the slots run out."
+                    error={fieldErr.maxClaims}
                   >
                     <Input
                       type="number"
                       min={1}
                       value={maxClaims}
-                      onChange={(e) => setMaxClaims(Number(e.target.value))}
+                      onChange={(e) => setMaxClaims(Math.floor(Number(e.target.value)))}
                       className="h-11 rounded-[10px] font-mono"
                     />
                   </Field>
@@ -426,8 +571,53 @@ export default function CreateChestPage() {
                     <span className="text-[var(--dim)]">Max claims · </span>
                     {maxClaims}
                   </p>
+                  <p>
+                    <span className="text-[var(--dim)]">Visibility · </span>
+                    {listed ? "Public, listed in Explore" : "Private link"}
+                  </p>
+                  <div className="space-y-2 border-t border-[var(--line)] pt-3">
+                    <p>
+                      <span className="text-[var(--dim)]">Escrow · </span>
+                      <span className="text-[var(--gold)]">
+                        {totalStroops ? `${stroopsToXlm(totalStroops)} XLM` : "—"}
+                      </span>
+                      <span className="text-[var(--dim)]">
+                        {" "}
+                        ({prize || "0"} × {maxClaims})
+                      </span>
+                    </p>
+                    <p>
+                      <span className="text-[var(--dim)]">Your balance · </span>
+                      {bal ? `${stroopsToXlm(bal.balance)} XLM` : "…"}
+                    </p>
+                    {short && (
+                      <div className="space-y-2" role="alert">
+                        <p className="text-[var(--red)]">
+                          Not enough XLM to fund this chest.
+                        </p>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            disabled={faucetBusy}
+                            onClick={() => void friendbot()}
+                            className="btn-landing btn-landing-s disabled:opacity-40"
+                          >
+                            {faucetBusy ? "Requesting…" : "Fund with Friendbot"}
+                          </button>
+                          <Link
+                            href="/wallet?tab=receive"
+                            className="text-[var(--proof)] underline underline-offset-2"
+                          >
+                            Add XLM in Wallet
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <p className="text-[var(--dim)]">
-                    Deploy cost covered by relayer on testnet.
+                    {player?.kind === "passkey"
+                      ? "The prize comes from your balance. The network fee is covered by the relayer on testnet."
+                      : "The prize and the network fee come from your account."}
                   </p>
                 </div>
               )}
@@ -464,10 +654,10 @@ export default function CreateChestPage() {
               <button
                 type="button"
                 onClick={() => void onFund()}
-                disabled={busy}
-                className="btn-landing btn-landing-p"
+                disabled={busy || short || !player}
+                className="btn-landing btn-landing-p disabled:opacity-40"
               >
-                {busy ? "Funding…" : "Fund & create chest"}
+                {busy ? (phase ?? "Funding…") : "Fund & create chest"}
               </button>
             )}
           </div>
@@ -504,7 +694,7 @@ export default function CreateChestPage() {
               />
             </div>
             <p className="mt-4 font-mono text-[11px] leading-[1.5] text-[var(--dim)]">
-              Deploy cost covered by relayer on testnet.
+              You fund the prize from your own account.
             </p>
           </div>
         </aside>

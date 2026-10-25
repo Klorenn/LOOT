@@ -28,7 +28,7 @@ const which = process.argv[2];
 const doZk = !which || which === "zk";
 const doNormal = !which || which === "normal";
 const NORMAL_SLOTS = Number(process.env.NORMAL_SLOTS || 30);
-const secret = process.env.CREATOR_SECRET || process.env.RELAYER_SECRET;
+const secret = process.env.CREATOR_SECRET;
 if (!secret) {
   console.error("Falta CREATOR_SECRET (usá --env-file app/.env.local)");
   process.exit(2);
