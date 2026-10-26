@@ -5,6 +5,7 @@ import { Client } from "@findloot/chest";
 import { cfg } from "@/lib/cfg";
 import { relayMaxFee, relayerSecretFor } from "@/lib/relay-guard";
 import { readChest } from "@/lib/chain";
+import { resourceFeeOf } from "@/lib/sim-fee";
 import { decideSponsor, relayerBalance, reserveFee } from "@/lib/relay-limits";
 import { withRpcUrl } from "@/lib/rpc";
 import { relayLimit } from "@/lib/rate-limit";
@@ -133,8 +134,7 @@ export async function POST(req: NextRequest) {
           }
 
           // Tope sobre la tx FINAL (recurso simulado + inclusión) antes de firmar: el leeway de 1e8 no puede inflar la fee.
-          const sd = (tx as unknown as { simulationData?: { transactionData: { build(): { resourceFee(): { toString(): string } } } } }).simulationData;
-          const resource = sd ? BigInt(sd.transactionData.build().resourceFee().toString()) : null;
+          const resource = resourceFeeOf(tx);
           if (resource === null || resource + BigInt(inclusion) > maxFee) {
             throw new FeeCapError(`claim fee ${resource === null ? "unknown" : resource + BigInt(inclusion)} above the cap ${maxFee}`);
           }

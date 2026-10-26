@@ -8,6 +8,7 @@ import type { Quiz } from "./quiz";
 import { capError } from "./caps";
 import { CONTRACTS, NETWORK } from "./client-cfg";
 import { clientCfg } from "./network";
+import { resourceFeeOf } from "./sim-fee";
 import { getPasskeyKit } from "./passkey-client";
 import { SendError } from "./send";
 import { submitPasskeyTx, type Player } from "./wallet";
@@ -202,11 +203,9 @@ async function invokePasskey(player: Player, build: Build, onPhase?: Phase): Pro
 export async function estimateCreateFee(player: Player, input: CreateInput): Promise<bigint | null> {
   try {
     const client = newClient(player.kind === "passkey" ? SIM_ACCOUNT : player.publicKey);
-    const at = (await client.create_chest(createArgs(player, input), { simulate: true } as never)) as unknown as {
-      simulationData?: { transactionData: { build(): { resourceFee(): { toString(): string } } } };
-    };
-    const rf = at.simulationData?.transactionData.build().resourceFee().toString();
-    return rf ? BigInt(rf) + BigInt(100) : null;
+    const at = await client.create_chest(createArgs(player, input), { simulate: true } as never);
+    const rf = resourceFeeOf(at);
+    return rf === null ? null : rf + BigInt(100);
   } catch {
     return null;
   }
