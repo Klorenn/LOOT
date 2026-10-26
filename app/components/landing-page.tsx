@@ -148,9 +148,9 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                     aria-hidden
                   />
                   {IS_MAINNET
-                    ? "Live on Stellar mainnet · beta"
+                    ? "Live on Stellar mainnet"
                     : mainnetReady
-                      ? "Live on Stellar mainnet (beta) and testnet"
+                      ? "Live on Stellar mainnet and testnet"
                       : `Live on Stellar ${NETWORK_LC}`}
                 </p>
                 <h1
