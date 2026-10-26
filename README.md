@@ -8,11 +8,11 @@
 zero-knowledge proof bound to their own address, so a bot can't copy the answer.</p>
 
 <p>
-  <a href="https://www.findloot.xyz"><img alt="Live on Stellar mainnet" src="https://img.shields.io/badge/Stellar-mainnet-7B6CFF?style=for-the-badge&logo=stellar&logoColor=white" /></a>
-  <img alt="Soroban" src="https://img.shields.io/badge/Soroban-smart%20contracts-111114?style=for-the-badge" />
-  <img alt="Circom" src="https://img.shields.io/badge/Circom-Groth16%20%C2%B7%20BN254-111114?style=for-the-badge" />
-  <a href="https://www.npmjs.com/package/@findloot/sdk"><img alt="npm @findloot/sdk" src="https://img.shields.io/npm/v/@findloot/sdk?style=for-the-badge&label=%40findloot%2Fsdk&color=CB3837&logo=npm" /></a>
-  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge" /></a>
+  <a href="https://www.findloot.xyz"><img alt="Live on Stellar mainnet" src="https://img.shields.io/badge/Stellar-mainnet-7B6CFF?style=flat-square&logo=stellar&logoColor=white" /></a>
+  <img alt="Soroban" src="https://img.shields.io/badge/Soroban-smart%20contracts-111114?style=flat-square" />
+  <img alt="Circom" src="https://img.shields.io/badge/Circom-Groth16%20%C2%B7%20BN254-111114?style=flat-square" />
+  <a href="https://www.npmjs.com/package/@findloot/sdk"><img alt="npm @findloot/sdk" src="https://img.shields.io/npm/v/@findloot/sdk?style=flat-square&label=%40findloot%2Fsdk&color=CB3837&logo=npm" /></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square" /></a>
 </p>
 
 <p>
@@ -36,20 +36,32 @@ A community posts a riddle with a prize. Someone solves it, and a bot watching t
 
 On Loot, a creator locks XLM in a **puzzle chest** on Stellar. To claim, a player proves they know the answer with a **zero-knowledge proof** that never reveals the answer and is **bound to the player's own address**. If someone copies the proof and swaps in their own address, the on-chain verifier rejects it.
 
-- 🟣 **Live on Stellar mainnet and testnet.** Mainnet has prize caps.
-- 🌐 **Try it:** [findloot.xyz](https://www.findloot.xyz). The Testnet/Mainnet switch is in the app.
+- **Status:** live on Stellar mainnet (with prize caps) and testnet.
+- **App:** [findloot.xyz](https://www.findloot.xyz). Switch between Mainnet and Testnet from the network menu.
+
+## See it in action
+
+<table>
+  <tr>
+    <td align="center" width="50%"><img src="assets/demo.gif" alt="Create a chest" /><br/><sub><b>1. Create a chest</b></sub></td>
+    <td align="center" width="50%"><img src="assets/claim.gif" alt="Sign up and claim a chest" /><br/><sub><b>2. Sign up and claim</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><img src="assets/sdk.gif" alt="Build with the SDK" width="50%" /><br/><sub><b>3. Build with the SDK</b></sub></td>
+  </tr>
+</table>
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    A["🧑‍🎨 Creator<br/>writes riddle + answer"] -->|"Poseidon(answer, salt)"| B["🔒 Chest on Soroban<br/>fingerprint + XLM prize"]
-    C["🧑 Player<br/>solves the riddle"] --> D["⚙️ Browser builds Groth16 proof<br/>(answer, salt, playerSecret private)<br/>chestId + recipient public"]
-    D -->|"proof + nullifier"| E["🛰️ OpenZeppelin Relayer<br/>pays the gas"]
-    E --> F{"✅ Soroban verifier<br/>BN254 host functions"}
+    A["Creator<br/>writes riddle + answer"] -->|"Poseidon(answer, salt)"| B["Chest on Soroban<br/>fingerprint + XLM prize"]
+    C["Player<br/>solves the riddle"] --> D["Browser builds Groth16 proof<br/>(answer, salt, playerSecret private)<br/>chestId + recipient public"]
+    D -->|"proof + nullifier"| E["OpenZeppelin Relayer<br/>pays the gas"]
+    E --> F{"Soroban verifier<br/>BN254 host functions"}
     B --> F
-    F -->|"valid · fresh nullifier"| G["💰 XLM sent to the player's address"]
-    F -->|"copied proof · wrong recipient · reused nullifier"| H["❌ Rejected"]
+    F -->|"valid · fresh nullifier"| G["XLM sent to the player's address"]
+    F -->|"copied proof · wrong recipient · reused nullifier"| H["Rejected"]
 ```
 
 1. **Lock.** The creator publishes a riddle. Only the fingerprint `Poseidon(answer, salt)` goes on-chain, with the XLM prize.
@@ -93,41 +105,33 @@ The result is copy-proof rewards on Stellar in a few lines of TypeScript, instea
 
 ## Use cases
 
-A Loot chest fits any case where **you lock value and only the person who knows a secret can claim it**, without exposing that secret and without knowing the winner's wallet ahead of time. These are possible uses of the SDK, not all of them are built yet.
+A Loot chest fits any case where value is locked and only someone who knows a secret can claim it, without exposing the secret and without knowing the winner's wallet in advance. The list below describes possible integrations; not all of them are built.
 
-### For developers and products
-
-- **Onboarding:** give new users a welcome chest so their first Stellar transaction is claiming their first XLM.
-- **E-commerce and brands:** a QR code on a receipt, a package or a poster that is redeemed for real crypto.
-- **Learning platforms:** finish a lesson or pass a quiz, and the correct answer opens the reward.
-- **Open source bounties:** whoever fixes the bug gets the secret and gets paid.
-- **Communities (Discord, Telegram):** surprise drops and rewards for active members or moderators.
-- **Events and hackathons:** a code shown only at the talk or the booth, as proof of attendance with a prize.
-- **Payments and wallets:** send money with a link or QR to someone who doesn't have a wallet yet.
-- **Games:** in-game loot that pays real XLM, if you have one.
-
-### For NGOs and social impact
-
-- **Aid without exposing people:** an NGO locks funds and gives each person a private code. They claim to their own wallet, and the chain never shows the code or links it to their identity.
-- **Transparent donations:** donors can see on-chain how much was locked and claimed, while the people who received it stay private.
-- **Each proof works once:** the nullifier is spent on-chain, so the same proof can never be replayed.
-- **Incentives for training:** reward people who finish financial-education or digital-skills courses.
-- **No intermediary holding the money:** the contract releases the funds, not a person or a server.
+| Area | Example |
+|---|---|
+| Onboarding | A welcome chest, so a new user's first Stellar transaction is claiming XLM. |
+| Brands and commerce | A QR code on a receipt, package or poster, redeemable for XLM. |
+| Education | Pass a quiz or finish a lesson; the correct answer opens the reward. |
+| Open-source bounties | The contributor who fixes the issue receives the secret and claims the payout. |
+| Communities | Drops and rewards for members on Discord or Telegram. |
+| Events and hackathons | A code shown only on stage or at a booth, as proof of attendance. |
+| Payments | Send funds by link or QR to someone without a wallet yet. |
+| NGOs and aid | Each recipient gets a private code and claims to their own wallet; the code is never on-chain and is not linked to their identity, while totals stay publicly auditable. |
 
 > Real-world use needs care. Loot is not audited, so start with small amounts and follow the local rules for aid and payments.
 
 ## Features
 
-| | |
+| Feature | Description |
 |---|---|
-| 🛡️ **Copy-proof claims** | Proofs are bound to the claimer's address. A front-running bot gets `InvalidProof`. |
-| 🔁 **Each proof works once** | A nullifier is spent on-chain, so a proof can never be replayed. |
-| 🔑 **Passkey wallets** | Sign up with Face ID or a fingerprint through passkey smart wallets (passkey-kit). No seed phrase, no extension. |
-| 👛 **Bring your wallet** | Freighter, xBull and others through Stellar Wallets Kit. |
-| ⛽ **Gasless for players** | OpenZeppelin Relayer pays the transaction fees. |
-| 🎁 **Chests with slots** | Prize per place, several winners, link and QR to share, a creator panel to close a chest. |
-| 🧪 **Attack mode** | A side-by-side demo: a normal chest loses to a copy bot, a Loot chest doesn't (testnet only). |
-| 📦 **SDK** | [`@findloot/sdk`](https://www.npmjs.com/package/@findloot/sdk) to create, read and claim chests from your own app. |
+| **Copy-proof claims** | Proofs are bound to the claimer's address. A front-running bot gets `InvalidProof`. |
+| **Each proof works once** | A nullifier is spent on-chain, so a proof can never be replayed. |
+| **Passkey wallets** | Sign up with Face ID or a fingerprint through passkey smart wallets (passkey-kit). No seed phrase, no extension. |
+| **Bring your wallet** | Freighter, xBull and others through Stellar Wallets Kit. |
+| **Gasless for players** | OpenZeppelin Relayer pays the transaction fees. |
+| **Chests with slots** | Prize per place, several winners, link and QR to share, a creator panel to close a chest. |
+| **Attack mode** | A side-by-side demo: a normal chest loses to a copy bot, a Loot chest doesn't (testnet only). |
+| **SDK** | [`@findloot/sdk`](https://www.npmjs.com/package/@findloot/sdk) to create, read and claim chests from your own app. |
 
 ## Architecture
 
@@ -145,18 +149,6 @@ A Loot chest fits any case where **you lock value and only the person who knows 
 | Private | Public inputs | Public outputs |
 |---|---|---|
 | `answer`, `salt`, `playerSecret` | `chestId`, `recipient` | `fingerprint = Poseidon(answer, salt)`, `nullifier = Poseidon(playerSecret, chestId)` |
-
-## See it in action
-
-<table>
-  <tr>
-    <td align="center" width="50%"><img src="assets/demo.gif" alt="Create a chest" /><br/><sub><b>1. Create a chest</b></sub></td>
-    <td align="center" width="50%"><img src="assets/claim.gif" alt="Sign up and claim a chest" /><br/><sub><b>2. Sign up and claim</b></sub></td>
-  </tr>
-  <tr>
-    <td align="center" colspan="2"><img src="assets/sdk.gif" alt="Build with the SDK" width="50%" /><br/><sub><b>3. Build with the SDK</b></sub></td>
-  </tr>
-</table>
 
 ## SDK quickstart
 
