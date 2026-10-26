@@ -1,5 +1,6 @@
 "use client";
 
+import { SponsorNotice } from "@/components/sponsor-notice";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -391,6 +392,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         {/* Formulario (idle / fail) */}
         {(view === "idle" || view === "fail") && (
           <>
+            {!isLogin && <SponsorNotice />}
             {!isLogin && (
               <div>
                 <label htmlFor="handle" className="block text-[14px] font-medium">

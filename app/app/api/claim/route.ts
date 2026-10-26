@@ -4,6 +4,7 @@ import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client } from "@findloot/chest";
 import { NETWORK, CONTRACTS } from "@/lib/config";
 import { withRpcUrl } from "@/lib/rpc";
+import { relayLimit } from "@/lib/rate-limit";
 
 type Body = {
   chestId: number;
@@ -36,6 +37,9 @@ function validBody(b: Partial<Body> | null): b is Body {
 }
 
 export async function POST(req: NextRequest) {
+  if (relayLimit(req, "claim")) {
+    return NextResponse.json({ error: "too many requests" }, { status: 429, headers: { "retry-after": "60" } });
+  }
   try {
     const secret = process.env.RELAYER_SECRET;
     if (!secret) {

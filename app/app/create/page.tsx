@@ -18,6 +18,7 @@ import { balanceInfo, parseXlmAmount, SendError } from "@/lib/send";
 import { confirmMeta, createChestOnChain, estimateCreateFee, reserveMeta } from "@/lib/create-chest";
 import { capError } from "@/lib/caps";
 import { BetaNotice } from "@/components/network-banner";
+import { SponsorNotice } from "@/components/sponsor-notice";
 import { QuizBuilder } from "@/components/quiz-builder";
 import { draftToQuiz, emptyDraftQuestion, type DraftQuestion } from "@/lib/quiz-draft";
 import { QUIZ_LIMITS, quizIsGuessable } from "@/lib/quiz";
@@ -684,6 +685,7 @@ export default function CreateChestPage() {
               {step === 2 && (
                 <>
                   <BetaNotice />
+                  {player?.kind === "passkey" && <SponsorNotice />}
                   <Field
                     label="Reward per claim (XLM)"
                     hint="Decimals allowed, e.g. 0.1. Escrowed from your account when you create the chest."
