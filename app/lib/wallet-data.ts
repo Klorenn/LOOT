@@ -2,7 +2,8 @@
 
 import { Horizon } from "@stellar/stellar-sdk";
 import { readPrizeBalance } from "./chain";
-import { NETWORK, PRIZE, stroopsToXlm } from "./config";
+import { PRIZE, stroopsToXlm } from "./config";
+import { NETWORK } from "./client-cfg";
 import type { Player } from "./wallet";
 
 export type Asset = { code: string; label: string; amount: string; native: boolean };

@@ -1,12 +1,15 @@
+"use client";
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoChest } from "@/components/logo-chest";
 import { chestPath } from "@/lib/chest-code";
-import { SAMPLE_CHEST_ID } from "@/lib/config";
+import { useNet } from "@/components/network-provider";
 
 export const metadata: Metadata = { title: "Not found" };
 
 export default function NotFound() {
+  const { SAMPLE_CHEST_ID } = useNet();
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-[640px] flex-col items-center justify-center px-6 py-20 text-center">
       <LogoChest className="w-[180px] lg:w-[220px]" deg={28} showInside />

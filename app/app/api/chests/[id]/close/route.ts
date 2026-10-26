@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client } from "@findloot/chest";
-import { CONTRACTS, NETWORK } from "@/lib/config";
+import { cfg } from "@/lib/cfg";
 import { legacyOff } from "@/lib/mainnet-guard";
 import { withRpcUrl } from "@/lib/rpc";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -14,8 +14,9 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const off = legacyOff();
+  const off = await legacyOff();
   if (off) return off;
+  const { NETWORK, CONTRACTS } = await cfg();
   const denied = requireAdmin(req);
   if (denied) return denied;
   try {

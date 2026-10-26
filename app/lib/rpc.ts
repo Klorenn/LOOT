@@ -1,5 +1,5 @@
 import { rpc } from "@stellar/stellar-sdk";
-import { NETWORK } from "./config";
+import { cfg } from "./cfg";
 
 /**
  * Soroban RPC con failover. Lecturas (simulate, getLedgerEntries, getEvents): timeout corto y
@@ -50,6 +50,7 @@ export async function withRpcUrl<T>(
   fn: (rpcUrl: string) => Promise<T>,
   opts: { write?: boolean; timeoutMs?: number } = {},
 ): Promise<T> {
+  const { NETWORK } = await cfg();
   const all = NETWORK.rpcUrls as readonly string[];
   const now = Date.now();
   const urls = [

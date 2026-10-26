@@ -1,4 +1,4 @@
-import { DEMO_CHEST, CONTRACTS } from "./config";
+import { DEMO_CHEST } from "./config";
 
 export type ChestRow = {
   id: number;
@@ -37,12 +37,12 @@ export const CHESTS: ChestRow[] = [
   },
 ];
 
-export function getChest(id: number): ChestRow | undefined {
-  return CHESTS.find((c) => c.id === id);
+/** Catálogo del demo de TESTNET: en mainnet no hay demo (el id 6 de mainnet sería otro cofre). */
+export function getChest(id: number, mainnet = false): ChestRow | undefined {
+  return mainnet ? undefined : CHESTS.find((c) => c.id === id);
 }
 
 export function openChestsCount() {
   return CHESTS.filter((c) => c.status === "open").length;
 }
 
-export { CONTRACTS };

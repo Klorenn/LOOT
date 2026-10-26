@@ -16,7 +16,8 @@ import {
 } from "@stellar/stellar-sdk";
 import { contract } from "@stellar/stellar-sdk";
 import { latestLedgerHint } from "./chain";
-import { CONTRACTS, NETWORK, PRIZE } from "./config";
+import { PRIZE } from "./config";
+import { CONTRACTS, NETWORK } from "./client-cfg";
 import { getPasskeyKit } from "./passkey-client";
 import { submitPasskeyTx, type Player } from "./wallet";
 import { signWithWallet } from "./wallets-kit";

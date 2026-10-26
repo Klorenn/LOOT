@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client } from "@findloot/chest";
-import { NETWORK, CONTRACTS } from "@/lib/config";
+import { cfg } from "@/lib/cfg";
+import { relayerSecretFor } from "@/lib/relay-guard";
+import { decideSponsor, relayerBalance } from "@/lib/relay-limits";
 import { withRpcUrl } from "@/lib/rpc";
 import { relayLimit } from "@/lib/rate-limit";
 
@@ -37,17 +39,30 @@ function validBody(b: Partial<Body> | null): b is Body {
 }
 
 export async function POST(req: NextRequest) {
-  if (relayLimit(req, "claim")) {
+  const c = await cfg();
+  const { NETWORK, CONTRACTS, net } = c;
+  if (relayLimit(req, "claim", net)) {
     return NextResponse.json({ error: "too many requests" }, { status: 429, headers: { "retry-after": "60" } });
   }
   try {
-    const secret = process.env.RELAYER_SECRET;
+    // secreto de LA red de la petición: nunca se cae al de la otra
+    const secret = relayerSecretFor(c);
     if (!secret) {
-      console.error("claim: RELAYER_SECRET missing");
+      console.error(`claim: relayer secret for ${net} missing`);
       return NextResponse.json(
         { error: "server not configured" },
         { status: 500 },
       );
+    }
+
+    if (c.IS_MAINNET) {
+      const d = decideSponsor({
+        mainnet: true,
+        balance: await relayerBalance(c, Keypair.fromSecret(secret).publicKey()),
+        registrations: 0,
+        deploy: false,
+      });
+      if (!d.ok) return NextResponse.json({ error: d.message, code: d.reason }, { status: 503 });
     }
 
     const parsed = (await req.json().catch(() => null)) as Partial<Body> | null;

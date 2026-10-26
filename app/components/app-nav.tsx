@@ -6,8 +6,8 @@ import { useState } from "react";
 import { BrandMark } from "@/components/logo-chest";
 import { AccountMenu } from "@/components/account-menu";
 import { useSession } from "@/lib/session";
+import { useNet } from "@/components/network-provider";
 import { NetworkSwitch } from "@/components/network-switch";
-import { IS_MAINNET } from "@/lib/config";
 
 const ALL_LINKS = [
   { href: "/explore", label: "Explore" },
@@ -16,8 +16,6 @@ const ALL_LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/sdk", label: "SDK" },
 ] as const;
-// El modo ataque gasta fondos del relayer: solo testnet.
-const LINKS = ALL_LINKS.filter((l) => !(IS_MAINNET && l.href === "/attack"));
 
 /**
  * AppNav de Loot (72px). Reemplaza a components/app/app-nav.tsx (de otra persona, no se toca)
@@ -25,6 +23,9 @@ const LINKS = ALL_LINKS.filter((l) => !(IS_MAINNET && l.href === "/attack"));
  */
 export function AppNav() {
   const path = usePathname();
+  const { IS_MAINNET } = useNet();
+  // El modo ataque gasta fondos del relayer: solo testnet.
+  const LINKS = ALL_LINKS.filter((l) => !(IS_MAINNET && l.href === "/attack"));
   const { ready, address } = useSession();
   const [menu, setMenu] = useState(false);
 

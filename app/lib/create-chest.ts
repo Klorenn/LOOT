@@ -6,7 +6,8 @@ import { Client } from "@findloot/chest";
 import { latestLedgerHint } from "./chain";
 import type { Quiz } from "./quiz";
 import { capError } from "./caps";
-import { CONTRACTS, NETWORK } from "./config";
+import { CONTRACTS, NETWORK } from "./client-cfg";
+import { clientCfg } from "./network";
 import { getPasskeyKit } from "./passkey-client";
 import { SendError } from "./send";
 import { submitPasskeyTx, type Player } from "./wallet";
@@ -124,7 +125,7 @@ export async function createChestOnChain(
 ): Promise<{ chestId: number; hash: string }> {
   if (!Number.isSafeInteger(input.deadline) || input.deadline <= Math.floor(Date.now() / 1000))
     throw new SendError("The chest needs an expiry in the future; otherwise the prize could never be recovered.");
-  const capBad = capError(input.prizeStroops, input.maxClaims);
+  const capBad = capError(input.prizeStroops, input.maxClaims, clientCfg().CAPS);
   if (capBad) throw new SendError(capBad);
   const hash = await invokeAsCreator(player, (c, o) => c.create_chest(createArgs(player, input), o) as never, onPhase);
   return { chestId: Number(await returnValueFromTx(hash)), hash };

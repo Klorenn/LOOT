@@ -4,7 +4,6 @@ import { ExploreClient } from "./explore-client";
 
 export const metadata: Metadata = { title: "Explore chests" };
 // Lectura de cadena en el servidor, cacheada ~30 s (ISR).
-export const revalidate = 30;
 
 export default async function ExplorePage() {
   let rows: ChestRowData[] = [];

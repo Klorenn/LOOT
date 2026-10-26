@@ -1,8 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { BrandMark } from "@/components/logo-chest";
 import { Chest } from "@/components/chest";
 import { CellsCanvas } from "@/components/cells-canvas";
-import { IS_MAINNET } from "@/lib/config";
+import { useNet } from "@/components/network-provider";
 
 const FOOT = [
   ["Help", "#"],
@@ -16,6 +18,7 @@ const FOOT = [
  * Por debajo de lg el panel de marca se oculta.
  */
 export function AuthLayout({ children }: { children: React.ReactNode }) {
+  const { IS_MAINNET } = useNet();
   return (
     <div className="grid min-h-screen grid-cols-1 bg-[var(--bg)] lg:grid-cols-[minmax(520px,600px)_1fr]">
       <div className="flex min-h-screen flex-col border-[var(--line)] px-6 py-7 sm:px-14 lg:border-r">

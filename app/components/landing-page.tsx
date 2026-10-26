@@ -21,9 +21,10 @@ import { StackMarquee } from "@/components/stack-marquee";
 import { AudienceSection } from "@/components/landing/audience-section";
 import { SdkBlock } from "@/components/landing/sdk-block";
 import { chestPath } from "@/lib/chest-code";
-import { PRIZE, stroopsToXlm, SAMPLE_CHEST_ID, NETWORK_LC } from "@/lib/config";
+import { PRIZE, stroopsToXlm } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";
+import { useNet } from "@/components/network-provider";
 
 const DOCS_URL = "https://github.com/Klorenn/LOOT";
 
@@ -53,6 +54,7 @@ function useStats(): Stats {
 }
 
 export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
+  const { SAMPLE_CHEST_ID, NETWORK_LC } = useNet();
   const root = useRef<HTMLDivElement>(null);
   const stats = useStats();
   const { ready, address } = useSession();

@@ -2,15 +2,17 @@ import { chestPath } from "./chest-code";
 import { readChest, readClaimedEvents, type ClaimedEvent, type OnChainChest } from "./chain";
 import { getChest as demoMeta } from "./chests-demo";
 import { getChestMeta, listPublicMetas } from "./chest-store";
-import { CONTRACTS, DEMO_CHEST, HIDDEN_CHEST_IDS, LISTED_CHEST_IDS, stroopsToXlm, tokenDecimals, tokenLabel } from "./config";
+import { cfg } from "./cfg";
+import { DEMO_CHEST, stroopsToXlm, tokenDecimals, tokenLabel } from "./config";
 
 /** Solo servidor. Lecturas de cadena con failover (lib/rpc.ts) y caché en memoria de 30 s. */
 
 const TTL = 30_000;
 const MAX_SCAN = 300;
 
-let chestsCache: { at: number; value: OnChainChest[] } | null = null;
-let claimedCache: { at: number; value: ClaimedEvent[] } | null = null;
+// cachés por red: testnet y mainnet no se mezclan
+const chestsCache = new Map<string, { at: number; value: OnChainChest[] }>();
+const claimedCache = new Map<string, { at: number; value: ClaimedEvent[] }>();
 
 const isMissing = (e: unknown) =>
   /Error\(Contract,\s*#1\)|ChestNotFound/i.test(
@@ -19,7 +21,9 @@ const isMissing = (e: unknown) =>
 
 /** Todos los cofres del contrato principal (ids 1.. hasta el primero que no existe). */
 export async function readAllChests(fresh = false): Promise<OnChainChest[]> {
-  if (!fresh && chestsCache && Date.now() - chestsCache.at < TTL) return chestsCache.value;
+  const { net } = await cfg();
+  const hit = chestsCache.get(net);
+  if (!fresh && hit && Date.now() - hit.at < TTL) return hit.value;
   const out: OnChainChest[] = [];
   const CHUNK = 6;
   for (let start = 1; start <= MAX_SCAN; start += CHUNK) {
@@ -36,14 +40,16 @@ export async function readAllChests(fresh = false): Promise<OnChainChest[]> {
     for (const r of firstMissing === -1 ? res : res.slice(0, firstMissing)) if (r) out.push(r);
     if (firstMissing !== -1) break;
   }
-  chestsCache = { at: Date.now(), value: out };
+  chestsCache.set(net, { at: Date.now(), value: out });
   return out;
 }
 
 export async function readClaimedCached(): Promise<ClaimedEvent[]> {
-  if (claimedCache && Date.now() - claimedCache.at < TTL) return claimedCache.value;
+  const { net } = await cfg();
+  const hit = claimedCache.get(net);
+  if (hit && Date.now() - hit.at < TTL) return hit.value;
   const { items } = await readClaimedEvents();
-  claimedCache = { at: Date.now(), value: items };
+  claimedCache.set(net, { at: Date.now(), value: items });
   return items;
 }
 
@@ -73,9 +79,10 @@ export function statusOf(c: OnChainChest, nowSec = Math.floor(Date.now() / 1000)
 }
 
 export async function toRow(c: OnChainChest): Promise<ChestRowData> {
-  const demo = demoMeta(c.id);
+  const { IS_MAINNET } = await cfg();
+  const demo = IS_MAINNET ? undefined : demoMeta(c.id);
   let name = demo?.name;
-  let question = c.id === DEMO_CHEST.id ? DEMO_CHEST.question : demo?.question;
+  let question = !IS_MAINNET && c.id === DEMO_CHEST.id ? DEMO_CHEST.question : demo?.question;
   let difficulty = demo?.difficulty ?? null;
   if (!question) {
     const meta = await getChestMeta(c.id).catch(() => null);
@@ -103,6 +110,7 @@ export async function toRow(c: OnChainChest): Promise<ChestRowData> {
 
 /** Cofres listados en /explore: LISTED_CHEST_IDS + cofres públicos (listed:true) del almacén de metadatos. */
 export async function listExploreRows(): Promise<ChestRowData[]> {
+  const { LISTED_CHEST_IDS, HIDDEN_CHEST_IDS } = await cfg();
   const all = await readAllChests();
   const publicIds = new Set(
     (await listPublicMetas().catch(() => [])).filter((m) => m.listed === true).map((m) => m.id),
@@ -122,6 +130,7 @@ export type DashboardData = {
 };
 
 export async function dashboardFor(address: string, fresh = false): Promise<DashboardData> {
+  const { CONTRACTS } = await cfg();
   const all = await readAllChests(fresh);
   const mine = all.filter((c) => c.creator === address);
   const ids = new Set(mine.map((c) => c.id));

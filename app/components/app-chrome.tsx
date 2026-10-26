@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { AppNav } from "@/components/app-nav";
 import { SiteFooter } from "@/components/site-footer";
-import { ConfigBanner } from "@/components/network-banner";
+import { ConfigBanner, MainnetStrip } from "@/components/network-banner";
 import { SessionProvider } from "@/lib/session";
 
 /** Site chrome for app routes — hidden on the marketing landing `/`. */
@@ -15,12 +15,14 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
     return (
       <SessionProvider>
         <ConfigBanner />
+        <MainnetStrip />
         {children}
       </SessionProvider>
     );
   return (
     <SessionProvider>
       <ConfigBanner />
+      <MainnetStrip />
       {!isLanding && (
         <a
           href="#main"

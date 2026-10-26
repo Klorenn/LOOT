@@ -1,23 +1,11 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { IS_MAINNET, NETWORK_LABEL, NETWORK_URLS } from "@/lib/config";
-import { otherNetworkUrl } from "@/lib/network-switch";
-
-const TARGET = IS_MAINNET ? "Testnet" : "Mainnet";
-const BASE = IS_MAINNET ? NETWORK_URLS.testnet : NETWORK_URLS.mainnet;
-
-/** Enlace al despliegue de la otra red, conservando ruta y query. */
-export function useOtherNetworkHref(): string {
-  const path = usePathname();
-  const [search, setSearch] = useState("");
-  useEffect(() => setSearch(window.location.search), [path]);
-  return otherNetworkUrl(BASE, path || "/", search);
-}
+import { useNet } from "@/components/network-provider";
+import { switchNetwork, type Net } from "@/lib/network";
 
 /** Etiqueta de la red actual: dorado en mainnet (fondos reales), verde en testnet. */
 export function NetworkBadge({ className = "" }: { className?: string }) {
+  const { IS_MAINNET, NETWORK_LABEL } = useNet();
   const color = IS_MAINNET ? "var(--gold)" : "var(--ok)";
   return (
     <span
@@ -31,35 +19,56 @@ export function NetworkBadge({ className = "" }: { className?: string }) {
   );
 }
 
-/** Badge de la red actual + enlace "Testnet ⇄ Mainnet". */
+/**
+ * Botón "Testnet ⇄ Mainnet": cambia la red en este mismo sitio (cookie `loot_net`) y recarga.
+ * Si mainnet no está configurada, muestra "Mainnet (coming soon)" deshabilitado.
+ */
+export function NetworkToggle({ compact = false }: { compact?: boolean }) {
+  const { IS_MAINNET, mainnetReady, NETWORK_LABEL } = useNet();
+  const target: Net = IS_MAINNET ? "testnet" : "mainnet";
+  const soon = target === "mainnet" && !mainnetReady;
+  const label = soon ? "Mainnet (coming soon)" : target === "mainnet" ? "Mainnet" : "Testnet";
+  return (
+    <button
+      type="button"
+      disabled={soon}
+      onClick={() => switchNetwork(target)}
+      title={soon ? "Mainnet is not live yet" : `Switch to ${label}`}
+      className="font-mono text-[12px] text-[var(--dim)] underline-offset-2 hover:text-[var(--text)] hover:underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60"
+    >
+      {compact && !soon ? "⇄" : `${NETWORK_LABEL} ⇄ ${label}`}
+    </button>
+  );
+}
+
+/** Badge de la red actual + botón de cambio. */
 export function NetworkSwitch({ compact = false }: { compact?: boolean }) {
-  const href = useOtherNetworkHref();
   return (
     <span className="inline-flex items-center gap-3">
       <NetworkBadge />
-      <a
-        href={href}
-        title={`Open this page on ${TARGET}`}
-        className="font-mono text-[12px] text-[var(--dim)] underline-offset-2 hover:text-[var(--text)] hover:underline"
-      >
-        {compact ? "⇄" : `${NETWORK_LABEL} ⇄ ${TARGET}`}
-      </a>
+      <NetworkToggle compact={compact} />
     </span>
   );
 }
 
 /** Fila para el menú de cuenta. */
 export function NetworkMenuItem({ onClick }: { onClick?: () => void }) {
-  const href = useOtherNetworkHref();
+  const { IS_MAINNET, mainnetReady } = useNet();
+  const target: Net = IS_MAINNET ? "testnet" : "mainnet";
+  const soon = target === "mainnet" && !mainnetReady;
   return (
-    <a
-      href={href}
+    <button
+      type="button"
       role="menuitem"
-      onClick={onClick}
-      className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3 text-[14px] text-[var(--muted)] hover:bg-[var(--s2)] hover:text-[var(--text)]"
+      disabled={soon}
+      onClick={() => {
+        onClick?.();
+        switchNetwork(target);
+      }}
+      className="flex w-full items-center justify-between border-b border-[var(--line)] px-4 py-3 text-left text-[14px] text-[var(--muted)] hover:bg-[var(--s2)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
     >
-      <span>Switch to {TARGET}</span>
+      <span>{soon ? "Mainnet (coming soon)" : `Switch to ${target === "mainnet" ? "Mainnet" : "Testnet"}`}</span>
       <NetworkBadge className="!text-[12px]" />
-    </a>
+    </button>
   );
 }

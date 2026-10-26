@@ -4,7 +4,8 @@ import { InlineAlert } from "@/components/inline-alert";
 import { ExampleTag } from "@/components/example-tag";
 import { StateBlock } from "@/components/state-block";
 import { chestPath } from "@/lib/chest-code";
-import { DEMO_CHEST, SAMPLE_CHEST_ID } from "@/lib/config";
+import { DEMO_CHEST } from "@/lib/config";
+import { cfg } from "@/lib/cfg";
 
 const FP = `0x${DEMO_CHEST.fingerprintHex.slice(0, 4)}…${DEMO_CHEST.fingerprintHex.slice(-4)}`;
 
@@ -12,7 +13,8 @@ function Divider() {
   return <div className="border-t border-[var(--line)]" />;
 }
 
-export default function StatesPage() {
+export default async function StatesPage() {
+  const { SAMPLE_CHEST_ID } = await cfg();
   return (
     <main>
       <PageHeader

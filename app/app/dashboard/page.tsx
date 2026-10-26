@@ -6,15 +6,17 @@ import { PageHeader, Em } from "@/components/page-header";
 import { StateBlock } from "@/components/state-block";
 import { StatusLabel } from "@/components/status-label";
 import { Mono } from "@/components/kv";
-import { PRIZE, stroopsToXlm, NETWORK, NETWORK_LC } from "@/lib/config";
+import { PRIZE, stroopsToXlm } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import type { DashboardData } from "@/lib/listing";
 import { useSession } from "@/lib/session";
 import { closeChestOnChain } from "@/lib/create-chest";
+import { useNet } from "@/components/network-provider";
 
 type Load = { s: "loading" } | { s: "ok"; v: DashboardData } | { s: "error" };
 
 export default function DashboardPage() {
+  const { NETWORK, NETWORK_LC } = useNet();
   const { address, player } = useSession();
   const [data, setData] = useState<Load>({ s: "loading" });
   const [reload, setReload] = useState(0);

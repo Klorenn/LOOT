@@ -13,7 +13,7 @@ import { DifficultyBars } from "@/components/difficulty-bars";
 import { ExampleTag } from "@/components/example-tag";
 import { InlineAlert } from "@/components/inline-alert";
 import { chestPath } from "@/lib/chest-code";
-import { DEMO_CHEST, IS_MAINNET, PRIZE, ZK_ASSETS, SAMPLE_CHEST_ID } from "@/lib/config";
+import { DEMO_CHEST, PRIZE, ZK_ASSETS } from "@/lib/config";
 import { NetworkBadge } from "@/components/network-switch";
 import { getChest } from "@/lib/chests-demo";
 import { recipientField } from "@/lib/recipient";
@@ -21,6 +21,7 @@ import { useSession } from "@/lib/session";
 import { PasskeyUnavailableError } from "@/lib/wallet";
 import { QuizForm } from "@/components/quiz-form";
 import type { Quiz } from "@/lib/quiz";
+import { useNet } from "@/components/network-provider";
 
 type Meta = {
   question: string;
@@ -86,8 +87,9 @@ export function ChestSolve({
   chestId: number;
   badge?: React.ReactNode;
 }) {
+  const { IS_MAINNET, SAMPLE_CHEST_ID } = useNet();
   const router = useRouter();
-  const catalog = getChest(chestId);
+  const catalog = getChest(chestId, IS_MAINNET);
 
   const { player, connect } = useSession();
   const [answer, setAnswer] = useState("");
@@ -144,7 +146,7 @@ export function ChestSolve({
         }),
       )
       .catch(() => {
-        if (chestId === DEMO_CHEST.id) {
+        if (!IS_MAINNET && chestId === DEMO_CHEST.id) {
           setMeta({
             question: DEMO_CHEST.question,
             hint: DEMO_CHEST.hint,
@@ -277,7 +279,7 @@ export function ChestSolve({
       }
       mark(3, "done");
       sessionStorage.setItem(
-        `chestzk.claim.${chestId}`,
+        `chestzk.${IS_MAINNET ? "mainnet." : ""}claim.${chestId}`,
         JSON.stringify({
           hash: data.hash,
           explorer: data.explorer,
@@ -652,6 +654,7 @@ function FailBlock({
   chestId: number;
   onRetry: () => void;
 }) {
+  const { SAMPLE_CHEST_ID } = useNet();
   const retry = { label: "Try again", onClick: onRetry, primary: true } as const;
   const back = { label: "Back to chests", href: "/explore" } as const;
   switch (fail.kind) {

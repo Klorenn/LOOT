@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { InlineAlert } from "@/components/inline-alert";
-import { IS_MAINNET } from "@/lib/config";
+import { useNet } from "@/components/network-provider";
 
 /** Aviso cuando el relayer no patrocina (mainnet: saldo bajo o tope de cuentas passkey alcanzado). */
 export function SponsorNotice() {
+  const { IS_MAINNET } = useNet();
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     if (!IS_MAINNET) return;

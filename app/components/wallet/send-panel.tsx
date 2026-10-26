@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { InlineAlert } from "@/components/inline-alert";
 import { KV, Mono } from "@/components/kv";
 import { CopyButton } from "@/components/copy-button";
-import { PRIZE, stroopsToXlm, NETWORK_LC, IS_MAINNET } from "@/lib/config";
+import { PRIZE, stroopsToXlm } from "@/lib/config";
 import { expertTx, shortAddr } from "@/lib/format";
 import {
   parseDestination,
@@ -18,6 +18,7 @@ import {
   type Plan,
 } from "@/lib/send";
 import type { Player } from "@/lib/wallet";
+import { useNet } from "@/components/network-provider";
 
 type Stage = "form" | "review" | "signing" | "pending" | "done";
 type Bal = { balance: bigint; max: bigint; reserve: bigint } | null;
@@ -60,6 +61,7 @@ export function SendPanel({
   bal: Bal;
   onSent: () => void;
 }) {
+  const { NETWORK_LC, IS_MAINNET, NETWORK } = useNet();
   const [stage, setStage] = useState<Stage>("form");
   const [destText, setDestText] = useState("");
   const [amountText, setAmountText] = useState("");
@@ -162,7 +164,7 @@ export function SendPanel({
               ]}
             />
             <div className="flex flex-wrap gap-3">
-              <a href={expertTx(hash)} target="_blank" rel="noreferrer" className="btn-landing btn-landing-p">
+              <a href={expertTx(NETWORK.explorerUrl, hash)} target="_blank" rel="noreferrer" className="btn-landing btn-landing-p">
                 View on Stellar Expert ↗
               </a>
               <CopyButton value={hash} label="Copy hash" className="btn-landing btn-landing-s" />

@@ -7,8 +7,8 @@ import { CellsBackground } from "@/components/cells-background";
 import { Em } from "@/components/page-header";
 import { KV, Mono } from "@/components/kv";
 import { chestPath } from "@/lib/chest-code";
-import { SAMPLE_CHEST_ID, NETWORK } from "@/lib/config";
 import { loadPlayer } from "@/lib/wallet";
+import { useNet } from "@/components/network-provider";
 
 type ClaimTx = {
   hash?: string;
@@ -23,6 +23,7 @@ function shortAddr(a: string) {
 }
 
 export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
+  const { SAMPLE_CHEST_ID, NETWORK, IS_MAINNET } = useNet();
   const id = String(chestNum);
   const chestId = id.padStart(4, "0");
   const [deg, setDeg] = useState(0);
@@ -40,7 +41,7 @@ export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
       })
       .catch(() => {});
     try {
-      const raw = sessionStorage.getItem(`chestzk.claim.${id}`);
+      const raw = sessionStorage.getItem(`chestzk.${IS_MAINNET ? "mainnet." : ""}claim.${id}`);
       if (raw) setTx(JSON.parse(raw));
     } catch {
       /* ignore */

@@ -9,7 +9,7 @@ import {
   scValToNative,
   xdr,
 } from "@stellar/stellar-sdk";
-import { CONTRACTS, NETWORK } from "./config";
+import { cfg } from "./cfg";
 import { withRpc } from "./rpc";
 
 /**
@@ -21,9 +21,9 @@ import { withRpc } from "./rpc";
 const SIM_SOURCE = "GAKD2FSFFNLBVTUB4JHFYVUUMTKKEEJO2TG77BHV2KCZTDPUB64JU7E2";
 
 /** Último ledger visto en cualquier respuesta (simulate/getEvents); evita getLatestLedger, que hoy tarda 15–60 s. */
-let seen: { seq: number; at: number } | null = null;
-const noteLedger = (seq: number | undefined) => {
-  if (seq) seen = { seq, at: Date.now() };
+const seenByNet = new Map<string, { seq: number; at: number }>();
+const noteLedger = (net: string, seq: number | undefined) => {
+  if (seq) seenByNet.set(net, { seq, at: Date.now() });
 };
 
 async function simulateRead(
@@ -31,6 +31,7 @@ async function simulateRead(
   method: string,
   args: xdr.ScVal[],
 ) {
+  const { NETWORK, net } = await cfg();
   if (!contractId) throw new Error(`contract id not configured (${method})`);
   const tx = new TransactionBuilder(new Account(SIM_SOURCE, "0"), {
     fee: BASE_FEE,
@@ -40,7 +41,7 @@ async function simulateRead(
     .setTimeout(30)
     .build();
   const sim = await withRpc((s) => s.simulateTransaction(tx));
-  noteLedger(sim.latestLedger);
+  noteLedger(net, sim.latestLedger);
   if (!rpc.Api.isSimulationSuccess(sim) || !sim.result) {
     const err = rpc.Api.isSimulationError(sim)
       ? sim.error
@@ -65,6 +66,7 @@ export type OnChainChest = {
 
 /** `get_chest` del contrato principal. Lanza si el cofre no existe. */
 export async function readChest(id: number): Promise<OnChainChest> {
+  const { CONTRACTS } = await cfg();
   const c = await simulateRead(CONTRACTS.chest, "get_chest", [
     nativeToScVal(id, { type: "u64" }),
   ]);
@@ -83,6 +85,7 @@ export async function readChest(id: number): Promise<OnChainChest> {
 
 /** Balance (stroops) de `address` en el SAC del premio (XLM). */
 export async function readPrizeBalance(address: string): Promise<bigint> {
+  const { CONTRACTS } = await cfg();
   const v = await simulateRead(CONTRACTS.token, "balance", [
     Address.fromString(address).toScVal(),
   ]);
@@ -132,9 +135,13 @@ const ledgerOfCursor = (c: string) =>
  * transcurrido) o se lo saca de la respuesta de una simulación barata (que trae latestLedger).
  */
 export async function latestLedgerHint(): Promise<number> {
-  const fresh = () =>
-    seen ? seen.seq + Math.floor((Date.now() - seen.at) / 5000) : null;
-  if (seen && Date.now() - seen.at < 60_000) return fresh()!;
+  const { CONTRACTS, net } = await cfg();
+  const fresh = () => {
+    const seen = seenByNet.get(net);
+    return seen ? seen.seq + Math.floor((Date.now() - seen.at) / 5000) : null;
+  };
+  const cur = seenByNet.get(net);
+  if (cur && Date.now() - cur.at < 60_000) return fresh()!;
   try {
     await simulateRead(CONTRACTS.token, "balance", [
       Address.fromString(SIM_SOURCE).toScVal(),
@@ -154,6 +161,7 @@ type EventFilter = {
 };
 
 async function scanEvents(name: "claimed" | "created"): Promise<EventsScan> {
+  const { CONTRACTS } = await cfg();
   return scanWithFilters([
     {
       type: "contract" as const,
@@ -190,6 +198,7 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R>
  * endLedger para no depender de la estimación del ledger actual.
  */
 async function scanWithFilters(filters: EventFilter[]): Promise<EventsScan> {
+  const { net } = await cfg();
   const latest = await latestLedgerHint();
   let start = Math.max(1, latest - WINDOW_LEDGERS);
   let truncated = false;
@@ -205,7 +214,7 @@ async function scanWithFilters(filters: EventFilter[]): Promise<EventsScan> {
         (s) => s.getEvents({ filters, startLedger: cur, endLedger: to, limit: 200 }),
         { timeoutMs: SCAN_TIMEOUT_MS },
       );
-      noteLedger(res.latestLedger);
+      noteLedger(net, res.latestLedger);
       let added = 0;
       for (const ev of res.events) {
         if (seen.has(ev.id)) continue;
@@ -326,6 +335,7 @@ export async function readProtocolStats(): Promise<ProtocolStats> {
   ]);
 
   // El evento no dice el token: se resuelve por cofre y solo se suma XLM.
+  const { CONTRACTS } = await cfg();
   const perChest = new Map<number, bigint>();
   for (const ev of claimed.events) {
     try {
@@ -410,6 +420,7 @@ export type SacTransfer = {
 
 /** Transferencias del SAC de XLM donde `address` es origen o destino (ventana ~7 días del RPC). */
 export async function readSacTransfers(address: string): Promise<SacTransfer[]> {
+  const { CONTRACTS } = await cfg();
   const t = xdr.ScVal.scvSymbol("transfer").toXDR("base64");
   const a = Address.fromString(address).toScVal().toXDR("base64");
   const mk = (pos: "from" | "to") => ({

@@ -1,6 +1,6 @@
 import { del, list, put } from "@vercel/blob";
 import { Horizon } from "@stellar/stellar-sdk";
-import { IS_MAINNET, NETWORK } from "./config";
+import type { NetConfig } from "./network";
 
 /**
  * Límites del patrocinio en mainnet (el relayer paga las fees con fondos reales):
@@ -40,13 +40,14 @@ export function decideSponsor(i: {
 // ---------- Blob (token explícito: gana sobre OIDC, ver lib/chest-store.ts) ----------
 const token = () => process.env.LOOT_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
 const auth = () => (token() ? { token: token()! } : {});
-const PREFIX = "relay/registrations/";
+/** Contador por red (solo mainnet tiene tope; el prefijo deja el espacio listo y separado). */
+const prefixFor = (c: NetConfig) => `relay/${c.net}/registrations/`;
 
-async function countRegistrations(): Promise<number> {
+async function countRegistrations(c: NetConfig): Promise<number> {
   let n = 0;
   let cursor: string | undefined;
   do {
-    const page = await list({ prefix: PREFIX, limit: 1000, cursor, ...auth() });
+    const page = await list({ prefix: prefixFor(c), limit: 1000, cursor, ...auth() });
     n += page.blobs.length;
     cursor = page.hasMore ? page.cursor : undefined;
   } while (cursor);
@@ -57,8 +58,8 @@ async function countRegistrations(): Promise<number> {
  * Reserva un cupo de registro: escribe el marcador y cuenta; si se pasó del máximo lo borra.
  * Devuelve una función para liberar el cupo si el envío falla. null = sin cupo.
  */
-export async function reserveRegistration(): Promise<{ release: () => Promise<void>; used: number } | null> {
-  const id = `${PREFIX}${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
+export async function reserveRegistration(c: NetConfig): Promise<{ release: () => Promise<void>; used: number } | null> {
+  const id = `${prefixFor(c)}${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
   const put1 = await put(id, JSON.stringify({ at: new Date().toISOString() }), {
     access: "private",
     addRandomSuffix: false,
@@ -68,7 +69,7 @@ export async function reserveRegistration(): Promise<{ release: () => Promise<vo
   const release = async () => {
     await del(put1.url, auth()).catch(() => undefined);
   };
-  const used = await countRegistrations();
+  const used = await countRegistrations(c);
   if (used > MAX_REGISTRATIONS) {
     await release();
     return null;
@@ -76,29 +77,30 @@ export async function reserveRegistration(): Promise<{ release: () => Promise<vo
   return { release, used };
 }
 
-let balanceCache: { at: number; value: bigint | null } | null = null;
+const balanceCache = new Map<string, { at: number; value: bigint | null }>();
 /** Saldo XLM del relayer en stroops (caché 60 s). null si no se pudo leer. */
-export async function relayerBalance(publicKey: string): Promise<bigint | null> {
-  if (balanceCache && Date.now() - balanceCache.at < 60_000) return balanceCache.value;
+export async function relayerBalance(c: NetConfig, publicKey: string): Promise<bigint | null> {
+  const hit = balanceCache.get(c.net);
+  if (hit && Date.now() - hit.at < 60_000) return hit.value;
   let value: bigint | null = null;
   try {
-    const acc = await new Horizon.Server(NETWORK.horizonUrl).loadAccount(publicKey);
+    const acc = await new Horizon.Server(c.NETWORK.horizonUrl).loadAccount(publicKey);
     const native = acc.balances.find((b) => b.asset_type === "native");
     if (native) value = BigInt(Math.round(Number(native.balance) * 1e7));
   } catch {
     value = null;
   }
-  balanceCache = { at: Date.now(), value };
+  balanceCache.set(c.net, { at: Date.now(), value });
   return value;
 }
 
 export type SponsorStatus = { sponsoring: boolean; reason?: string; notice?: string; registrationsLeft?: number };
 
 /** Estado público para la UI (aviso cuando el patrocinio está pausado). */
-export async function sponsorStatus(relayerPublicKey: string | undefined): Promise<SponsorStatus> {
-  if (!IS_MAINNET) return { sponsoring: true };
+export async function sponsorStatus(c: NetConfig, relayerPublicKey: string | undefined): Promise<SponsorStatus> {
+  if (!c.IS_MAINNET) return { sponsoring: true };
   if (!relayerPublicKey) return { sponsoring: false, reason: "relayer_low", notice: NOTICES.relayer_low };
-  const [balance, used] = await Promise.all([relayerBalance(relayerPublicKey), countRegistrations().catch(() => MAX_REGISTRATIONS)]);
+  const [balance, used] = await Promise.all([relayerBalance(c, relayerPublicKey), countRegistrations(c).catch(() => MAX_REGISTRATIONS)]);
   const d = decideSponsor({ mainnet: true, balance, registrations: used, deploy: false });
   if (!d.ok) return { sponsoring: false, reason: d.reason, notice: d.message };
   const left = Math.max(0, MAX_REGISTRATIONS - used);

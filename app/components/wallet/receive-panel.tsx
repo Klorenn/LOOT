@@ -4,10 +4,11 @@ import { useState } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { QrTile } from "@/components/qr-tile";
 import { expertAddress } from "@/lib/format";
-import { IS_MAINNET } from "@/lib/config";
+import { useNet } from "@/components/network-provider";
 
 /** Una sola QR: la dirección conectada, en un tile #F5F2EC de 264 px. */
 export function ReceivePanel({ address }: { address: string }) {
+  const { IS_MAINNET, NETWORK } = useNet();
   const [msg, setMsg] = useState<string | null>(null);
 
   async function share() {
@@ -45,7 +46,7 @@ export function ReceivePanel({ address }: { address: string }) {
           Share
         </button>
         <a
-          href={expertAddress(address)}
+          href={expertAddress(NETWORK.explorerUrl, address)}
           target="_blank"
           rel="noreferrer"
           className="btn-landing btn-landing-s"

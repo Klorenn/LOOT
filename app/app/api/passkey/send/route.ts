@@ -7,10 +7,11 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 import { Api, Server } from "@stellar/stellar-sdk/rpc";
-import { IS_MAINNET, NETWORK } from "@/lib/config";
+import { cfg } from "@/lib/cfg";
+import type { NetConfig } from "@/lib/network";
 import { pickRpcUrl } from "@/lib/rpc";
 import { relayLimit } from "@/lib/rate-limit";
-import { RELAY_MAX_FEE_STROOPS, vetRelayTx } from "@/lib/relay-guard";
+import { relayMaxFee, relayerSecretFor, vetRelayTx } from "@/lib/relay-guard";
 import { decideSponsor, relayerBalance, reserveRegistration } from "@/lib/relay-limits";
 
 type Body = { xdr: string };
@@ -41,6 +42,7 @@ function hasSourceAccountAuth(tx: Transaction): boolean {
  * inner.fee is 0 (feeBump.fee = resourceFee + inclusion*2).
  */
 function assembleDeployTx(
+  c: NetConfig,
   raw: Transaction,
   sim: Api.SimulateTransactionSuccessResponse,
   kp: Keypair,
@@ -48,8 +50,8 @@ function assembleDeployTx(
   const minRf = BigInt(sim.minResourceFee);
   const needsBump = minRf + BigInt(INCLUSION) > BigInt(UINT32_MAX);
   // Mainnet: sin fee-bump, y la fee de la tx FINAL no puede pasar del tope.
-  if (minRf + BigInt(INCLUSION) > RELAY_MAX_FEE_STROOPS) throw new Error("fee above the relayer cap; transaction not relayed");
-  if (IS_MAINNET && needsBump) throw new Error("fee-bump is not allowed on mainnet");
+  if (minRf + BigInt(INCLUSION) > relayMaxFee(c)) throw new Error("fee above the relayer cap; transaction not relayed");
+  if (c.IS_MAINNET && needsBump) throw new Error("fee-bump is not allowed on mainnet");
 
   // First build under uint32 so TransactionBuilder accepts the envelope.
   const buildRf = needsBump
@@ -61,7 +63,7 @@ function assembleDeployTx(
   let inner = TransactionBuilder.cloneFrom(raw, {
     fee: String(INCLUSION),
     sorobanData,
-    networkPassphrase: NETWORK.passphrase,
+    networkPassphrase: c.NETWORK.passphrase,
   }).build();
 
   if (!needsBump) {
@@ -79,7 +81,7 @@ function assembleDeployTx(
   v1.signatures([]);
   inner = new Transaction(
     xdr.TransactionEnvelope.envelopeTypeTx(v1),
-    NETWORK.passphrase,
+    c.NETWORK.passphrase,
   );
   inner.sign(kp);
 
@@ -87,7 +89,7 @@ function assembleDeployTx(
     kp,
     String(INCLUSION),
     inner,
-    NETWORK.passphrase,
+    c.NETWORK.passphrase,
   );
   bump.sign(kp);
   return bump as unknown as Transaction;
@@ -99,13 +101,14 @@ function assembleDeployTx(
  * `{func,auth}`. Locally we rebuild with RELAYER_SECRET.
  */
 async function submitAsChannel(
+  c: NetConfig,
   signedXdr: string,
   secret: string,
 ): Promise<{ hash: string; via: string; pending?: boolean }> {
   const kp = Keypair.fromSecret(secret);
   const parsed = TransactionBuilder.fromXDR(
     signedXdr,
-    NETWORK.passphrase,
+    c.NETWORK.passphrase,
   ) as Transaction;
 
   const op = parsed.operations[0];
@@ -122,7 +125,7 @@ async function submitAsChannel(
     const account = await rpc.getAccount(kp.publicKey());
     const built = new TransactionBuilder(account, {
       fee: String(INCLUSION),
-      networkPassphrase: NETWORK.passphrase,
+      networkPassphrase: c.NETWORK.passphrase,
     })
       .addOperation(
         Operation.invokeHostFunction({
@@ -144,11 +147,11 @@ async function submitAsChannel(
     }
 
     console.info("[passkey/send] minResourceFee", sim.minResourceFee);
-    if (BigInt(sim.minResourceFee) + BigInt(INCLUSION) > RELAY_MAX_FEE_STROOPS) {
+    if (BigInt(sim.minResourceFee) + BigInt(INCLUSION) > relayMaxFee(c)) {
       throw new Error("fee above the relayer cap; transaction not relayed");
     }
 
-    const signed = assembleDeployTx(built, sim, kp);
+    const signed = assembleDeployTx(c, built, sim, kp);
     const sent = await rpc.sendTransaction(signed);
     if (sent.status === "ERROR") {
       throw new Error(`send ERROR: ${JSON.stringify(sent)}`);
@@ -156,12 +159,12 @@ async function submitAsChannel(
     return waitForHash(rpc, sent.hash, "local-channel");
   }
 
-  if (IS_MAINNET) throw new Error("fee-bump is not allowed on mainnet");
+  if (c.IS_MAINNET) throw new Error("fee-bump is not allowed on mainnet");
   const feeBump = TransactionBuilder.buildFeeBumpTransaction(
     kp,
     "1000000",
     parsed,
-    NETWORK.passphrase,
+    c.NETWORK.passphrase,
   );
   feeBump.sign(kp);
   const sent = await rpc.sendTransaction(feeBump);
@@ -195,13 +198,14 @@ async function waitForHash(
  */
 export async function POST(req: NextRequest) {
   let slot: Awaited<ReturnType<typeof reserveRegistration>> = null;
+  const c = await cfg(); // red de la petición (cookie): fija passphrase, contratos, secretos y límites
   try {
     const body = (await req.json()) as Body;
     if (!body?.xdr) {
       return NextResponse.json({ error: "xdr required" }, { status: 400 });
     }
 
-    const limited = relayLimit(req, "passkey-send");
+    const limited = relayLimit(req, "passkey-send", c.net);
     if (limited) {
       return NextResponse.json(
         { error: "Too many requests. Try again in a minute." },
@@ -209,10 +213,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const secret = process.env.RELAYER_SECRET;
+    // secreto de LA red de la petición; nunca cae al de la otra
+    const secret = relayerSecretFor(c);
     const relayerKey = secret ? Keypair.fromSecret(secret).publicKey() : undefined;
     // Solo se retransmite lo que invoca NUESTRO contrato (ver lib/relay-policy.ts).
-    const verdict = vetRelayTx(body.xdr, relayerKey);
+    const verdict = vetRelayTx(body.xdr, c, relayerKey);
     if (!verdict.ok) {
       console.warn("passkey/send rejected:", verdict.reason);
       return NextResponse.json({ error: `not relayed: ${verdict.reason}` }, { status: 403 });
@@ -220,33 +225,34 @@ export async function POST(req: NextRequest) {
 
     // Mainnet: saldo mínimo del relayer y tope de registros de wallet (ver lib/relay-limits.ts).
     const deploy = verdict.kind === "wallet_deploy";
-    if (IS_MAINNET) {
-      const watch = relayerKey ?? process.env.RELAYER_ACCOUNT;
-      const balance = watch ? await relayerBalance(watch) : null;
+    if (c.IS_MAINNET) {
+      const watch = relayerKey ?? process.env.RELAYER_ACCOUNT_MAINNET;
+      const balance = watch ? await relayerBalance(c, watch) : null;
       const d = decideSponsor({ mainnet: true, balance, registrations: 0, deploy: false });
       if (!d.ok) return NextResponse.json({ error: d.message, code: d.reason }, { status: 503 });
     }
-    if (IS_MAINNET && deploy) {
-      slot = await reserveRegistration();
+    if (c.IS_MAINNET && deploy) {
+      slot = await reserveRegistration(c);
       if (!slot) {
         const d = decideSponsor({ mainnet: true, balance: BigInt(1e12), registrations: 1e9, deploy: true });
         return NextResponse.json({ error: d.ok ? "limit reached" : d.message, code: "registrations_full" }, { status: 503 });
       }
     }
 
-    const apiKey = process.env.RELAYER_API_KEY;
-    const baseUrl =
-      process.env.RELAYER_BASE_URL ||
-      (IS_MAINNET ? "" : "https://channels.openzeppelin.com/testnet");
+    // OZ Channels por red: mainnet usa *_MAINNET y nunca la clave de testnet
+    const apiKey = c.IS_MAINNET ? process.env.RELAYER_API_KEY_MAINNET : process.env.RELAYER_API_KEY;
+    const baseUrl = c.IS_MAINNET
+      ? (process.env.RELAYER_BASE_URL_MAINNET ?? "")
+      : process.env.RELAYER_BASE_URL || "https://channels.openzeppelin.com/testnet";
     if (apiKey && !baseUrl) {
       await slot?.release();
-      return NextResponse.json({ error: "Set RELAYER_BASE_URL for mainnet Channels" }, { status: 500 });
+      return NextResponse.json({ error: "Set RELAYER_BASE_URL_MAINNET for mainnet Channels" }, { status: 500 });
     }
 
     if (apiKey) {
       const { PasskeyServer } = await import("passkey-kit/server");
       const server = new PasskeyServer({
-        networkPassphrase: NETWORK.passphrase,
+        networkPassphrase: c.NETWORK.passphrase,
         rpcUrl: await pickRpcUrl(),
         relayer: { baseUrl, apiKey },
       });
@@ -275,13 +281,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Set RELAYER_API_KEY (OZ Channels) or RELAYER_SECRET for local channel",
+            `Set a relayer for ${c.NETWORK_LC}: OZ Channels key or RELAYER_SECRET${c.IS_MAINNET ? "_MAINNET" : ""}`,
         },
         { status: 500 },
       );
     }
 
-    const out = await submitAsChannel(body.xdr, secret);
+    const out = await submitAsChannel(c, body.xdr, secret);
     return NextResponse.json({ ok: true, ...out });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

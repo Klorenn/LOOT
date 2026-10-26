@@ -2,6 +2,7 @@
 
 import { expertTx, shortAddr } from "@/lib/format";
 import type { ActivityItem } from "@/lib/wallet-data";
+import { useNet } from "@/components/network-provider";
 
 const COLOR: Record<ActivityItem["kind"], string> = {
   Sent: "var(--text)",
@@ -31,6 +32,7 @@ export function ActivityList({
   error: boolean;
   empty: string;
 }) {
+  const { NETWORK } = useNet();
   if (loading) {
     return (
       <div className="space-y-2" aria-busy>
@@ -65,7 +67,7 @@ export function ActivityList({
             </p>
           </div>
           <a
-            href={expertTx(a.hash)}
+            href={expertTx(NETWORK.explorerUrl, a.hash)}
             target="_blank"
             rel="noreferrer"
             className="font-mono text-[12px] text-[var(--proof)] underline underline-offset-2"

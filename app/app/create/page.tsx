@@ -13,7 +13,7 @@ import { answerToField, normalizeAnswer, randomSalt } from "@/lib/answer";
 import { poseidon2, fieldToHex } from "@/lib/zk";
 import { chestPath } from "@/lib/chest-code";
 import { useSession } from "@/lib/session";
-import { NETWORK, stroopsToXlm, NETWORK_LC, CONFIG_INCOMPLETE } from "@/lib/config";
+import { stroopsToXlm } from "@/lib/config";
 import { balanceInfo, parseXlmAmount, SendError } from "@/lib/send";
 import { confirmMeta, createChestOnChain, estimateCreateFee, reserveMeta } from "@/lib/create-chest";
 import { capError } from "@/lib/caps";
@@ -22,6 +22,7 @@ import { SponsorNotice } from "@/components/sponsor-notice";
 import { QuizBuilder } from "@/components/quiz-builder";
 import { draftToQuiz, emptyDraftQuestion, type DraftQuestion } from "@/lib/quiz-draft";
 import { QUIZ_LIMITS, quizIsGuessable } from "@/lib/quiz";
+import { useNet } from "@/components/network-provider";
 
 type Mode = "riddle" | "quiz";
 
@@ -52,6 +53,7 @@ function expiryError(expires: string): string | null {
 }
 
 export default function CreateChestPage() {
+  const { NETWORK, NETWORK_LC, CONFIG_INCOMPLETE, CAPS, IS_MAINNET } = useNet();
   const [step, setStep] = useState(0);
   const [tpl, setTpl] = useState<ChestTemplate>(TEMPLATES[2]);
   const [question, setQuestion] = useState(TEMPLATES[2].question);
@@ -220,12 +222,12 @@ export default function CreateChestPage() {
       e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
     if (step === 2 && !prizeStroops) e.prize = "Enter a reward greater than 0 (up to 7 decimals).";
     if (step === 2 && prizeStroops) {
-      const cb = capError(prizeStroops, Math.max(1, maxClaims));
+      const cb = capError(prizeStroops, Math.max(1, maxClaims), CAPS);
       if (cb) e.prize = cb;
     }
     if (step === 3 && (!Number.isSafeInteger(maxClaims) || maxClaims < 1)) e.maxClaims = "At least 1 claim.";
     if (step === 3 && prizeStroops && Number.isSafeInteger(maxClaims) && maxClaims >= 1) {
-      const cb = capError(prizeStroops, maxClaims);
+      const cb = capError(prizeStroops, maxClaims, CAPS);
       if (cb) e.maxClaims = cb;
     }
     if (step === 3) {
@@ -249,7 +251,7 @@ export default function CreateChestPage() {
     if (!validateStep()) return;
     if (!player || !prizeStroops) return;
     if (CONFIG_INCOMPLETE) return setError("Mainnet configuration is incomplete; chest creation is disabled.");
-    const capBad = capError(prizeStroops, maxClaims);
+    const capBad = capError(prizeStroops, maxClaims, CAPS);
     if (capBad) return setError(capBad);
     setBusy(true);
     setError(null);
@@ -296,7 +298,8 @@ export default function CreateChestPage() {
       } catch {
         saved = false;
       }
-      const base = `${window.location.origin}${chestPath(chestId)}`;
+      // En mainnet el enlace lleva ?net=mainnet: quien lo abra cambia a esa red (proxy.ts) y ve el cofre correcto.
+      const base = `${window.location.origin}${chestPath(chestId)}${IS_MAINNET ? "?net=mainnet" : ""}`;
       setResult({
         chestId,
         link: listed ? base : `${base}#s=${salt.toString()}`,

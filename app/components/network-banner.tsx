@@ -1,8 +1,11 @@
-import { CAPS, CONFIG_INCOMPLETE, CONFIG_ISSUES, IS_MAINNET } from "@/lib/config";
+"use client";
 
-/** Franja roja arriba de todo si la config de mainnet está incompleta (la app no puede operar). */
+import { useNet } from "@/components/network-provider";
+
+/** Franja roja si la config de mainnet está incompleta pero mainnet está activa (no puede operar). */
 export function ConfigBanner() {
-  if (!CONFIG_INCOMPLETE) return null;
+  const { CONFIG_INCOMPLETE, CONFIG_ISSUES, IS_MAINNET } = useNet();
+  if (!IS_MAINNET || !CONFIG_INCOMPLETE) return null;
   return (
     <div
       role="alert"
@@ -13,8 +16,20 @@ export function ConfigBanner() {
   );
 }
 
+/** Franja dorada permanente mientras mainnet esté activa: fondos reales. */
+export function MainnetStrip() {
+  const { IS_MAINNET } = useNet();
+  if (!IS_MAINNET) return null;
+  return (
+    <div role="status" className="w-full bg-[var(--gold)] px-4 py-1 text-center font-mono text-[12px] font-medium text-[#14110a]">
+      MAINNET · real funds · beta, unaudited contracts
+    </div>
+  );
+}
+
 /** Aviso de beta sin auditar (solo mainnet). `compact` para el footer. */
 export function BetaNotice({ compact = false }: { compact?: boolean }) {
+  const { IS_MAINNET, CAPS } = useNet();
   if (!IS_MAINNET) return null;
   if (compact) {
     return (

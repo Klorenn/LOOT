@@ -13,7 +13,9 @@ import {
 import { ExampleTag } from "@/components/example-tag";
 import { LogoChest } from "@/components/logo-chest";
 import { chestPath } from "@/lib/chest-code";
-import { DEMO_CHEST, PRIZE, SAMPLE_CHEST_ID, IS_MAINNET, NETWORK_URLS } from "@/lib/config";
+import { DEMO_CHEST, PRIZE } from "@/lib/config";
+import { useNet } from "@/components/network-provider";
+import { switchNetwork } from "@/lib/network";
 
 /** Valores reales de /api/stats (eventos on-chain); "—" mientras carga o si el RPC falla. */
 export type Stats = { paid: string; claims: string; created: string };
@@ -196,6 +198,7 @@ export function UseCasesSection() {
 const CHEST_NO = String(DEMO_CHEST.id).padStart(4, "0");
 
 export function AttackSection() {
+  const { IS_MAINNET } = useNet();
   return (
     <section
       id="attack"
@@ -225,13 +228,14 @@ export function AttackSection() {
             Even if a bot copies your answer, the prize still goes to you.
           </p>
           {IS_MAINNET ? (
-            <a
-              href={`${NETWORK_URLS.testnet.replace(/\/+$/, "")}/attack`}
+            <button
+              type="button"
+              onClick={() => switchNetwork("testnet")}
               data-fade
               className="btn-landing btn-landing-s mt-8 inline-flex"
             >
-              Run the demo on testnet
-            </a>
+              Switch to testnet for the demo
+            </button>
           ) : (
             <Link
               href="/attack"
@@ -290,6 +294,7 @@ export function AttackSection() {
 }
 
 export function CtaSection() {
+  const { SAMPLE_CHEST_ID } = useNet();
   return (
     <section
       aria-labelledby="cta-h"

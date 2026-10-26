@@ -1,9 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { BuildersIllustration } from "@/components/landing/builders-illustration";
 import { CreatorsIllustration } from "@/components/landing/creators-illustration";
 import { PlayersIllustration } from "@/components/landing/players-illustration";
 import { chestPath } from "@/lib/chest-code";
-import { SAMPLE_CHEST_ID } from "@/lib/config";
+import { useNet } from "@/components/network-provider";
 
 type Card = {
   k: string;
@@ -18,6 +20,7 @@ type Card = {
 
 /** "Who it is for": tres públicos, cada uno con su ilustración (Figma 46-235). */
 export function AudienceSection({ docsUrl }: { docsUrl: string }) {
+  const { SAMPLE_CHEST_ID } = useNet();
   const cards: Card[] = [
     {
       k: "Players",

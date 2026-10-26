@@ -5,7 +5,7 @@
  * preact + window y no puede evaluarse en SSR. Solo se piden direcciones; la
  * prueba ZK se envía por el relayer, así que no se firma nada con la wallet.
  */
-import { IS_MAINNET, NETWORK } from "./config";
+import { NETWORK, isMainnet } from "./client-cfg";
 
 type Kit = typeof import("@creit.tech/stellar-wallets-kit/sdk").StellarWalletsKit;
 
@@ -55,7 +55,7 @@ function loadKit(): Promise<Kit> {
           new onekey.OneKeyModule(),
           new bitget.BitgetModule(),
         ],
-        network: IS_MAINNET ? Networks.PUBLIC : Networks.TESTNET,
+        network: isMainnet() ? Networks.PUBLIC : Networks.TESTNET,
         // Tema Loot para el modal del kit (contraste AA: foreground/strong 15:1, secondary 7:1,
         // primary-foreground sobre primary 6.5:1, danger 6:1; light/gray solo son bordes).
         theme: {

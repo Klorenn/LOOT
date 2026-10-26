@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cfg } from "@/lib/cfg";
 import { readSacTransfers, readWonChests } from "@/lib/chain";
 
 // Escanear eventos del RPC por ventanas puede tardar decenas de segundos: se hace en el servidor
@@ -13,7 +14,9 @@ export async function GET(req: NextRequest) {
   if (!/^[GC][A-Z2-7]{55}$/.test(address)) {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
-  const hit = cache.get(address);
+  const { net } = await cfg();
+  const key = `${net}:${address}`; // la misma G tiene actividad distinta en cada red
+  const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL) return NextResponse.json(hit.value);
   try {
     const [transfers, wins] = await Promise.all([readSacTransfers(address), readWonChests(address)]);
@@ -21,7 +24,7 @@ export async function GET(req: NextRequest) {
       transfers: transfers.map((t) => ({ ...t, amount: t.amount.toString() })),
       wins: wins.items.map((w) => ({ ...w, prize: w.prize.toString() })),
     };
-    cache.set(address, { at: Date.now(), value });
+    cache.set(key, { at: Date.now(), value });
     return NextResponse.json(value);
   } catch (e) {
     console.error("activity", e);

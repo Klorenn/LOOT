@@ -2,25 +2,29 @@
 
 import { PasskeyKit } from "passkey-kit";
 import { IndexedDBStorage } from "passkey-kit/storage";
-import { NETWORK } from "./config";
+import { NETWORK, isMainnet } from "./client-cfg";
 import { ensurePasskeyFeeClamp } from "./passkey-fee-clamp";
+import { WALLET_WASM_HASH } from "./network";
 
-/** Canonical smart-wallet WASM (passkey-kit docs / Protocol 27 artifact). */
-export const WALLET_WASM_HASH =
-  "97ce047884106b1c6c3bb40b8973cc48db1c4dad95c9e20462bf2c701daa764e";
+export { WALLET_WASM_HASH };
 
-let kit: PasskeyKit | null = null;
+// Un kit por red: RPC, passphrase y base IndexedDB propios (la passkey/keyId de una red no se mezcla con la otra).
+const kits = new Map<string, PasskeyKit>();
 
 export function getPasskeyKit(): PasskeyKit {
   ensurePasskeyFeeClamp();
+  const net = isMainnet() ? "mainnet" : "testnet";
+  let kit = kits.get(net);
   if (!kit) {
     kit = new PasskeyKit({
       rpcUrl: NETWORK.rpcUrl,
       networkPassphrase: NETWORK.passphrase,
       walletWasmHash: WALLET_WASM_HASH,
-      storage: new IndexedDBStorage(),
+      // testnet conserva la base por defecto (sesiones existentes); mainnet usa una propia
+      storage: net === "mainnet" ? new IndexedDBStorage("chestzk-mainnet-passkeys") : new IndexedDBStorage(),
       timeoutInSeconds: 30,
     });
+    kits.set(net, kit);
   }
   return kit;
 }

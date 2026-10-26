@@ -1,57 +1,61 @@
+"use client";
+
 import Link from "next/link";
 import { BrandMark } from "@/components/logo-chest";
 import { CellsBackground } from "@/components/cells-background";
 import { BetaNotice } from "@/components/network-banner";
 import { NetworkSwitch } from "@/components/network-switch";
-import { CONTRACTS, IS_MAINNET, NETWORK } from "@/lib/config";
-
-const SHORT = CONTRACTS.chest ? `${CONTRACTS.chest.slice(0, 4)}…${CONTRACTS.chest.slice(-4)}` : "not configured";
-const NET = NETWORK.name.charAt(0) + NETWORK.name.slice(1).toLowerCase();
-
-const COLUMNS = [
-  [
-    "Product",
-    [
-      ["/explore", "Open chests"],
-      ["/create", "Create a chest"],
-      ["/dashboard", "Dashboard"],
-      ...(IS_MAINNET ? [] : [["/attack", "Attack demo"]]),
-    ],
-  ],
-  [
-    "Developers",
-    [
-      ["/sdk", "Docs"],
-      ["#", "Circuits"],
-      [
-        `${NETWORK.explorerUrl}/contract/${CONTRACTS.chest}`,
-        "Soroban contract",
-      ],
-      ["https://github.com/Klorenn/LOOT", "GitHub"],
-    ],
-  ],
-  [
-    "Stellar",
-    [
-      [NETWORK.explorerUrl, "Stellar Expert"],
-      ["https://freighter.app", "Freighter wallet"],
-      ["https://developers.stellar.org/docs/build", "Soroban docs"],
-      ...(NETWORK.friendbotUrl ? [[NETWORK.friendbotUrl, "Testnet faucet"]] : []),
-    ],
-  ],
-  [
-    "Community",
-    [
-      ["#", "X / Twitter"],
-      ["#", "Discord"],
-      ["https://meridian.stellar.org", "HackMeridian 2026"],
-      ["#", "Contact"],
-    ],
-  ],
-] as const;
+import { useNet } from "@/components/network-provider";
 
 /** Loot footer (landing + app). Reemplaza components/app/site-footer.tsx (de otra persona). */
 export function SiteFooter() {
+  const { CONTRACTS, IS_MAINNET, NETWORK } = useNet();
+  const SHORT = CONTRACTS.chest ? `${CONTRACTS.chest.slice(0, 4)}…${CONTRACTS.chest.slice(-4)}` : "not configured";
+  const NET = NETWORK.name.charAt(0) + NETWORK.name.slice(1).toLowerCase();
+
+  const columns = [
+    [
+      "Product",
+      [
+        ["/explore", "Open chests"],
+        ["/create", "Create a chest"],
+        ["/dashboard", "Dashboard"],
+        ...(IS_MAINNET ? [] : [["/attack", "Attack demo"]]),
+      ],
+    ],
+    [
+      "Developers",
+      [
+        ["/sdk", "Docs"],
+        ["#", "Circuits"],
+        [
+          `${NETWORK.explorerUrl}/contract/${CONTRACTS.chest}`,
+          "Soroban contract",
+        ],
+        ["https://github.com/Klorenn/LOOT", "GitHub"],
+      ],
+    ],
+    [
+      "Stellar",
+      [
+        [NETWORK.explorerUrl, "Stellar Expert"],
+        ["https://freighter.app", "Freighter wallet"],
+        ["https://developers.stellar.org/docs/build", "Soroban docs"],
+        ...(NETWORK.friendbotUrl ? [[NETWORK.friendbotUrl, "Testnet faucet"]] : []),
+      ],
+    ],
+    [
+      "Community",
+      [
+        ["#", "X / Twitter"],
+        ["#", "Discord"],
+        ["https://meridian.stellar.org", "HackMeridian 2026"],
+        ["#", "Contact"],
+      ],
+    ],
+  ] as const;
+
+
   return (
     <footer
       data-footer
@@ -78,7 +82,7 @@ export function SiteFooter() {
               <BetaNotice compact />
             </div>
           </div>
-          {COLUMNS.map(([title, links]) => (
+          {columns.map(([title, links]) => (
             <div key={title} data-fade>
               <div className="font-mono text-[12px] font-medium tracking-[0.1em] text-[var(--dim)] uppercase">
                 {title}

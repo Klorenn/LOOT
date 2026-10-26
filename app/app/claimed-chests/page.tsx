@@ -8,10 +8,11 @@ import { StateBlock } from "@/components/state-block";
 import { Mono } from "@/components/kv";
 import { readWonChests, type WonChestsResult } from "@/lib/chain";
 import { chestPath } from "@/lib/chest-code";
-import { CONTRACTS, stroopsToXlm, tokenDecimals, tokenLabel, SAMPLE_CHEST_ID, NETWORK_LC } from "@/lib/config";
+import { stroopsToXlm, tokenDecimals, tokenLabel } from "@/lib/config";
 import { getChest } from "@/lib/chests-demo";
 import { expertTx, shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";
+import { useNet } from "@/components/network-provider";
 
 type Load = { s: "loading" } | { s: "ok"; v: WonChestsResult } | { s: "error"; msg: string };
 
@@ -19,6 +20,7 @@ const stamp = (iso: string) =>
   `${new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC`;
 
 export default function ClaimedChestsPage() {
+  const { CONTRACTS, SAMPLE_CHEST_ID, NETWORK_LC, NETWORK, IS_MAINNET } = useNet();
   const { address } = useSession();
   const [data, setData] = useState<Load>({ s: "loading" });
   const seq = useRef(0);
@@ -132,7 +134,7 @@ export default function ClaimedChestsPage() {
                 </thead>
                 <tbody>
                   {items.map((w) => {
-                    const cat = getChest(w.chestId);
+                    const cat = getChest(w.chestId, IS_MAINNET);
                     return (
                       <tr key={`${w.txHash}-${w.chestId}`} className="border-b border-[var(--line)]">
                         <td className="py-4">
@@ -157,7 +159,7 @@ export default function ClaimedChestsPage() {
                         <td className="py-4 pl-6 font-mono text-[13px]">{stamp(w.closedAt)}</td>
                         <td className="py-4">
                           <a
-                            href={expertTx(w.txHash)}
+                            href={expertTx(NETWORK.explorerUrl, w.txHash)}
                             target="_blank"
                             rel="noreferrer"
                             className="font-mono text-[13px] text-[var(--proof)] hover:underline"

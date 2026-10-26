@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { cookies } from "next/headers";
 import { AppChrome } from "@/components/app-chrome";
+import { NetworkProvider } from "@/components/network-provider";
+import { NET_COOKIE, effectiveNet, mainnetPublicFromEnv, parseNet } from "@/lib/network";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -28,14 +31,21 @@ export const viewport: Viewport = {
   themeColor: "#0C0B10",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+// La red sale de una cookie: toda la app es dinámica (nada de HTML estático con la red equivocada).
+export const dynamic = "force-dynamic";
+
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const mainnet = mainnetPublicFromEnv();
+  const net = effectiveNet(parseNet((await cookies()).get(NET_COOKIE)?.value), mainnet);
   return (
     <html
       lang="en"
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-[var(--bg)] text-[var(--text)]">
-        <AppChrome>{children}</AppChrome>
+        <NetworkProvider net={net} mainnet={mainnet}>
+          <AppChrome>{children}</AppChrome>
+        </NetworkProvider>
       </body>
     </html>
   );

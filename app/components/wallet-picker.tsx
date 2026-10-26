@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { InlineAlert } from "@/components/inline-alert";
 import { IconSmartAccountKit as PasskeyGlyph } from "@/components/stack-logos";
 import { listWallets, WrongNetworkError, type WalletOption } from "@/lib/wallets-kit";
-import { NETWORK_LABEL, NETWORK_LC } from "@/lib/config";
+import { useNet } from "@/components/network-provider";
 
 /** Wallets web: no hay nada que instalar (xBull también corre como PWA). */
 const WEB_IDS = new Set(["albedo", "hot-wallet", "xbull"]);
@@ -35,6 +35,7 @@ export function WalletPicker({
   onClose: () => void;
   onSelect: (id: string) => Promise<void>;
 }) {
+  const { NETWORK_LABEL, NETWORK_LC } = useNet();
   const [wallets, setWallets] = useState<WalletOption[] | null>(null);
   const [listErr, setListErr] = useState(false);
   const [view, setView] = useState<View>({ kind: "list" });

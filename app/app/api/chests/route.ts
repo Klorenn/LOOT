@@ -2,14 +2,16 @@ import { NextResponse } from "next/server";
 import { legacyOff } from "@/lib/mainnet-guard";
 import { Keypair } from "@stellar/stellar-sdk";
 import { Client } from "@findloot/chest";
-import { DEMO_CHEST, NETWORK, CONTRACTS } from "@/lib/config";
+import { cfg } from "@/lib/cfg";
+import { DEMO_CHEST } from "@/lib/config";
 import { withRpcUrl } from "@/lib/rpc";
 import { listChests } from "@/lib/chest-store";
 
 /** true = exists on-chain, false = ChestNotFound (#1), null = could not verify. */
 async function existsOnChain(id: number): Promise<boolean | null> {
-  const secret = process.env.RELAYER_SECRET;
+  const secret = process.env.RELAYER_SECRET; // solo testnet (la ruta está apagada en mainnet)
   if (!secret) return null;
+  const { NETWORK, CONTRACTS } = await cfg();
   try {
     return await withRpcUrl(async (rpcUrl) => {
       const client = new Client({
@@ -30,8 +32,9 @@ async function existsOnChain(id: number): Promise<boolean | null> {
 }
 
 export async function GET() {
-  const off = legacyOff();
+  const off = await legacyOff();
   if (off) return off;
+  const { NETWORK, CONTRACTS } = await cfg();
   // Solo cofres públicos; la sal no sale en el listado.
   const stored = (await listChests()).map(({ salt: _s, ...c }) => (void _s, c));
   const demo = {

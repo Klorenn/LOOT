@@ -27,7 +27,8 @@ export function allow(key: string, limit: number, windowMs: number, now = Date.n
 const num = (v: string | undefined, d: number) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
 
 /** Por IP y global para un endpoint que paga fees. Devuelve el motivo si hay que rechazar. */
-export function relayLimit(req: NextRequest, scope: string): "ip" | "global" | null {
+export function relayLimit(req: NextRequest, scope: string, net: string): "ip" | "global" | null {
+  scope = `${net}:${scope}`; // contadores separados por red
   const perIp = num(process.env.RELAY_RATE_PER_IP_PER_MIN, 10);
   const global = num(process.env.RELAY_RATE_GLOBAL_PER_MIN, 120);
   if (!allow(`${scope}:ip:${clientIp(req)}`, perIp, 60_000)) return "ip";

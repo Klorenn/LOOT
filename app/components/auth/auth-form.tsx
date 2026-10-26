@@ -9,7 +9,6 @@ import { CopyField } from "@/components/copy-field";
 import { IconSmartAccountKit as PasskeyGlyph } from "@/components/stack-logos";
 import { InlineAlert } from "@/components/inline-alert";
 import { chestPath } from "@/lib/chest-code";
-import { SAMPLE_CHEST_ID, NETWORK_LC, IS_MAINNET } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { HANDLE_HINT, HANDLE_RE, setHandle } from "@/lib/handle";
 import { safeNext } from "@/lib/safe-next";
@@ -19,6 +18,7 @@ import {
   PasskeyUnavailableError,
   type EnrollOpts,
 } from "@/lib/wallet";
+import { useNet } from "@/components/network-provider";
 
 type Mode = "login" | "register";
 type View = "idle" | "wait" | "deploy" | "done" | "fail" | "none";
@@ -41,6 +41,7 @@ const isCancel = (e: unknown) =>
   /NotAllowedError|AbortError|timed out or was not allowed|cancel/i.test(errMsg(e));
 
 export function AuthForm({ mode }: { mode: Mode }) {
+  const { SAMPLE_CHEST_ID, NETWORK_LC, IS_MAINNET } = useNet();
   const router = useRouter();
   const params = useSearchParams();
   const rawNext = params.get("next");

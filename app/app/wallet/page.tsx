@@ -7,11 +7,12 @@ import { CellsCanvas } from "@/components/cells-canvas";
 import { ActivityList } from "@/components/wallet/activity-list";
 import { ReceivePanel } from "@/components/wallet/receive-panel";
 import { SendPanel } from "@/components/wallet/send-panel";
-import { PRIZE, stroopsToXlm, NETWORK_LC } from "@/lib/config";
+import { PRIZE, stroopsToXlm } from "@/lib/config";
 import { expertAddress } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { balanceInfo } from "@/lib/send";
 import { loadActivity, loadAssets, type ActivityItem, type Asset } from "@/lib/wallet-data";
+import { useNet } from "@/components/network-provider";
 
 type Tab = "receive" | "send" | "activity";
 const TABS: { key: Tab; label: string }[] = [
@@ -21,6 +22,7 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 function WalletInner() {
+  const { NETWORK_LC, NETWORK } = useNet();
   const { player } = useSession();
   const params = useSearchParams();
   const raw = params.get("tab");
@@ -99,7 +101,7 @@ function WalletInner() {
           Recent activity
         </h2>
         <a
-          href={expertAddress(address)}
+          href={expertAddress(NETWORK.explorerUrl, address)}
           target="_blank"
           rel="noreferrer"
           className="font-mono text-[12px] text-[var(--proof)] underline underline-offset-2"

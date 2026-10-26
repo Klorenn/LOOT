@@ -9,7 +9,7 @@ import { StatusLabel } from "@/components/status-label";
 import { DifficultyBars } from "@/components/difficulty-bars";
 import { Mono } from "@/components/kv";
 import type { ChestRowData, ChestStatus } from "@/lib/listing";
-import { NETWORK_LC } from "@/lib/config";
+import { useNet } from "@/components/network-provider";
 
 type Filter = "all" | ChestStatus;
 const FILTERS: { key: Filter; label: string }[] = [
@@ -20,6 +20,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 ];
 
 export function ExploreClient({ rows, error }: { rows: ChestRowData[]; error: boolean }) {
+  const { NETWORK_LC } = useNet();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 

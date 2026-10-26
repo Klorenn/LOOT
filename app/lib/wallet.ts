@@ -1,10 +1,13 @@
 "use client";
 
 import { hash, Keypair } from "@stellar/stellar-sdk";
-import { NETWORK } from "./config";
+import { NETWORK, isMainnet } from "./client-cfg";
 import { getPasskeyKit } from "./passkey-client";
 
 const STORAGE_KEY = "chestzk.player";
+/** Claves de storage por red: testnet conserva las de siempre; mainnet usa un prefijo propio, así una
+ *  sesión (dirección C… de passkey) de una red nunca se reutiliza en la otra. */
+const sk = (k: string) => (isMainnet() ? k.replace("chestzk.", "chestzk.mainnet.") : k);
 /** playerSecret por dirección: el nullifier debe ser estable aunque se cierre sesión. */
 const SECRETS_KEY = "chestzk.secrets";
 /** Evento de ventana que avisa a la sesión (header, wallet) que el storage cambió. */
@@ -33,7 +36,7 @@ export function sessionKind(p: Pick<Player, "kind">): SessionKind {
 
 function readSecrets(): Record<string, string> {
   try {
-    return JSON.parse(localStorage.getItem(SECRETS_KEY) || "{}");
+    return JSON.parse(localStorage.getItem(sk(SECRETS_KEY)) || "{}");
   } catch {
     return {};
   }
@@ -45,7 +48,7 @@ export function playerSecretFor(address: string, derived?: string): string {
   if (all[address]) return all[address];
   const secret = derived ?? randomFieldElement();
   try {
-    localStorage.setItem(SECRETS_KEY, JSON.stringify({ ...all, [address]: secret }));
+    localStorage.setItem(sk(SECRETS_KEY), JSON.stringify({ ...all, [address]: secret }));
   } catch {
     /* storage lleno o bloqueado: el secret vive solo en la sesión */
   }
@@ -72,7 +75,7 @@ export class PasskeyUnavailableError extends Error {
 
 export function loadPlayer(): Player | null {
   if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = localStorage.getItem(sk(STORAGE_KEY));
   if (!raw) return null;
   try {
     const p = JSON.parse(raw) as Player;
@@ -87,12 +90,12 @@ export function loadPlayer(): Player | null {
 }
 
 export function savePlayer(p: Player) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+  localStorage.setItem(sk(STORAGE_KEY), JSON.stringify(p));
   notifySession();
 }
 
 export function clearPlayer() {
-  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(sk(STORAGE_KEY));
   notifySession();
 }
 
@@ -165,7 +168,7 @@ const ACCOUNTS_KEY = "chestzk.accounts";
 /** keyId (credential id) → C…; sobrevive al cierre de sesión para poder volver a entrar. */
 function readAccounts(): Record<string, string> {
   try {
-    return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "{}");
+    return JSON.parse(localStorage.getItem(sk(ACCOUNTS_KEY)) || "{}");
   } catch {
     return {};
   }
@@ -174,7 +177,7 @@ function readAccounts(): Record<string, string> {
 function rememberAccount(keyId: string, contractId: string) {
   try {
     localStorage.setItem(
-      ACCOUNTS_KEY,
+      sk(ACCOUNTS_KEY),
       JSON.stringify({ ...readAccounts(), [keyId]: contractId }),
     );
   } catch {

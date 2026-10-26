@@ -1,7 +1,8 @@
 import { KuyfiBadge } from "@/components/kuyfi-badge";
 import { LandingPage } from "@/components/landing-page";
-import { CONTRACTS } from "@/lib/config";
+import { cfg } from "@/lib/cfg";
 
-export default function Home() {
+export default async function Home() {
+  const { CONTRACTS } = await cfg();
   return <LandingPage kuyfiBadge={<KuyfiBadge contractId={CONTRACTS.chest} />} />;
 }

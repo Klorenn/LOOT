@@ -13,14 +13,16 @@ import {
   type WonChestsResult,
 } from "@/lib/chain";
 import { chestPath } from "@/lib/chest-code";
-import { CONTRACTS, PRIZE, stroopsToXlm, tokenDecimals, SAMPLE_CHEST_ID, NETWORK_LABEL } from "@/lib/config";
+import { PRIZE, stroopsToXlm, tokenDecimals } from "@/lib/config";
 import { expertAddress, shortAddr } from "@/lib/format";
 import { HANDLE_HINT, HANDLE_RE, setHandle, useHandle } from "@/lib/handle";
 import { useSession } from "@/lib/session";
+import { useNet } from "@/components/network-provider";
 
 type Load<T> = { s: "loading" } | { s: "ok"; v: T } | { s: "error" };
 
 export default function ProfilePage() {
+  const { CONTRACTS, SAMPLE_CHEST_ID, NETWORK_LABEL, NETWORK } = useNet();
   const router = useRouter();
   const { address, player, disconnect } = useSession();
   const [balance, setBalance] = useState<Load<bigint>>({ s: "loading" });
@@ -127,7 +129,7 @@ export default function ProfilePage() {
             <div className="mt-5 flex max-w-[640px] flex-wrap items-center gap-2">
               <CopyField value={address} className="min-w-0 flex-1" />
               <a
-                href={expertAddress(address)}
+                href={expertAddress(NETWORK.explorerUrl, address)}
                 target="_blank"
                 rel="noreferrer"
                 className="btn-landing btn-landing-s btn-landing-sm"

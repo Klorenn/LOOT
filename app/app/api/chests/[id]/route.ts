@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   DEMO_CHEST,
-  IS_MAINNET,
   stroopsToXlm,
   tokenDecimals,
   tokenLabel,
 } from "@/lib/config";
+import { cfg } from "@/lib/cfg";
 import { getChestMeta } from "@/lib/chest-store";
 import { readChest, type OnChainChest } from "@/lib/chain";
 
@@ -47,6 +47,7 @@ export async function GET(
   }
 
   // Cofre #1 legacy: misma pregunta en UI, pero la huella era de "42".
+  const { IS_MAINNET } = await cfg();
   if (n === 1 && !IS_MAINNET) {
     return NextResponse.json({
       id: 1,
@@ -61,7 +62,7 @@ export async function GET(
     });
   }
 
-  const isDemo = n === DEMO_CHEST.id;
+  const isDemo = !IS_MAINNET && n === DEMO_CHEST.id;
   const meta = isDemo ? null : await getChestMeta(n);
   if (!isDemo && !meta) {
     return NextResponse.json({ error: "not found" }, { status: 404 });

@@ -3,7 +3,7 @@ import { legacyOff } from "@/lib/mainnet-guard";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client } from "@findloot/chest";
-import { NETWORK, CONTRACTS } from "@/lib/config";
+import { cfg } from "@/lib/cfg";
 import { withRpcUrl } from "@/lib/rpc";
 
 type Body = {
@@ -43,8 +43,9 @@ function validBody(b: Partial<Body> | null): b is Body {
  * Debe fallar con InvalidProof — eso ES el demo del modo ataque.
  */
 export async function POST(req: NextRequest) {
-  const off = legacyOff();
+  const off = await legacyOff();
   if (off) return off;
+  const { NETWORK, CONTRACTS } = await cfg();
   const logs: string[] = [];
   const push = (m: string) => {
     logs.push(`[${new Date().toISOString().slice(11, 19)}] ${m}`);

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { legacyOff } from "@/lib/mainnet-guard";
 import { pickRpcUrl } from "@/lib/rpc";
-import { CONTRACTS, NETWORK, NORMAL_CHEST } from "@/lib/config";
+import { cfg } from "@/lib/cfg";
+import { NORMAL_CHEST } from "@/lib/config";
 import { runNormalChestFlow } from "@/lib/normal-chest";
 
 export const maxDuration = 120;
@@ -38,8 +39,9 @@ function rateLimit(ip: string): string | null {
  * respuesta en claro y el bot la lee del ledger y cobra con su cuenta.
  */
 export async function POST(req: NextRequest) {
-  const off = legacyOff();
+  const off = await legacyOff();
   if (off) return off;
+  const { NETWORK, CONTRACTS } = await cfg();
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   const limited = rateLimit(ip);
   if (limited) {

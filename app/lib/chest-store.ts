@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { del, get, list, put } from "@vercel/blob";
+import { cfg } from "./cfg";
 import type { Quiz } from "./quiz";
 
 /**
@@ -48,8 +49,20 @@ export class StorageNotConfiguredError extends Error {
   }
 }
 
-const FILE = path.join(process.cwd(), "data", "chests.json");
-const PENDING_FILE = path.join(process.cwd(), "data", "pending.json");
+/**
+ * Namespace por red. Testnet conserva sus claves de siempre (chests/<id>.json, pending/<huella>.json,
+ * data/chests.json) sin migración; mainnet vive bajo mainnet/… y data/mainnet-….json, sin tocar las anteriores.
+ */
+async function ns() {
+  const { IS_MAINNET } = await cfg();
+  return {
+    net: IS_MAINNET ? "mainnet" : "testnet",
+    chests: IS_MAINNET ? "mainnet/chests/" : "chests/",
+    pending: IS_MAINNET ? "mainnet/pending/" : "pending/",
+    file: path.join(process.cwd(), "data", IS_MAINNET ? "mainnet-chests.json" : "chests.json"),
+    pendingFile: path.join(process.cwd(), "data", IS_MAINNET ? "mainnet-pending.json" : "pending.json"),
+  };
+}
 
 type Backend = "blob" | "file";
 /** Blob credentials: a read-write token, or a connected store via Vercel OIDC (BLOB_STORE_ID + VERCEL_OIDC_TOKEN). */
@@ -115,12 +128,13 @@ async function fileWriteAll(file: string, data: unknown) {
 
 // ---------- API ----------
 async function readLegacyFile(id: number): Promise<ChestMeta | null> {
-  return (await fileReadAll<ChestMeta>(FILE))[String(id)] ?? null;
+  return (await fileReadAll<ChestMeta>((await ns()).file))[String(id)] ?? null;
 }
 
 export async function getChestMeta(id: number): Promise<ChestMeta | null> {
+  const n = await ns();
   if (hasBlob()) {
-    const m = await blobRead<ChestMeta>(`chests/${id}.json`);
+    const m = await blobRead<ChestMeta>(`${n.chests}${id}.json`);
     if (m) return m;
   }
   return readLegacyFile(id); // legado / dev local (en Vercel el archivo no existe: null)
@@ -128,52 +142,57 @@ export async function getChestMeta(id: number): Promise<ChestMeta | null> {
 
 /** Reserva (write-once) los metadatos de un cofre por su huella, antes de crearlo on-chain. */
 export async function reserveChestMeta(p: PendingMeta): Promise<"ok" | "exists"> {
-  if (backend() === "blob") return blobWriteOnce(`pending/${p.fingerprintHex}.json`, p);
-  const all = await fileReadAll<PendingMeta>(PENDING_FILE);
+  const n = await ns();
+  if (backend() === "blob") return blobWriteOnce(`${n.pending}${p.fingerprintHex}.json`, p);
+  const all = await fileReadAll<PendingMeta>(n.pendingFile);
   if (all[p.fingerprintHex]) return "exists";
   all[p.fingerprintHex] = p;
-  await fileWriteAll(PENDING_FILE, all);
+  await fileWriteAll(n.pendingFile, all);
   return "ok";
 }
 
 export async function getPending(fingerprintHex: string): Promise<PendingMeta | null> {
-  if (backend() === "blob") return blobRead<PendingMeta>(`pending/${fingerprintHex}.json`);
-  return (await fileReadAll<PendingMeta>(PENDING_FILE))[fingerprintHex] ?? null;
+  const n = await ns();
+  if (backend() === "blob") return blobRead<PendingMeta>(`${n.pending}${fingerprintHex}.json`);
+  return (await fileReadAll<PendingMeta>(n.pendingFile))[fingerprintHex] ?? null;
 }
 
 /** Publica (write-once) los metadatos definitivos por id de cofre. Devuelve los que queden guardados. */
 export async function saveChestMeta(meta: ChestMeta): Promise<ChestMeta> {
+  const n = await ns();
   if (backend() === "blob") {
-    const r = await blobWriteOnce(`chests/${meta.id}.json`, meta);
-    if (r === "exists") return (await blobRead<ChestMeta>(`chests/${meta.id}.json`)) ?? meta;
-    await del(`pending/${meta.fingerprintHex}.json`, auth()).catch(() => {});
+    const r = await blobWriteOnce(`${n.chests}${meta.id}.json`, meta);
+    if (r === "exists") return (await blobRead<ChestMeta>(`${n.chests}${meta.id}.json`)) ?? meta;
+    await del(`${n.pending}${meta.fingerprintHex}.json`, auth()).catch(() => {});
     return meta;
   }
-  const all = await fileReadAll<ChestMeta>(FILE);
+  const all = await fileReadAll<ChestMeta>(n.file);
   if (all[String(meta.id)]) return all[String(meta.id)];
   all[String(meta.id)] = meta;
-  await fileWriteAll(FILE, all);
-  const pend = await fileReadAll<PendingMeta>(PENDING_FILE);
+  await fileWriteAll(n.file, all);
+  const pend = await fileReadAll<PendingMeta>(n.pendingFile);
   delete pend[meta.fingerprintHex];
-  await fileWriteAll(PENDING_FILE, pend);
+  await fileWriteAll(n.pendingFile, pend);
   return meta;
 }
 
-let publicCache: { at: number; value: ChestMeta[] } | null = null;
+const publicCache = new Map<string, { at: number; value: ChestMeta[] }>();
 
 /** Metadatos de cofres públicos (listed !== false), de Blob o del archivo local. */
 export async function listPublicMetas(): Promise<ChestMeta[]> {
-  if (publicCache && Date.now() - publicCache.at < 30_000) return publicCache.value;
-  let metas: ChestMeta[] = Object.values(await fileReadAll<ChestMeta>(FILE));
+  const n = await ns();
+  const hit = publicCache.get(n.net);
+  if (hit && Date.now() - hit.at < 30_000) return hit.value;
+  let metas: ChestMeta[] = Object.values(await fileReadAll<ChestMeta>(n.file));
   if (hasBlob()) {
-    const { blobs } = await list({ prefix: "chests/", limit: 500, ...auth() });
+    const { blobs } = await list({ prefix: n.chests, limit: 500, ...auth() });
     const fetched = await Promise.all(blobs.map((b) => blobRead<ChestMeta>(b.pathname)));
     const byId = new Map(metas.map((m) => [m.id, m]));
     for (const m of fetched) if (m) byId.set(m.id, m);
     metas = [...byId.values()];
   }
   const value = metas.filter((m) => m.listed !== false).sort((a, b) => b.id - a.id);
-  publicCache = { at: Date.now(), value };
+  publicCache.set(n.net, { at: Date.now(), value });
   return value;
 }
 

@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { PageHeader, Em } from "@/components/page-header";
 import { ExampleTag } from "@/components/example-tag";
 import { Terminal } from "@/components/terminal";
-import { ATTACK_CHEST, NETWORK } from "@/lib/config";
+import { ATTACK_CHEST } from "@/lib/config";
 import { loadPlayer, enrollPreferPasskey } from "@/lib/wallet";
 import { recipientField } from "@/lib/recipient";
 import { proveChest } from "@/lib/zk";
@@ -15,8 +15,6 @@ type LogLine = { t: string; msg: string; side: Side };
 /** Cuenta que hace de bot (la del relayer en testnet): destino al que se re-apunta la prueba copiada. */
 const BOT_ADDR = "GAVLW5IKB7VFBRJ3EHBE4BRZ5OX3AOW3ICMLMB6KVKCQDO6WJ2SPHDN3";
 const BOT_SHORT = `${BOT_ADDR.slice(0, 4)}…${BOT_ADDR.slice(-4)}`;
-
-const EXPLORER_TX = `${NETWORK.explorerUrl}/tx/`;
 
 export function AttackClient({
   zkBadge,
@@ -257,7 +255,7 @@ export function AttackClient({
         <p className="mt-6 font-mono text-[12px] text-[var(--dim)]">
           Live txs →{" "}
           <a
-            href={EXPLORER_TX}
+            href="https://stellar.expert/explorer/testnet"
             className="underline underline-offset-2"
             target="_blank"
             rel="noreferrer"
