@@ -3,9 +3,6 @@
 import Link from "next/link";
 import {
   Flag,
-  Gift,
-  GraduationCap,
-  MapPin,
   Megaphone,
   Users,
   type LucideIcon,
@@ -134,13 +131,26 @@ export function HowSection() {
   );
 }
 
-const USE_CASES: { icon: LucideIcon; t: string; b: string }[] = [
-  { icon: MapPin, t: "Treasure hunts", b: "Hide clues in a place. First to solve wins." },
-  { icon: Megaphone, t: "Marketing", b: "Put a riddle on your product or ad. Fans win real prizes." },
-  { icon: Flag, t: "Hackathons & CTFs", b: "The answer is the flag. The bounty pays out on its own." },
-  { icon: GraduationCap, t: "Classrooms", b: "Students win when they get it right." },
-  { icon: Users, t: "Communities", b: "A weekly puzzle for your Discord or Telegram." },
-  { icon: Gift, t: "Gifts", b: "A gift only the right person can open." },
+/** Tres públicos concretos (no seis): quién lo usa, qué hace con Loot y qué pasa. */
+const USE_CASES: { icon: LucideIcon; who: string; t: string; b: string }[] = [
+  {
+    icon: Users,
+    who: "Communities",
+    t: "Run a prize puzzle for your community.",
+    b: "Post a riddle in Discord or Telegram. Whoever solves it wins XLM, paid automatically. No one has to send prizes by hand.",
+  },
+  {
+    icon: Megaphone,
+    who: "Brands & marketing",
+    t: "Turn a campaign into a game.",
+    b: "Put a riddle on your product, ad or event page. Fans who solve it win a real prize, and you set the budget up front.",
+  },
+  {
+    icon: Flag,
+    who: "Hackathons & events",
+    t: "Pay bounties and quests without a spreadsheet.",
+    b: "The answer is the flag. Solve it, get paid. The prize is locked from the start, and what isn’t claimed comes back to you.",
+  },
 ];
 
 export function UseCasesSection() {
@@ -155,31 +165,32 @@ export function UseCasesSection() {
           data-fade
           className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)]"
         >
-          Use cases
+          Who uses it
         </p>
         <h2
           id="use-cases-h"
           data-reveal-h2
-          className="mt-4 max-w-[18ch] text-[clamp(36px,4.5vw,56px)] leading-[1.02] font-semibold tracking-[-0.04em]"
+          className="mt-4 max-w-[20ch] text-[clamp(36px,4.5vw,56px)] leading-[1.02] font-semibold tracking-[-0.04em]"
         >
-          Any prize. Any riddle.
+          Pay people who know the answer.
         </h2>
         <p
           data-fade
           className="mt-5 max-w-[40rem] text-[18px] leading-[1.55] text-[var(--muted)]"
         >
-          If you can ask a question, you can lock a prize behind it.
+          Ask a question, lock a prize behind it, share a link. Three ways to use it:
         </p>
-        <div className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {USE_CASES.map(({ icon: Icon, t, b }) => (
+        <div className="mt-16 grid grid-cols-1 gap-5 md:grid-cols-3">
+          {USE_CASES.map(({ icon: Icon, who, t, b }) => (
             <div
-              key={t}
+              key={who}
               data-fade
-              className="flex flex-col rounded-[14px] border border-[var(--line)] bg-[var(--s1)] p-6"
+              className="flex flex-col rounded-[14px] border border-[var(--line)] bg-[var(--s1)] p-7"
             >
               <Icon aria-hidden className="size-6 text-[var(--proof)]" strokeWidth={1.75} />
-              <h3 className="mt-5 text-[20px] font-semibold tracking-[-0.02em]">{t}</h3>
-              <p className="mt-2 text-[15px] leading-[1.55] text-[var(--muted)]">{b}</p>
+              <p className="mt-5 font-mono text-[12px] tracking-[0.06em] text-[var(--proof)]">{who}</p>
+              <h3 className="mt-3 text-[24px] leading-[1.2] font-semibold tracking-[-0.02em]">{t}</h3>
+              <p className="mt-3 text-[15px] leading-[1.55] text-[var(--muted)]">{b}</p>
             </div>
           ))}
         </div>
