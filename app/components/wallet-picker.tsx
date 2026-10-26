@@ -3,21 +3,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { InlineAlert } from "@/components/inline-alert";
 import { IconSmartAccountKit as PasskeyGlyph } from "@/components/stack-logos";
-import { isPhone, listWallets, WC_PROJECT_ID, WC_WALLET_ID, wcEnabled, WrongNetworkError, type WalletOption } from "@/lib/wallets-kit";
+import { isPhone, listWallets, preloadKit, walletErrorMessage, WC_WALLET_ID, wcEnabled, WrongNetworkError, type WalletOption } from "@/lib/wallets-kit";
 import { MAINNET_PASSKEY_NOTE } from "@/lib/passkey-policy";
 import { useNet } from "@/components/network-provider";
 
 /** Wallets web: no hay nada que instalar (xBull también corre como PWA). */
 const WEB_IDS = new Set(["albedo", "hot-wallet", "xbull"]);
-/** Apps móviles: en el sheet de móvil van en su propia grilla; las extensiones de escritorio se ocultan. */
-const MOBILE_IDS = new Set(["lobstr", "onekey", "bitget", "hana"]);
+/** Orden de las wallets web en el teléfono (xBull, Albedo, HOT). */
+const WEB_ORDER = ["xbull", "albedo", "hot-wallet"];
 const WALLET_INFO_URL = "https://stellar.org/ecosystem/wallets";
 const LAST_KEY = "chestzk.lastWallet";
 
 type View =
   | { kind: "list" }
   | { kind: "connecting"; wallet: WalletOption }
-  | { kind: "rejected"; wallet: WalletOption }
+  | { kind: "rejected"; wallet: WalletOption; message: string }
   | { kind: "network"; wallet: WalletOption; network: string; checking?: boolean };
 
 const isDetected = (w: WalletOption) => w.isAvailable && !WEB_IDS.has(w.id);
@@ -41,8 +41,8 @@ export function WalletPicker({
   const [listErr, setListErr] = useState(false);
   const [view, setView] = useState<View>({ kind: "list" });
   const [moreOpen, setMoreOpen] = useState(false);
-  const [mobile, setMobile] = useState(false);
   const [last, setLast] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const attempt = useRef(0);
@@ -53,13 +53,13 @@ export function WalletPicker({
     setView({ kind: "list" });
     setMoreOpen(false);
     setListErr(false);
-    setMobile(window.matchMedia("(max-width: 639px)").matches);
     try {
       setLast(localStorage.getItem(LAST_KEY));
     } catch {
       setLast(null);
     }
     let live = true;
+    preloadKit(); // el click debe poder llamar al kit sin await (popups de xBull/Albedo)
     listWallets()
       .then((l) => live && setWallets(l))
       .catch(() => live && setListErr(true));
@@ -73,40 +73,41 @@ export function WalletPicker({
     };
   }, [open]);
 
+  const phone = open && isPhone();
   const groups = useMemo(() => {
     const byLast = (a: WalletOption, b: WalletOption) =>
       (b.id === last ? 1 : 0) - (a.id === last ? 1 : 0) || a.name.localeCompare(b.name);
-    // WalletConnect genérico no se lista: en teléfonos se ofrece como "LOBSTR (mobile app)"; el módulo
-    // `lobstr` del kit es la extensión de escritorio y en un teléfono nunca se detecta.
-    // Freighter no detectado no se esconde en "More wallets": va arriba como fila propia (ver freighterRow).
-    const all = (wallets ?? []).filter(
-      (w) => w.id !== WC_WALLET_ID && !(isPhone() && w.id === "lobstr" && !w.isAvailable) && !(w.id === "freighter" && !w.isAvailable),
-    );
+    // WalletConnect genérico va en su propia fila (ver wcRow). Freighter no detectado va arriba como fila propia.
+    const all = (wallets ?? []).filter((w) => w.id !== WC_WALLET_ID && !(w.id === "freighter" && !w.isAvailable));
     const detected = all.filter(isDetected).sort(byLast);
-    const web = all.filter((w) => WEB_IDS.has(w.id)).sort(byLast);
-    const apps = all.filter((w) => MOBILE_IDS.has(w.id) && !isDetected(w) && !WEB_IDS.has(w.id)).sort(byLast);
-    const more = all
-      .filter((w) => !isDetected(w) && !WEB_IDS.has(w.id))
-      .filter((w) => !mobile) // móvil: las apps van arriba y las extensiones de escritorio se ocultan
-      .sort(byLast);
-    return { detected, web, apps, more };
-  }, [wallets, last, mobile]);
+    const web = all
+      .filter((w) => WEB_IDS.has(w.id))
+      .sort(phone ? (a, b) => WEB_ORDER.indexOf(a.id) - WEB_ORDER.indexOf(b.id) : byLast);
+    // teléfono: las extensiones de escritorio no instaladas (OneKey, Bitget, Hana…) fallan, así que no se listan
+    const more = phone ? [] : all.filter((w) => !isDetected(w) && !WEB_IDS.has(w.id)).sort(byLast);
+    return { detected, web, more };
+  }, [wallets, last, phone]);
 
   // isPlatformWrapper: la wallet que nos abrió se autoselecciona
   useEffect(() => {
     if (!open || !wallets || view.kind !== "list") return;
-    // la wallet que nos abrió (isPlatformWrapper del kit, o el navegador interno de LOBSTR) se autoselecciona
+    // la wallet que nos abrió (isPlatformWrapper del kit, o el navegador interno de LOBSTR) se autoselecciona.
+    // WalletConnect (p. ej. Freighter mobile) puede reportarse como no disponible mientras arranca su cliente.
     const inLobstr = /lobstr/i.test(navigator.userAgent);
-    const w = wallets.find((x) => x.isPlatformWrapper && x.isAvailable) ?? (inLobstr ? wallets.find((x) => x.id === "lobstr" && x.isAvailable) : undefined);
+    const w =
+      wallets.find((x) => x.isPlatformWrapper && (x.isAvailable || (x.id === WC_WALLET_ID && wcEnabled()))) ??
+      (inLobstr ? wallets.find((x) => x.id === "lobstr" && x.isAvailable) : undefined);
     if (w) void choose(w);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, wallets]);
 
   async function choose(w: WalletOption) {
     const mine = ++attempt.current;
+    // onSelect se invoca ANTES de cualquier setState/await: el kit abre el popup (xBull, Albedo) dentro del gesto
+    const pending = onSelect(w.id);
     setView({ kind: "connecting", wallet: w });
     try {
-      await onSelect(w.id);
+      await pending;
       try {
         if (w.id !== "passkey") localStorage.setItem(LAST_KEY, w.id);
       } catch {
@@ -115,7 +116,7 @@ export function WalletPicker({
     } catch (e) {
       if (mine !== attempt.current) return; // cancelado mientras tanto
       if (e instanceof WrongNetworkError) setView({ kind: "network", wallet: w, network: e.networkName });
-      else setView({ kind: "rejected", wallet: w });
+      else setView({ kind: "rejected", wallet: w, message: walletErrorMessage(e) });
     }
   }
 
@@ -169,13 +170,16 @@ export function WalletPicker({
     <img src={w.icon} alt="" width={size} height={size} className="shrink-0 rounded-[6px]" style={{ width: size, height: size }} />
   );
 
-  const Row = ({ w, status, dot }: { w: WalletOption; status: string; dot?: boolean }) => (
+  const Row = ({ w, status, dot, name, sub }: { w: WalletOption; status: string; dot?: boolean; name?: string; sub?: string }) => (
     <li className="border-t border-[var(--line)] first:border-t-0">
       <button type="button" data-row disabled={busy} onClick={() => void choose(w)} className={row}>
         <Icon w={w} />
-        <span className="min-w-0 flex-1 text-[15px] font-medium">
-          {w.name}
-          {w.id === last && <span className="ml-2 font-mono text-[11px] font-normal text-[var(--dim)]">last used</span>}
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-medium">
+            {name ?? w.name}
+            {w.id === last && <span className="ml-2 font-mono text-[11px] font-normal text-[var(--dim)]">last used</span>}
+          </span>
+          {sub && <span className="block text-[13px] font-normal text-[var(--muted)]">{sub}</span>}
         </span>
         <span className="flex items-center gap-2 font-mono text-[12px] text-[var(--dim)]">
           {dot && <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden />}
@@ -185,39 +189,55 @@ export function WalletPicker({
     </li>
   );
 
-  // LOBSTR en un teléfono: por WalletConnect si hay projectId; si no, instrucciones (no una página de
-  // instalación para una wallet que la persona ya tiene).
-  const phoneLobstr = (() => {
-    if (!isPhone() || !IS_MAINNET) return null;
-    if (wcEnabled()) {
-      const wc = (wallets ?? []).find((w) => w.id === WC_WALLET_ID);
-      if (!wc) return null;
-      const opt: WalletOption = { ...wc, id: WC_WALLET_ID, name: "LOBSTR (mobile app)", icon: "https://stellar.creit.tech/wallet-icons/lobstr.png" };
-      return (
-        <>
-          <p className={label}>Mobile app</p>
-          <ul className="border-y border-[var(--line)]">
-            <Row w={opt} status="WalletConnect" />
-          </ul>
-        </>
-      );
-    }
-    if (WC_PROJECT_ID) return null;
-    return (
+  // WalletConnect: en el teléfono abre la app de la wallet (LOBSTR, Freighter mobile, xBull…); en escritorio, QR.
+  // Sin projectId se avisa de forma visible (nunca se oculta en silencio).
+  const wc = (wallets ?? []).find((w) => w.id === WC_WALLET_ID);
+  const wcRow = wcEnabled() ? (
+    wc || !wallets ? (
       <>
-        <p className={label}>LOBSTR (mobile app)</p>
-        <div className="mx-5 mb-3 rounded-[10px] border border-[var(--line)] bg-[var(--bg)] p-3 text-[13px] leading-[1.5] text-[var(--muted)]" role="note">
-          Using LOBSTR on your phone? Open this site inside the LOBSTR app&apos;s browser, then connect from there. We can&apos;t
-          detect the app from a regular mobile browser.
-        </div>
+        <p className={label}>{phone ? "Wallet app" : "Phone wallet"}</p>
+        <ul className="border-y border-[var(--line)]">
+          {wc ? (
+            <Row
+              w={wc}
+              name={phone ? "Wallet app" : "WalletConnect"}
+              sub={phone ? "LOBSTR, Freighter mobile, xBull…" : "Scan a QR with your phone wallet"}
+              status="WalletConnect"
+            />
+          ) : null}
+        </ul>
       </>
-    );
-  })();
+    ) : null
+  ) : phone ? (
+    <p className="mx-5 my-3 rounded-[10px] border border-[var(--line)] bg-[var(--bg)] p-3 text-[13px] leading-[1.5] text-[var(--muted)]" role="note">
+      Wallet apps (LOBSTR, Freighter mobile…) connect through WalletConnect, which isn&apos;t configured on this deployment yet.
+      Use a web wallet below, or open this site inside your wallet app&apos;s browser.
+    </p>
+  ) : null;
+
+  // Teléfono: Freighter/LOBSTR no se detectan desde un navegador normal (son extensiones). En vez de un botón
+  // que falla, se explica cómo usarlos: su navegador interno (o WalletConnect, arriba).
+  const inAppNote = phone ? (
+    <div className="mx-5 my-3 rounded-[10px] border border-[var(--line)] bg-[var(--bg)] p-3 text-[13px] leading-[1.5] text-[var(--muted)]" role="note">
+      <p>
+        Using Freighter or LOBSTR? Open this site in the wallet app&apos;s browser, then connect from there.
+      </p>
+      <button
+        type="button"
+        onClick={() => {
+          void navigator.clipboard?.writeText(window.location.href).then(() => setCopied(true), () => {});
+        }}
+        className="mt-2 font-mono text-[12px] text-[var(--text)] underline underline-offset-2"
+      >
+        {copied ? "Link copied" : "Copy link"}
+      </button>
+    </div>
+  ) : null;
 
   // Freighter sin detectar (extensión no instalada o navegador sin ella): siempre visible, con una
   // salida clara. En el teléfono, Freighter corre en su propio navegador interno.
   const freighterMissing = (wallets ?? []).find((w) => w.id === "freighter" && !w.isAvailable);
-  const freighterRow = freighterMissing ? (
+  const freighterRow = freighterMissing && !phone ? (
     <>
       <p className={label}>Freighter</p>
       <ul className="border-y border-[var(--line)]">
@@ -227,9 +247,7 @@ export function WalletPicker({
             <span className="min-w-0 flex-1">
               <span className="block text-[15px] font-medium">Freighter</span>
               <span className="block text-[13px] text-[var(--muted)]">
-                {isPhone()
-                  ? "Not detected in this browser. Open this site inside the Freighter app's browser."
-                  : "Not detected. Install the extension, then reload this page."}
+                Not detected. Install the extension, then reload this page.
               </span>
             </span>
             <span className="text-[var(--dim)]" aria-hidden>
@@ -323,7 +341,12 @@ export function WalletPicker({
 
             {freighterRow}
 
-            {phoneLobstr}
+            {phone ? (
+              <>
+                {wcRow}
+                {inAppNote}
+              </>
+            ) : null}
 
             {listErr && (
               <p className="px-5 py-6 text-[14px] text-[var(--muted)]">
@@ -354,24 +377,7 @@ export function WalletPicker({
               </>
             )}
 
-            {mobile && groups.apps.length > 0 && (
-              <>
-                <p className={label}>Mobile apps</p>
-                <ul className="grid grid-cols-2 gap-px border-y border-[var(--line)] bg-[var(--line)]">
-                  {groups.apps.map((w) => (
-                    <li key={w.id} className="bg-[var(--s1)]">
-                      <a href={w.url} target="_blank" rel="noopener noreferrer" className={`${row} px-4`}>
-                        <Icon w={w} />
-                        <span className="min-w-0 flex-1 truncate text-[14px]">{w.name}</span>
-                        <span className="text-[var(--dim)]" aria-hidden>
-                          ↗
-                        </span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
+            {!phone && wcRow}
 
             {groups.more.length > 0 && (
               <>
@@ -456,7 +462,7 @@ export function WalletPicker({
             <InlineAlert
               tone="red"
               title="Wallet not connected"
-              body={`Couldn’t connect to ${view.wallet.name}. The request was cancelled or failed.`}
+              body={`Couldn’t connect to ${view.wallet.name}. ${view.message || "The request was cancelled or failed."}`}
             />
             <button type="button" onClick={() => void choose(view.wallet)} className="btn-landing btn-landing-p w-full">
               Try again

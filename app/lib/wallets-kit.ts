@@ -8,30 +8,53 @@
 import { NETWORK, isMainnet } from "./client-cfg";
 
 /**
- * LOBSTR en el móvil: el módulo `lobstr` del kit es la EXTENSIÓN de navegador (usa
- * @lobstrco/signer-extension-api), así que en un teléfono siempre aparece como "no instalado" aunque la
- * app esté. La app móvil se conecta por WalletConnect (módulo `wallet-connect` del kit, que necesita un
- * projectId de Reown/WalletConnect). Sin NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID esa opción no existe.
+ * WalletConnect (módulo `wallet-connect` del kit, necesita un projectId de Reown/WalletConnect): es la vía
+ * para las apps móviles (LOBSTR, Freighter mobile, xBull…), porque los módulos de extensión del kit nunca
+ * se detectan en un teléfono. El acceso a la variable tiene que ser LITERAL (`process.env.NEXT_PUBLIC_X`):
+ * Next solo sustituye ese patrón en el bundle del cliente; un acceso dinámico (`process.env[name]`) queda
+ * sin sustituir. Sin la variable no hay WalletConnect: se avisa por consola y en el selector.
  */
 export const WC_PROJECT_ID = (process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "").trim();
 export const WC_WALLET_ID = "wallet_connect";
-/** Id de LOBSTR en el directorio de WalletConnect/Reown (el mismo que el kit usa como destacado). */
+/** Ids del directorio de WalletConnect/Reown de las wallets destacadas en su modal. */
 const LOBSTR_WC_WALLET = "76a3d548a08cf402f5c7d021f24fd2881d767084b387a5325df88bc3d4b6f21b";
+const FREIGHTER_WC_WALLET = "997a355c8f682468706a76cff1b004a7115f505fb962dac54b6e9b442dd1c380";
+const SCOPULY_WC_WALLET = "9c78aee7d8a771255942334d06d2cbab89e2178ee49fee4ea3b6c78032fcac76";
+/** El `url` de la metadata de WalletConnect debe coincidir con el dominio verificado en Reown. */
+const WC_METADATA_URL = "https://www.findloot.xyz";
 
 export const isPhone = () =>
   typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-/** WalletConnect solo se ofrece en teléfonos y en mainnet (la app de LOBSTR no opera en testnet). */
-export const wcEnabled = () => !!WC_PROJECT_ID && isMainnet() && isPhone();
+/** WalletConnect se ofrece en escritorio y móvil, testnet y mainnet; solo requiere el projectId. */
+export const wcEnabled = () => !!WC_PROJECT_ID;
+
+/** Mensaje del kit: sus errores son objetos `{ code, message }` (no instancias de Error). */
+export function walletErrorMessage(e: unknown): string {
+  if (typeof e === "string") return e;
+  const m = (e as { message?: unknown } | null)?.message;
+  return typeof m === "string" && m ? m : "";
+}
 
 type Kit = typeof import("@creit.tech/stellar-wallets-kit/sdk").StellarWalletsKit;
 
 let loading: Promise<Kit> | null = null;
+/**
+ * Kit ya cargado. Los popups (xBull, Albedo) solo se abren si `window.open` corre dentro del gesto del
+ * usuario; iOS Safari lo bloquea tras un `await`. Con la instancia en una variable de módulo el click puede
+ * llamar a setWallet/fetchAddress/authModal de forma síncrona (ver connectGWalletSync/authModalSync).
+ */
+let kitInstance: Kit | null = null;
+
+/** Carga el kit en segundo plano (selector abierto, o ocioso en teléfonos). Nunca lanza. */
+export function preloadKit(): void {
+  void loadKit().catch((e) => console.warn("[wallets] kit preload failed:", e));
+}
 
 function loadKit(): Promise<Kit> {
   if (!loading) {
     loading = (async () => {
-      // Sin WalletConnect (pide projectId) ni Ledger/Trezor (flujo hardware por USB).
+      // Sin Ledger/Trezor (flujo hardware por USB); WalletConnect se añade más abajo si hay projectId.
       const [
         { StellarWalletsKit },
         { Networks },
@@ -70,13 +93,18 @@ function loadKit(): Promise<Kit> {
             metadata: {
               name: "Loot",
               description: "Puzzle chests with prizes only the rightful solver can claim.",
-              url: window.location.origin,
-              icons: [`${window.location.origin}/icon.svg`],
+              url: WC_METADATA_URL,
+              icons: [`${WC_METADATA_URL}/icon.svg`],
             },
-            allowedChains: [WalletConnectTargetChain.PUBLIC],
-            // el modal de Reown solo ofrece LOBSTR: deep link directo desde el teléfono
-            appKitOptions: { includeWalletIds: [LOBSTR_WC_WALLET], featuredWalletIds: [LOBSTR_WC_WALLET] } as never,
+            allowedChains: [isMainnet() ? WalletConnectTargetChain.PUBLIC : WalletConnectTargetChain.TESTNET],
+            // sin includeWalletIds: el modal de Reown lista todas las wallets Stellar; solo se destacan
+            appKitOptions: { featuredWalletIds: [LOBSTR_WC_WALLET, FREIGHTER_WC_WALLET, SCOPULY_WC_WALLET] } as never,
           }),
+        );
+      } else {
+        console.warn(
+          "[wallets] NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is not set: WalletConnect (mobile wallet apps) is disabled. " +
+            "Create a project at https://dashboard.reown.com, set the variable and redeploy.",
         );
       }
       StellarWalletsKit.init({
@@ -116,6 +144,7 @@ function loadKit(): Promise<Kit> {
           "font-family": "var(--font-geist-sans), Geist, ui-sans-serif, system-ui, sans-serif",
         },
       });
+      kitInstance = StellarWalletsKit;
       return StellarWalletsKit;
     })().catch((e) => {
       loading = null;
@@ -186,6 +215,22 @@ export async function assertWalletOnNetwork(walletId: string): Promise<void> {
   throw new WrongNetworkError(name);
 }
 
+/** WalletConnect inicia su SignClient en segundo plano: espera a que esté listo (no necesita gesto). */
+async function waitWalletReady(kit: Kit, walletId: string): Promise<void> {
+  if (walletId !== WC_WALLET_ID) return;
+  for (let i = 0; i < 40; i++) {
+    if (await kit.selectedModule.isAvailable()) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error("WalletConnect is still starting. Try again in a moment.");
+}
+
+async function fetchFrom(kit: Kit, walletId: string): Promise<{ address: string; walletId: string }> {
+  await waitWalletReady(kit, walletId);
+  const { address } = await kit.fetchAddress();
+  return { address, walletId };
+}
+
 /** Abre el selector de wallets y devuelve la cuenta G… elegida y el id del módulo. */
 export async function connectGWallet(
   walletId?: string,
@@ -194,11 +239,34 @@ export async function connectGWallet(
   if (walletId) {
     // Wallet elegida directamente (botones Freighter / xBull): sin selector.
     kit.setWallet(walletId);
-    const { address } = await kit.fetchAddress();
-    return { address, walletId };
+    return fetchFrom(kit, walletId);
   }
   const { address } = await kit.authModal();
   return { address, walletId: kit.selectedModule.productId };
+}
+
+/**
+ * Igual que connectGWallet(id) pero SIN ningún `await` antes de setWallet/fetchAddress cuando el kit ya está
+ * precargado: hay que llamarla directo desde el onClick para que el popup de xBull/Albedo conserve el gesto
+ * del usuario. Si el kit aún no cargó, cae a la ruta asíncrona (puede que el navegador bloquee el popup).
+ */
+export function connectGWalletSync(walletId: string): Promise<{ address: string; walletId: string }> {
+  const kit = kitInstance;
+  if (!kit) return connectGWallet(walletId);
+  try {
+    kit.setWallet(walletId);
+    if (walletId === WC_WALLET_ID) return fetchFrom(kit, walletId); // modal en la página, sin popup
+    return kit.fetchAddress().then(({ address }) => ({ address, walletId }));
+  } catch (e) {
+    return Promise.reject(e);
+  }
+}
+
+/** authModal del kit llamado de forma síncrona desde el click (NEXT_PUBLIC_WALLET_MODAL=kit). */
+export function authModalSync(): Promise<{ address: string; walletId: string }> {
+  const kit = kitInstance;
+  if (!kit) return connectGWallet();
+  return kit.authModal().then(({ address }) => ({ address, walletId: kit.selectedModule.productId }));
 }
 
 export class FreighterUnavailableError extends Error {

@@ -23,3 +23,17 @@ describe("wallet kit phone detection", () => {
     expect(isPhone()).toBe(false);
   });
 });
+
+describe("wallet kit helpers", () => {
+  it("offers WalletConnect on any device/network once a project id exists, and reads kit error objects", async () => {
+    vi.stubEnv("NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID", "abc123");
+    vi.resetModules();
+    const { wcEnabled, WC_PROJECT_ID, walletErrorMessage } = await import("./wallets-kit");
+    expect(WC_PROJECT_ID).toBe("abc123");
+    expect(wcEnabled()).toBe(true);
+    expect(walletErrorMessage({ code: -1, message: "The user closed the modal." })).toBe("The user closed the modal.");
+    expect(walletErrorMessage(new Error("boom"))).toBe("boom");
+    expect(walletErrorMessage(undefined)).toBe("");
+    vi.unstubAllEnvs();
+  });
+});

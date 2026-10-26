@@ -26,8 +26,11 @@ import {
 import {
   connectFreighter,
   assertWalletOnNetwork,
-  connectGWallet,
+  authModalSync,
+  connectGWalletSync,
   disconnectGWallet,
+  isPhone,
+  preloadKit,
   restoreGWallet,
 } from "./wallets-kit";
 import { WalletPicker } from "@/components/wallet-picker";
@@ -82,6 +85,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // En teléfonos precarga el kit en ocio: así el click en una wallet (xBull, Albedo…) puede abrir su popup
+  // sin ningún await antes, dentro del gesto del usuario (iOS Safari bloquea window.open si no).
+  useEffect(() => {
+    if (!isPhone()) return;
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    if (w.requestIdleCallback) w.requestIdleCallback(preloadKit, { timeout: 3000 });
+    else setTimeout(preloadKit, 1500);
+  }, []);
+
   // Al volver: rearmar el estado del conector sin pedir nada al usuario.
   useEffect(() => {
     if (!ready || !player) return;
@@ -126,7 +138,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (id === "passkey") {
       p = await enrollWithPasskey();
     } else {
-      const { address, walletId } = await connectGWallet(id);
+      // Sin ningún await antes: el popup de xBull/Albedo debe abrirse dentro del gesto del click.
+      const { address, walletId } = await connectGWalletSync(id);
       await assertWalletOnNetwork(walletId); // WrongNetworkError: no se guarda la sesión
       p = enrollWalletAccount(address, walletId);
       try {
@@ -170,19 +183,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       // Por defecto: selector propio de Loot (components/wallet-picker.tsx).
       // NEXT_PUBLIC_WALLET_MODAL=kit: modal de Stellar Wallets Kit con tema Loot (fallback).
       if (process.env.NEXT_PUBLIC_WALLET_MODAL === "kit") {
-        const { address, walletId } = await connectGWallet();
+        const { address, walletId } = await authModalSync();
         return enrollWalletAccount(address, walletId);
       }
       return openPicker();
     }
     if (method.startsWith("wallet:")) {
-      const { address, walletId } = await connectGWallet(method.slice(7));
+      const { address, walletId } = await connectGWalletSync(method.slice(7));
       return enrollWalletAccount(address, walletId);
     }
     const { address, walletId } =
       method === "freighter"
         ? await connectFreighter()
-        : await connectGWallet(method === "xbull" ? "xbull" : undefined);
+        : method === "xbull"
+          ? await connectGWalletSync("xbull")
+          : await authModalSync();
     return enrollWalletAccount(address, walletId);
   },
     [openPicker],
