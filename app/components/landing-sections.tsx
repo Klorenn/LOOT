@@ -374,6 +374,7 @@ const SECURITY_ITEMS: { k: string; h: string; hc: string; b: string }[] = [
 ];
 
 export function SecuritySection({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
+  const { mainnetReady } = useNet();
   return (
     <section
       id="security"
@@ -468,8 +469,9 @@ export function SecuritySection({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }
               {kuyfiBadge}
             </div>
             <p className="text-[15px] leading-[1.55] text-[var(--muted)]">
-              Black-box scan, not a full audit. Full audit planned via SCF Audit
-              Bank before mainnet.
+              {mainnetReady
+                ? "Black-box scan of the same bytecode on testnet, not a full audit. A full audit is planned via the SCF Audit Bank. Mainnet is in beta, with prize caps."
+                : "Black-box scan, not a full audit. A full audit is planned via the SCF Audit Bank before mainnet."}
             </p>
             <div className="flex flex-wrap gap-3">
               <a

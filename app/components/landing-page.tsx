@@ -55,7 +55,7 @@ function useStats(): Stats {
 }
 
 export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
-  const { SAMPLE_CHEST_ID, NETWORK_LC } = useNet();
+  const { SAMPLE_CHEST_ID, NETWORK_LC, IS_MAINNET, mainnetReady } = useNet();
   const root = useRef<HTMLDivElement>(null);
   const stats = useStats();
   const { ready, address } = useSession();
@@ -147,7 +147,11 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                     className="status-dot inline-block size-[6px] rounded-full bg-[var(--ok)]"
                     aria-hidden
                   />
-                  Live on Stellar {NETWORK_LC}
+                  {IS_MAINNET
+                    ? "Live on Stellar mainnet · beta"
+                    : mainnetReady
+                      ? "Live on Stellar mainnet (beta) and testnet"
+                      : `Live on Stellar ${NETWORK_LC}`}
                 </p>
                 <h1
                   data-reveal-h1
