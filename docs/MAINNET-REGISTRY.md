@@ -87,3 +87,19 @@ a `__constructor` so deploy+init is atomic.
 - The script never overwrites `deployments/registry-mainnet.json`; move it away to redeploy.
 - Caveat: the `init`-storage decoding in `verify-registry.mjs` (key `["Verifier"]`) and the second-init `#10` check could only
   be exercised against a fake deployment before the first real run; confirm they print OK right after the real deploy.
+
+## App configuration (one domain, both networks)
+
+findloot.xyz serves testnet and mainnet. Visitors switch with the Testnet/Mainnet button (cookie `loot_net`; testnet by default; `?net=mainnet` in a shared link sets it and redirects to the clean URL). Mainnet is enabled once these server env vars exist (otherwise the switch reads "Mainnet (coming soon)"):
+
+```
+MAINNET_REGISTRY_ID=<deployments/registry-mainnet.json .registry>
+MAINNET_VERIFIER_ID=<post-ceremony verifier>
+MAINNET_RPC_URL=<mainnet Soroban RPC>      # sent to browsers: use a domain-restricted key
+RELAYER_SECRET_MAINNET=S...                # never falls back to RELAYER_SECRET (testnet)
+MAINNET_SAMPLE_CHEST_ID=1                  # optional
+MAINNET_MAX_PRIZE_PER_PLACE_XLM=1          # optional beta caps (defaults 1 / 30)
+MAINNET_MAX_TOTAL_PRIZE_XLM=30
+```
+Mainnet relayer limits: max 60 sponsored passkey registrations (Blob markers under `relay/mainnet/registrations/`, token `LOOT_READ_WRITE_TOKEN`), sponsoring stops below 3 XLM relayer balance (UI notice), final tx fee <= 2 XLM, no fee-bump, strict allowlist (registry create_chest/claim/close_chest, SAC transfer from the signer, passkey wallet deploy 97ce0478…).
+Blob: testnet keys are unchanged (`chests/<id>.json`, `pending/<fp>.json`); mainnet uses `mainnet/chests/…` and `mainnet/pending/…`.
