@@ -234,7 +234,7 @@ export function AttackSection() {
               data-fade
               className="btn-landing btn-landing-s mt-8 inline-flex"
             >
-              Switch to testnet for the demo
+              Switch to Testnet
             </button>
           ) : (
             <Link

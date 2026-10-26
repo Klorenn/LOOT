@@ -32,7 +32,7 @@ export function AppNav() {
   return (
     <nav className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--bg)]">
       <div className="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between gap-4 px-6">
-        <Link href="/" className="focus-landing shrink-0">
+        <Link href="/" className="focus-landing inline-flex shrink-0 items-center">
           <BrandMark />
         </Link>
 

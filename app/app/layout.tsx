@@ -41,6 +41,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      style={{ "--network-strip-h": net === "mainnet" ? "32px" : "0px" } as React.CSSProperties}
     >
       <body className="flex min-h-full flex-col bg-[var(--bg)] text-[var(--text)]">
         <NetworkProvider net={net} mainnet={mainnet}>

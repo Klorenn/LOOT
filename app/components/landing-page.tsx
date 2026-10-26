@@ -77,9 +77,9 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
         </a>
 
         {/* Nav */}
-        <nav className="absolute top-0 right-0 left-0 z-50 h-20">
+        <nav className="absolute top-[var(--network-strip-h)] right-0 left-0 z-50 h-20">
           <div className="mx-auto flex h-full max-w-[1200px] items-center justify-between px-6">
-            <Link href="/" className="focus-landing">
+            <Link href="/" className="focus-landing inline-flex items-center">
               <BrandMark />
             </Link>
             <div className="hidden items-center gap-8 md:flex">
@@ -125,7 +125,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
           </div>
         </nav>
         {/* móvil: selector de red bajo la barra */}
-        <div className="absolute top-20 right-0 left-0 z-40 flex justify-center md:hidden">
+        <div className="absolute top-[calc(var(--network-strip-h)+5rem)] right-0 left-0 z-40 flex justify-center md:hidden">
           <NetworkSegmented />
         </div>
 
@@ -134,7 +134,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
           <header
             data-hero
             className="hero relative min-h-[760px] overflow-hidden border-b border-[var(--line)]"
-            style={{ height: "100vh" }}
+            style={{ height: "calc(100vh - var(--network-strip-h))" }}
           >
             <CellsBackground variant="hero" />
             <div className="relative z-10 mx-auto grid h-full max-w-[1200px] grid-cols-1 items-center gap-10 px-6 pt-20 lg:grid-cols-[1.05fr_.95fr]">

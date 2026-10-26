@@ -21,8 +21,8 @@ const FOOT = [
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   const { IS_MAINNET } = useNet();
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-[var(--bg)] lg:grid-cols-[minmax(520px,600px)_1fr]">
-      <div className="flex min-h-screen flex-col border-[var(--line)] px-6 py-7 sm:px-14 lg:border-r">
+    <div className="grid min-h-[calc(100vh-var(--network-strip-h))] grid-cols-1 bg-[var(--bg)] lg:grid-cols-[minmax(520px,600px)_1fr]">
+      <div className="flex min-h-[calc(100vh-var(--network-strip-h))] flex-col border-[var(--line)] px-6 py-7 sm:px-14 lg:border-r">
         <header className="flex items-center justify-between">
           <Link href="/" className="focus-landing">
             <BrandMark />

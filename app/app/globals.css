@@ -45,6 +45,8 @@
 }
 
 :root {
+  /* Alto de la franja MAINNET (0 en testnet); lo fija app/layout.tsx. Lo anclado arriba lo suma. */
+  --network-strip-h: 0px;
   /* Landing v7 / product tokens */
   --bg: #0c0b10;
   --s1: #14131a;

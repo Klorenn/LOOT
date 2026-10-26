@@ -94,7 +94,7 @@ export function AccountMenu({ address }: { address: string }) {
               </p>
             </div>
           </div>
-          <NetworkMenuItem onClick={() => setOpen(false)} />
+          <NetworkMenuItem />
           {ITEMS.map((i) => (
             <Link
               key={i.href}

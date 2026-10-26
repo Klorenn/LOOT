@@ -14,7 +14,7 @@ export function AttackOnTestnetOnly() {
       />
       <div className="mx-auto max-w-[560px] px-6 pb-16">
         <button type="button" onClick={() => switchNetwork("testnet")} className="btn-landing btn-landing-p">
-          Switch to testnet and open the demo
+          Switch to Testnet
         </button>
       </div>
     </main>

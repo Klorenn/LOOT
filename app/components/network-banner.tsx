@@ -25,7 +25,7 @@ export function MainnetStrip() {
     <Link
       href="/network"
       role="status"
-      className="block w-full bg-[var(--gold)] px-4 py-1 text-center font-mono text-[12px] font-medium tracking-[0.04em] text-[#14110a]"
+      className="flex h-[var(--network-strip-h)] w-full items-center justify-center rounded-none bg-[var(--gold)] px-4 font-mono text-[12px] font-semibold tracking-[0.06em] text-[#14110a]"
     >
       MAINNET · REAL FUNDS
     </Link>
