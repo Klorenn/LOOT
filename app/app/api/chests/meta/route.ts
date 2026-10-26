@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       const p = parseReserve(b);
       if (typeof p === "string") return NextResponse.json({ error: p }, { status: 400 });
       if (!canReserve(gate, p.creator))
-        return NextResponse.json({ error: "chest creation on mainnet is limited to approved creators during the beta" }, { status: 403 });
+        return NextResponse.json({ error: "chest creation on mainnet is limited to approved creators" }, { status: 403 });
       const r = await reserveChestMeta(p);
       if (r === "exists") {
         // reintento legítimo del mismo creador: idempotente; otro creador: conflicto

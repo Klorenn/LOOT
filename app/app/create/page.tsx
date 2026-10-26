@@ -40,7 +40,7 @@ const QUIZ_WEAK_MSG =
 
 const MIN_EXPIRY_S = 5 * 60;
 const MAX_EXPIRY_S = 90 * 24 * 3600;
-/** Mainnet (beta): el relayer solo patrocina plazos de hasta 30 días. */
+/** Mainnet: el relayer solo patrocina plazos de hasta 30 días. */
 const MAX_EXPIRY_MAINNET_S = 30 * 24 * 3600;
 
 /** Vencimiento obligatorio y futuro: con deadline 0 el cofre nunca se podría cerrar (premio bloqueado). */
@@ -51,7 +51,7 @@ function expiryError(expires: string, mainnet: boolean): string | null {
   if (!expires || !Number.isFinite(t))
     return "Pick an expiry date — unclaimed prize can only be recovered after it.";
   if (sec < now + MIN_EXPIRY_S) return "Expiry must be at least 5 minutes from now.";
-  if (mainnet && sec > now + MAX_EXPIRY_MAINNET_S) return "On mainnet (beta) the expiry can be at most 30 days from now.";
+  if (mainnet && sec > now + MAX_EXPIRY_MAINNET_S) return "On mainnet the expiry can be at most 30 days from now.";
   if (sec > now + MAX_EXPIRY_S) return "Expiry can be at most 90 days from now.";
   return null;
 }

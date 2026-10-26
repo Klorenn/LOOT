@@ -77,7 +77,7 @@ export function BetaNotice({ compact = false }: { compact?: boolean }) {
         </Link>
       </p>
       <p className="mt-1">
-        Real funds on Stellar mainnet. Kuyfi black-box scan of the identical bytecode on testnet: 0 findings (registry + verifier). Beta limits:{" "}
+        Real funds on Stellar mainnet. Kuyfi black-box scan of the identical bytecode on testnet: 0 findings (registry + verifier). Limits:{" "}
         {Number.isFinite(CAPS.maxPrizePerPlaceXlm) ? `${CAPS.maxPrizePerPlaceXlm} XLM per claim` : "no per-claim cap"},{" "}
         {Number.isFinite(CAPS.maxTotalPrizeXlm) ? `${CAPS.maxTotalPrizeXlm} XLM per chest in total` : "no total cap"}.
       </p>

@@ -35,8 +35,8 @@ describe("clampClaims", () => {
 });
 
 describe("capHint", () => {
-  it("is empty without caps and explains the beta limits otherwise", () => {
+  it("is empty without caps and explains the limits otherwise", () => {
     expect(capHint({ maxPrizePerPlaceXlm: Infinity, maxTotalPrizeXlm: Infinity })).toBeNull();
-    expect(capHint(caps)).toBe("Beta: up to 30 XLM total · 1 XLM per claim");
+    expect(capHint(caps)).toBe("Limits: up to 30 XLM total · 1 XLM per claim");
   });
 });

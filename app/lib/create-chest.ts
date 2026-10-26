@@ -127,7 +127,7 @@ export async function createChestOnChain(
   if (!Number.isSafeInteger(input.deadline) || input.deadline <= Math.floor(Date.now() / 1000))
     throw new SendError("The chest needs an expiry in the future; otherwise the prize could never be recovered.");
   if (clientCfg().IS_MAINNET && input.deadline > Math.floor(Date.now() / 1000) + 30 * 86400)
-    throw new SendError("On mainnet (beta) the expiry can be at most 30 days from now.");
+    throw new SendError("On mainnet the expiry can be at most 30 days from now.");
   const capBad = capError(input.prizeStroops, input.maxClaims, clientCfg().CAPS);
   if (capBad) throw new SendError(capBad);
   const hash = await invokeAsCreator(player, (c, o) => c.create_chest(createArgs(player, input), o) as never, onPhase);

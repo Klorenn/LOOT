@@ -170,12 +170,12 @@ export default async function NetworkPage() {
         </Section>
 
         {IS_MAINNET && (
-          <Section title="Beta limits">
+          <Section title="Limits">
             <Row k="Prize per claim">at most {CAPS.maxPrizePerPlaceXlm} XLM</Row>
             <Row k="Total per chest">at most {CAPS.maxTotalPrizeXlm} XLM</Row>
             <Row k="Expiry">at most 30 days (required; no open-ended chests)</Row>
             <Row k="Passkey accounts sponsored">max 60 in total; paused if the relayer drops below 3 XLM</Row>
-            <Row k="Who can create chests">approved creators only during the beta</Row>
+            <Row k="Who can create chests">approved creators only</Row>
           </Section>
         )}
       </div>

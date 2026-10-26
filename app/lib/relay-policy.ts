@@ -116,8 +116,8 @@ export async function checkRelayable(xdrB64: string, passphrase: string, p: Rela
       if (token !== p.xlmSac) return no("create_chest: the prize token must be native XLM");
       const L = p.createLimits;
       if (L) {
-        if (prize > L.maxPrizeStroops) return no("create_chest: prize per claim above the beta cap");
-        if (prize * BigInt(claims) > L.maxTotalStroops) return no("create_chest: total prize above the beta cap");
+        if (prize > L.maxPrizeStroops) return no("create_chest: prize per claim above the cap");
+        if (prize * BigInt(claims) > L.maxTotalStroops) return no("create_chest: total prize above the cap");
         if (deadline <= BigInt(L.nowSec)) return no("create_chest: the deadline must be in the future");
         if (deadline > BigInt(L.nowSec + L.maxDeadlineSecs)) return no("create_chest: deadline too far away");
       }

@@ -16,7 +16,7 @@ export type SponsorDecision = { ok: true } | { ok: false; reason: "relayer_low" 
 
 export const NOTICES = {
   relayer_low: "Free account setup and fee sponsorship are paused: the relayer is low on funds. You can still use a Stellar wallet (Freighter, xBull, ...).",
-  registrations_full: "The beta limit of sponsored passkey accounts has been reached. You can still connect a Stellar wallet (Freighter, xBull, ...).",
+  registrations_full: "The limit of sponsored passkey accounts has been reached. You can still connect a Stellar wallet (Freighter, xBull, ...).",
 } as const;
 
 /** Decisión pura: ¿se puede patrocinar esta operación? `deploy` = registro de wallet nueva. */
