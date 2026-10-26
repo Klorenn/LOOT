@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CellsCanvas } from "@/components/cells-canvas";
 import { LogoChest } from "@/components/logo-chest";
 import { StateBlock } from "@/components/state-block";
-import { PageHeader, Em } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { KV, Mono } from "@/components/kv";
 import { StatusLabel } from "@/components/status-label";
 import { DifficultyBars } from "@/components/difficulty-bars";
@@ -167,12 +167,6 @@ export function ChestSolve({
   const needsInvite = !!meta?.saltRequired && !fragSalt;
   const connected = !!player;
   const canProve = connected && answer.trim().length > 0 && !running && !needsInvite;
-
-  const titleWord = useMemo(() => {
-    const n = catalog?.name || `Chest #${chestId}`;
-    const parts = n.split(" ");
-    return { head: parts.slice(0, -1).join(" "), last: parts.at(-1) || n };
-  }, [catalog, chestId]);
 
   const status = useMemo(() => {
     if (!meta) return "open" as const;
@@ -346,13 +340,27 @@ export function ChestSolve({
             <Link href="/explore" className="hover:text-[var(--text)]">
               Explore
             </Link>
-            {" / "}#{String(chestId).padStart(4, "0")}
             {IS_MAINNET && (
               <>
                 {" · "}
                 <NetworkBadge />
               </>
             )}
+          </span>
+        }
+        // La pregunta es el titular; el número del cofre va debajo, chico.
+        title={
+          meta ? (
+            <span className="block text-[clamp(28px,4.4vw,52px)] leading-[1.12] tracking-[-0.03em]">
+              {meta.question}
+            </span>
+          ) : (
+            <span className="block text-[clamp(28px,4.4vw,52px)] leading-[1.12] text-[var(--dim)]">Loading…</span>
+          )
+        }
+        lead={
+          <span className="font-mono text-[14px] tracking-[0.06em] text-[var(--dim)]">
+            {catalog?.name ? `${catalog.name} · ` : ""}Chest #{String(chestId).padStart(4, "0")}
             {!catalog?.live && catalog && (
               <>
                 {" · "}
@@ -360,19 +368,6 @@ export function ChestSolve({
               </>
             )}
           </span>
-        }
-        title={
-          <>
-            {titleWord.head ? `${titleWord.head} ` : ""}
-            <Em>{titleWord.last}</Em>
-          </>
-        }
-        lead={
-          meta ? (
-            <span className="italic">&ldquo;{meta.question}&rdquo;</span>
-          ) : (
-            "Loading…"
-          )
         }
       />
 
