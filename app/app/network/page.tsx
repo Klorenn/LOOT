@@ -6,7 +6,10 @@ import { shortAddr } from "@/lib/format";
 import { KUYFI_TWINS, MAINNET_RECORD, TEST_EVIDENCE, kuyfiTarget } from "@/lib/mainnet-record";
 import { networkFacts } from "@/lib/onchain-facts";
 
-export const metadata: Metadata = { title: "Network" };
+export const metadata: Metadata = {
+  title: "Network",
+  description: "Which Stellar network Loot runs on, the contract addresses, the prize limits and what has been tested.",
+};
 export const dynamic = "force-dynamic";
 
 function Row({ k, children }: { k: string; children: React.ReactNode }) {
