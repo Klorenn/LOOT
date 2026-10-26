@@ -8,7 +8,6 @@ import { Check, Wallet as WalletIcon } from "lucide-react";
 import { CopyField } from "@/components/copy-field";
 import { IconSmartAccountKit as PasskeyGlyph } from "@/components/stack-logos";
 import { InlineAlert } from "@/components/inline-alert";
-import { chestPath } from "@/lib/chest-code";
 import { shortAddr } from "@/lib/format";
 import { HANDLE_HINT, HANDLE_RE, setHandle } from "@/lib/handle";
 import { safeNext } from "@/lib/safe-next";
@@ -43,7 +42,7 @@ const isCancel = (e: unknown) =>
   /NotAllowedError|AbortError|timed out or was not allowed|cancel/i.test(errMsg(e));
 
 export function AuthForm({ mode }: { mode: Mode }) {
-  const { SAMPLE_CHEST_ID, NETWORK_LC, IS_MAINNET, PASSKEY_ENABLED } = useNet();
+  const { NETWORK_LC, IS_MAINNET, PASSKEY_ENABLED } = useNet();
   const router = useRouter();
   const params = useSearchParams();
   const rawNext = params.get("next");
@@ -391,10 +390,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
           <>
             <CopyField value={doneAddr} />
             <Link
-              href={next ?? chestPath(SAMPLE_CHEST_ID)}
+              href={next ?? "/explore"}
               className="btn-landing btn-landing-p w-full"
             >
-              Open your first chest →
+              {next ? "Open your first chest →" : "Explore chests →"}
             </Link>
             <Link href="/profile" className="btn-landing btn-landing-s w-full">
               Go to profile

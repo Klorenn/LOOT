@@ -3,13 +3,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoChest } from "@/components/logo-chest";
-import { chestPath } from "@/lib/chest-code";
-import { useNet } from "@/components/network-provider";
 
 export const metadata: Metadata = { title: "Not found" };
 
 export default function NotFound() {
-  const { SAMPLE_CHEST_ID } = useNet();
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-[640px] flex-col items-center justify-center px-6 py-20 text-center">
       <LogoChest className="w-[180px] lg:w-[220px]" deg={28} showInside />
@@ -21,8 +18,8 @@ export default function NotFound() {
         <em className="not-italic text-[var(--proof)]">empty.</em>
       </h1>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
-        <Link href={chestPath(SAMPLE_CHEST_ID)} className="btn-landing btn-landing-p">
-          Open a chest →
+        <Link href="/explore" className="btn-landing btn-landing-p">
+          Explore chests →
         </Link>
         <Link href="/" className="btn-landing btn-landing-s">
           Home

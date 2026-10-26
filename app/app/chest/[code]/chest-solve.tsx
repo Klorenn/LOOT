@@ -92,7 +92,7 @@ export function ChestSolve({
   chestId: number;
   badge?: React.ReactNode;
 }) {
-  const { IS_MAINNET, SAMPLE_CHEST_ID, PASSKEY_ENABLED } = useNet();
+  const { IS_MAINNET, PASSKEY_ENABLED } = useNet();
   const router = useRouter();
   const catalog = getChest(chestId, IS_MAINNET);
 
@@ -310,7 +310,7 @@ export function ChestSolve({
           title="Not found"
           body="This chest id is not on the catalogue."
           actions={[
-            { href: chestPath(SAMPLE_CHEST_ID), label: "Open the demo chest", primary: true },
+            { href: "/explore", label: "Explore chests", primary: true },
           ]}
         />
       </main>
@@ -674,7 +674,6 @@ function FailBlock({
   chestId: number;
   onRetry: () => void;
 }) {
-  const { SAMPLE_CHEST_ID } = useNet();
   const retry = { label: "Try again", onClick: onRetry, primary: true } as const;
   const back = { label: "Back to chests", href: "/explore" } as const;
   switch (fail.kind) {
@@ -706,7 +705,7 @@ function FailBlock({
           body="This account’s nullifier is already stored on this chest. Each proof works once and only pays the address it was made for."
           chest="none"
           actions={[
-            { href: chestPath(SAMPLE_CHEST_ID), label: "Open the demo chest", primary: true },
+            { href: "/explore", label: "Explore chests", primary: true },
             { href: "/claimed-chests", label: "My claimed chests" },
           ]}
         />
@@ -719,7 +718,7 @@ function FailBlock({
           title="Every slot is claimed."
           body="All prizes in this chest have been paid out."
           chest="none"
-          actions={[{ href: chestPath(SAMPLE_CHEST_ID), label: "Open the demo chest", primary: true }]}
+          actions={[{ href: "/explore", label: "Explore chests", primary: true }]}
         />
       );
     case "closed":
@@ -730,7 +729,7 @@ function FailBlock({
           title="This chest is closed or expired."
           body="The creator closed it, its deadline passed, or it doesn’t exist on the network."
           chest="none"
-          actions={[{ href: chestPath(SAMPLE_CHEST_ID), label: "Open the demo chest", primary: true }]}
+          actions={[{ href: "/explore", label: "Explore chests", primary: true }]}
         />
       );
     case "invalid":
@@ -801,7 +800,7 @@ function FailBlock({
           body="Open the live demo chest to try a real claim."
           chest="none"
           actions={[
-            { href: chestPath(SAMPLE_CHEST_ID), label: "Open live demo", primary: true },
+            { href: "/explore", label: "Explore chests", primary: true },
           ]}
         />
       );

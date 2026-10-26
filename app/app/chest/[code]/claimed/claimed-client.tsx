@@ -24,7 +24,7 @@ function shortAddr(a: string) {
 }
 
 export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
-  const { SAMPLE_CHEST_ID, NETWORK, IS_MAINNET } = useNet();
+  const { NETWORK, IS_MAINNET } = useNet();
   const id = String(chestNum);
   const chestId = id.padStart(4, "0");
   const [deg, setDeg] = useState(0);
@@ -136,8 +136,8 @@ export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href={chestPath(SAMPLE_CHEST_ID)} className="btn-landing btn-landing-p">
-              Open another chest →
+            <Link href="/explore" className="btn-landing btn-landing-p">
+              Explore more chests →
             </Link>
             {tx?.explorer ? (
               <a
