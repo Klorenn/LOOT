@@ -9,9 +9,8 @@ import {
 import { Api, Server } from "@stellar/stellar-sdk/rpc";
 import { cfg } from "@/lib/cfg";
 import type { NetConfig } from "@/lib/network";
-import type { RelayVerdict } from "@/lib/relay-policy";
+import { RelayCapError, SIGNUP_UNAVAILABLE, logWalletDeployFee, type RelayKind } from "@/lib/passkey-relay";
 
-type RelayKind = Extract<RelayVerdict, { ok: true }>["kind"];
 import { pickRpcUrl } from "@/lib/rpc";
 import { relayLimit } from "@/lib/rate-limit";
 import { relayMaxFee, relayerSecretFor, vetRelayTx } from "@/lib/relay-guard";
@@ -21,16 +20,6 @@ type Body = { xdr: string };
 
 const UINT32_MAX = 0xffffffff;
 const INCLUSION = 100;
-
-/** La simulación pasó del tope de fee del relayer (p. ej. el deploy de wallet en mainnet antes de extender el TTL del wasm). */
-class RelayCapError extends Error {
-  constructor(public minResourceFee: string) {
-    super("fee above the relayer cap; transaction not relayed");
-  }
-}
-
-export const SIGNUP_UNAVAILABLE =
-  "Passkey signup is temporarily unavailable on Mainnet — connect a Stellar wallet";
 
 /** Auth entry uses the envelope source account (needs fee-bump, not rebuild). */
 function hasSourceAccountAuth(tx: Transaction): boolean {
@@ -162,7 +151,9 @@ async function submitAsChannel(
     }
 
     console.info("[passkey/send] minResourceFee", sim.minResourceFee);
-    if (BigInt(sim.minResourceFee) + BigInt(INCLUSION) > relayMaxFee(c, kind)) {
+    const overCap = BigInt(sim.minResourceFee) + BigInt(INCLUSION) > relayMaxFee(c, kind);
+    logWalletDeployFee(c, kind, { stage: "simulated", minResourceFee: sim.minResourceFee, overCap });
+    if (overCap) {
       console.warn(`[passkey/send] ${kind} on ${c.NETWORK_LC}: minResourceFee ${sim.minResourceFee} above cap ${relayMaxFee(c, kind)}`);
       throw new RelayCapError(sim.minResourceFee);
     }
@@ -172,7 +163,9 @@ async function submitAsChannel(
     if (sent.status === "ERROR") {
       throw new Error(`send ERROR: ${JSON.stringify(sent)}`);
     }
-    return waitForHash(rpc, sent.hash, "local-channel");
+    const out = await waitForHash(rpc, sent.hash, "local-channel");
+    logWalletDeployFee(c, kind, { stage: "confirmed", minResourceFee: sim.minResourceFee, hash: out.hash, pending: out.pending ?? false });
+    return out;
   }
 
   if (c.IS_MAINNET) throw new Error("fee-bump is not allowed on mainnet");
@@ -188,6 +181,24 @@ async function submitAsChannel(
     throw new Error(`fee-bump ERROR: ${JSON.stringify(sent)}`);
   }
   return waitForHash(rpc, sent.hash, "fee-bump");
+}
+
+async function measureDeployFeeForLog(c: NetConfig, kind: RelayKind, signedXdr: string, accountId: string | undefined): Promise<void> {
+  try {
+    if (!accountId) return;
+    const op = (TransactionBuilder.fromXDR(signedXdr, c.NETWORK.passphrase) as Transaction).operations[0] as Operation.InvokeHostFunction;
+    const rpc = new Server(await pickRpcUrl(), { allowHttp: true });
+    const built = new TransactionBuilder(await rpc.getAccount(accountId), { fee: String(INCLUSION), networkPassphrase: c.NETWORK.passphrase })
+      .addOperation(Operation.invokeHostFunction({ func: op.func, auth: op.auth ?? [] }))
+      .setTimeout(30)
+      .build();
+    const sim = await rpc.simulateTransaction(built);
+    if (Api.isSimulationSuccess(sim)) {
+      logWalletDeployFee(c, kind, { stage: "simulated", via: "channels", minResourceFee: sim.minResourceFee, overCap: BigInt(sim.minResourceFee) + BigInt(INCLUSION) > relayMaxFee(c, kind) });
+    }
+  } catch {
+    /* solo es para el log */
+  }
 }
 
 async function waitForHash(
@@ -280,6 +291,8 @@ export async function POST(req: NextRequest) {
     if (c.IS_MAINNET) release = reserveFee(c, relayMaxFee(c, verdict.kind));
 
     if (apiKey) {
+      // Con OZ Channels no simulamos para enviar; en mainnet medimos el deploy solo para el log (best-effort).
+      if (c.IS_MAINNET && deploy) void measureDeployFeeForLog(c, verdict.kind, body.xdr, relayerKey ?? process.env.RELAYER_ACCOUNT_MAINNET);
       const { PasskeyServer } = await import("passkey-kit/server");
       const server = new PasskeyServer({
         networkPassphrase: c.NETWORK.passphrase,
