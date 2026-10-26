@@ -1,0 +1,31 @@
+[INFO]  snarkJS: Reading r1cs
+[INFO]  snarkJS: Reading tauG1
+[INFO]  snarkJS: Reading tauG2
+[INFO]  snarkJS: Reading alphatauG1
+[INFO]  snarkJS: Reading betatauG1
+[INFO]  snarkJS: Circuit hash: 
+		53305403 0f713a0a 2069f7ac 4ea04c01
+		6e97b4bb e541aee3 66b88916 9ab558d2
+		53e13b34 b0dc1d38 33d58470 3817a26b
+		44bae1fb 4886f324 4d0d8390 7eabc044
+[INFO]  snarkJS: Circuit Hash: 
+		53305403 0f713a0a 2069f7ac 4ea04c01
+		6e97b4bb e541aee3 66b88916 9ab558d2
+		53e13b34 b0dc1d38 33d58470 3817a26b
+		44bae1fb 4886f324 4d0d8390 7eabc044
+[INFO]  snarkJS: -------------------------
+[INFO]  snarkJS: contribution #2 Final Beacon: Stellar mainnet ledger 65137885:
+		73e0530a 55754a0a bece5190 d2961b5b
+		2ef1af6f 7524b299 c4d33241 59c10419
+		908cd594 5085b0d6 7cc023a0 167596a7
+		ca767fc2 9a75daa9 ab209b1f c22a57af
+[INFO]  snarkJS: Beacon generator: 4ed85c6b3d7e8b80774c91ca24fdcfa4c7cc81d2bf514202b909882e6e26c083
+[INFO]  snarkJS: Beacon iterations Exp: 10
+[INFO]  snarkJS: -------------------------
+[INFO]  snarkJS: contribution #1 Pau:
+		fba5bc1a 63ae9172 16de8cd8 97ab1347
+		ad30d8fc 82c14aa0 85526a45 1c5242a6
+		4e0e0e82 c8a45e7b 5e32a8b6 26c3860a
+		91f7fa03 991fe7a4 ea0beb5e 3793792c
+[INFO]  snarkJS: -------------------------
+[INFO]  snarkJS: ZKey Ok!

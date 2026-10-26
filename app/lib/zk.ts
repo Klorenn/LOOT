@@ -2,7 +2,8 @@
 
 import { buildPoseidon } from "circomlibjs";
 import * as snarkjs from "snarkjs";
-import { ZK_ASSETS } from "./config";
+import { zkAssets } from "./config";
+import { clientCfg } from "./network";
 
 export type ChestProof = {
   a: string; // 64-byte hex
@@ -75,6 +76,8 @@ export async function proveChest(input: ProveInput): Promise<ProveResult> {
   const nullifier = await poseidon2(playerSecret, chestId);
   const calcMs = performance.now() - t0;
 
+  // la zkey depende de la red activa (ceremonia en mainnet, original en testnet)
+  const assets = zkAssets(clientCfg().IS_MAINNET);
   input.onStage?.("prove");
   const t1 = performance.now();
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(
@@ -85,8 +88,8 @@ export async function proveChest(input: ProveInput): Promise<ProveResult> {
       chestId: chestId.toString(),
       recipient: recipient.toString(),
     },
-    ZK_ASSETS.wasm,
-    ZK_ASSETS.zkey,
+    assets.wasm,
+    assets.zkey,
   );
   const proveMs = performance.now() - t1;
 

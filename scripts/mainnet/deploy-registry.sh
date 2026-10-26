@@ -115,8 +115,12 @@ if [ -z "${WASM_DIR:-}" ]; then
   RUSTV="$(rustc -V | awk '{print $2}')"
   [ "$(printf '%s\n1.91.0\n' "$RUSTV" | sort -V | head -1)" = "1.91.0" ] || die "rustc $RUSTV < 1.91.0 (soroban-sdk 27.0.6); use rustup's toolchain or set WASM_DIR"
   mkdir -p "$OUT_DIR"
-  echo "  \$ stellar contract build --manifest-path contracts/verifier/Cargo.toml --out-dir $OUT_DIR"
-  stellar contract build --manifest-path contracts/verifier/Cargo.toml --out-dir "$OUT_DIR"
+  # Verifier: the CEREMONY crate (contracts/verifier-mainnet = circuits/ceremony/release-2026-10-26/verifier),
+  # built exactly like the release (plain cargo, NOT `stellar contract build`, which changes the wasm bytes):
+  # sha256 must be 8df17eda8f2f901a9636804e0e173586723420d38af6407974218b53f98905b5.
+  echo "  \$ cargo +stable build --release --target wasm32v1-none  (contracts/verifier-mainnet)"
+  (cd contracts/verifier-mainnet && cargo +stable build --release --target wasm32v1-none)
+  cp contracts/verifier-mainnet/target/wasm32v1-none/release/chestzk_verifier.wasm "$OUT_DIR/chestzk_verifier.wasm"
   echo "  \$ stellar contract build --manifest-path contracts/chest/Cargo.toml --out-dir $OUT_DIR"
   stellar contract build --manifest-path contracts/chest/Cargo.toml --out-dir "$OUT_DIR"
 fi
@@ -129,7 +133,7 @@ echo "  registry wasm sha256: $REG_HASH ($(wc -c <"$REG_WASM" | tr -d ' ') bytes
 
 # ---------------------------------------------------------------- ceremony gate
 step "verifier gate (must be post-ceremony)"
-EXPECT_HASH="${VERIFIER_WASM_SHA256:-${CEREMONY_EXPORT_HASH:-}}"
+EXPECT_HASH="${VERIFIER_WASM_SHA256:-${CEREMONY_EXPORT_HASH:-8df17eda8f2f901a9636804e0e173586723420d38af6407974218b53f98905b5}}"  # default = ceremony release 2026-10-26
 EXPECT_SRC="env"
 if [ -z "$EXPECT_HASH" ] && [ -d circuits ]; then
   while IFS= read -r f; do

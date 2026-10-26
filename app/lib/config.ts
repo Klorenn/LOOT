@@ -89,10 +89,16 @@ export const LEGACY_ATTACK_CHEST = {
     "06c2f5aaf2800f039ea9ab82643ef44b84609fdb5bdad06653d147c7aff34bd5",
 } as const;
 
-export const ZK_ASSETS = {
-  wasm: "/zk/chest.wasm",
-  zkey: "/zk/chest_final.zkey",
-} as const;
+/**
+ * Assets del prover por red. El circuito (wasm) es el mismo; la zkey NO: testnet usa la original (su
+ * verificador y cofres tienen la VK vieja) y mainnet la de la ceremonia (circuits/ceremony/release-*).
+ */
+export function zkAssets(mainnet: boolean) {
+  return {
+    wasm: "/zk/chest.wasm",
+    zkey: mainnet ? "/zk/mainnet/chest_final.zkey" : "/zk/chest_final.zkey",
+  } as const;
+}
 
 /**
  * Cofre NORMAL (sin ZK) para el modo ataque: la respuesta viaja en claro.

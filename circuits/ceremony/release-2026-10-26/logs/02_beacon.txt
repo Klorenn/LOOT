@@ -1,0 +1,13 @@
+network: mainnet
+ledger_seq: 65137885
+ledger_closed_at: 2026-10-26T00:40:08Z
+ledger_hash (beacon): 4ed85c6b3d7e8b80774c91ca24fdcfa4c7cc81d2bf514202b909882e6e26c083
+horizon: https://horizon.stellar.org/ledgers/65137885
+iterations_exp: 10
+prev_zkey_sha256: 1b0fcf3941bf0ce3e831ee520b8b1f9f46f56c1d10b3de6f96867290bdca5ffa
+final_zkey_sha256: 5ff4aeb24038d8e70453479aea8971934bb9fdfbbc549858efdd1d2e6e45db2a
+contribution_hash:
+  73e0530a 55754a0a bece5190 d2961b5b
+  2ef1af6f 7524b299 c4d33241 59c10419
+  908cd594 5085b0d6 7cc023a0 167596a7
+  ca767fc2 9a75daa9 ab209b1f c22a57af

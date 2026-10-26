@@ -13,7 +13,7 @@ import { DifficultyBars } from "@/components/difficulty-bars";
 import { ExampleTag } from "@/components/example-tag";
 import { InlineAlert } from "@/components/inline-alert";
 import { chestPath } from "@/lib/chest-code";
-import { DEMO_CHEST, PRIZE, ZK_ASSETS } from "@/lib/config";
+import { DEMO_CHEST, PRIZE, zkAssets } from "@/lib/config";
 import { NetworkBadge } from "@/components/network-switch";
 import { getChest } from "@/lib/chests-demo";
 import { recipientField } from "@/lib/recipient";
@@ -230,7 +230,8 @@ export function ChestSolve({
       }
 
       mark(0, "run");
-      await Promise.all([fetch(ZK_ASSETS.wasm), fetch(ZK_ASSETS.zkey)]);
+      const zk = zkAssets(IS_MAINNET);
+      await Promise.all([fetch(zk.wasm), fetch(zk.zkey)]);
       mark(0, "done");
 
       const { decimal: recipient } = recipientField(player.publicKey);

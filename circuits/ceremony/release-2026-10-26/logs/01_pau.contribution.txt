@@ -1,0 +1,9 @@
+participant: Pau
+date_utc: 2026-10-26T00:33:06Z
+prev_zkey_sha256: 309d64b82771a1daece987a72c0fa9234b307d1324da09d892a4293d56c34388
+next_zkey_sha256: 1b0fcf3941bf0ce3e831ee520b8b1f9f46f56c1d10b3de6f96867290bdca5ffa
+contribution_hash:
+  fba5bc1a 63ae9172 16de8cd8 97ab1347
+  ad30d8fc 82c14aa0 85526a45 1c5242a6
+  4e0e0e82 c8a45e7b 5e32a8b6 26c3860a
+  91f7fa03 991fe7a4 ea0beb5e 3793792c

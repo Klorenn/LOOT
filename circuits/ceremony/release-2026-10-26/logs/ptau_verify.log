@@ -1,0 +1,22 @@
+
+
+dcf4ea473bf14b971ce5f7b7c1d6ce1c41a8ed042cdb75b65ca9178e3a3c7c17  /private/tmp/claude-501/-Users-paukoh-Chest-ZK/f8a5e91e-42f1-4113-bdde-c802da5a9f97/scratchpad/ptau/a/powersOfTau28_hez_final_12.ptau
+		eda11ae0 cf429bb8 c04af72d 8a2633b5
+		625f8cbe bb07b61b 510403d4 bf644357
+		a80ea08d 7d5cc04d 58a8aa4d 2d9084ea
+[INFO]  snarkJS: Response Hash:
+		398b99a4 3f0214e0 2b7483ea 96b8ac0d
+		1e2aa662 7b6e9e3b 9fe0b043 2803be29
+		f014b567 8fd83cfa 0abee8ca 07d7655c
+		b6682b52 7a7965aa 1f99f02a 89afb712
+[INFO]  snarkJS: Response Hash:
+		93da9192 0d5a54a8 a0fde55c d9dc3a10
+		c4f3eef7 68b62c09 48741370 864254b4
+		c1920f3f 29d4ebc0 ef3acecf 2e2db63a
+		755713d7 7e1ed773 47a56fbc 317c7a93
+[INFO]  snarkJS: -----------------------------------------------------
+[INFO]  snarkJS: Powers of Tau Ok!
+snarkjs powersoftau verify $D/a/powersOfTau28_hez_final_12.ptau 2>&1  2793.30s user 83.30s system 67% cpu 1:10:35.88 total
+tail -15  0.00s user 0.00s system 0% cpu 1:10:35.88 total
+
+[exited with code 0]
