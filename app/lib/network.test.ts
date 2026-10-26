@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { configFor, effectiveNet, readNetCookie, type MainnetPublic } from "./network";
+import { configFor, effectiveNet, readNetCookie, withNet, type MainnetPublic } from "./network";
 
 const REG = "CBKH5Z25DDQRGMJDXQWUADOND4DUM5CN4CVZOX7M3OFH2HL7KYFONRRV";
 const VER = "CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE";
@@ -55,5 +55,13 @@ describe("cookie and effective network", () => {
     expect(effectiveNet("mainnet", ready)).toBe("mainnet");
     expect(effectiveNet("mainnet", empty)).toBe("testnet");
     expect(effectiveNet("testnet", ready)).toBe("testnet");
+  });
+});
+
+describe("withNet", () => {
+  it("adds ?net= and keeps other params and the #fragment", () => {
+    expect(withNet("https://www.findloot.xyz/chest/abc#s=123", "mainnet")).toBe("https://www.findloot.xyz/chest/abc?net=mainnet#s=123");
+    expect(withNet("https://x.io/a?b=1", "testnet")).toBe("https://x.io/a?b=1&net=testnet");
+    expect(withNet("https://x.io/a?net=mainnet", "testnet")).toBe("https://x.io/a?net=testnet");
   });
 });

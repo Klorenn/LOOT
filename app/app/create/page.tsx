@@ -17,6 +17,7 @@ import { stroopsToXlm } from "@/lib/config";
 import { balanceInfo, parseXlmAmount, SendError } from "@/lib/send";
 import { confirmMeta, createChestOnChain, estimateCreateFee, reserveMeta } from "@/lib/create-chest";
 import { capError } from "@/lib/caps";
+import { withNet } from "@/lib/network";
 import { BetaNotice } from "@/components/network-banner";
 import { SponsorNotice } from "@/components/sponsor-notice";
 import { QuizBuilder } from "@/components/quiz-builder";
@@ -39,15 +40,18 @@ const QUIZ_WEAK_MSG =
 
 const MIN_EXPIRY_S = 5 * 60;
 const MAX_EXPIRY_S = 90 * 24 * 3600;
+/** Mainnet (beta): el relayer solo patrocina plazos de hasta 30 días. */
+const MAX_EXPIRY_MAINNET_S = 30 * 24 * 3600;
 
 /** Vencimiento obligatorio y futuro: con deadline 0 el cofre nunca se podría cerrar (premio bloqueado). */
-function expiryError(expires: string): string | null {
+function expiryError(expires: string, mainnet: boolean): string | null {
   const t = new Date(expires).getTime();
   const now = Date.now() / 1000;
   const sec = Math.floor(t / 1000);
   if (!expires || !Number.isFinite(t))
     return "Pick an expiry date — unclaimed prize can only be recovered after it.";
   if (sec < now + MIN_EXPIRY_S) return "Expiry must be at least 5 minutes from now.";
+  if (mainnet && sec > now + MAX_EXPIRY_MAINNET_S) return "On mainnet (beta) the expiry can be at most 30 days from now.";
   if (sec > now + MAX_EXPIRY_S) return "Expiry can be at most 90 days from now.";
   return null;
 }
@@ -231,7 +235,7 @@ export default function CreateChestPage() {
       if (cb) e.maxClaims = cb;
     }
     if (step === 3) {
-      const ee = expiryError(expires);
+      const ee = expiryError(expires, IS_MAINNET);
       if (ee) e.expires = ee;
     }
     setFieldErr(e);
@@ -266,7 +270,7 @@ export default function CreateChestPage() {
       const n = normalizeAnswer(secretText);
       const fp = await poseidon2(answerToField(n), salt);
       const fingerprintHex = fieldToHex(fp);
-      const ee = expiryError(expires);
+      const ee = expiryError(expires, IS_MAINNET);
       if (ee) {
         setStep(3);
         setFieldErr({ expires: ee });
@@ -298,8 +302,8 @@ export default function CreateChestPage() {
       } catch {
         saved = false;
       }
-      // En mainnet el enlace lleva ?net=mainnet: quien lo abra cambia a esa red (proxy.ts) y ve el cofre correcto.
-      const base = `${window.location.origin}${chestPath(chestId)}${IS_MAINNET ? "?net=mainnet" : ""}`;
+      // El enlace siempre lleva ?net=<red>: quien lo abra cambia a esa red (proxy.ts) y ve el cofre correcto.
+      const base = withNet(`${window.location.origin}${chestPath(chestId)}`, IS_MAINNET ? "mainnet" : "testnet");
       setResult({
         chestId,
         link: listed ? base : `${base}#s=${salt.toString()}`,

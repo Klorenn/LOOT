@@ -14,6 +14,7 @@ import { ExampleTag } from "@/components/example-tag";
 import { InlineAlert } from "@/components/inline-alert";
 import { chestPath } from "@/lib/chest-code";
 import { DEMO_CHEST, PRIZE, zkAssets } from "@/lib/config";
+import { TrustedSetupNote } from "@/components/network-banner";
 import { NetworkBadge } from "@/components/network-switch";
 import { getChest } from "@/lib/chests-demo";
 import { recipientField } from "@/lib/recipient";
@@ -439,6 +440,7 @@ export function ChestSolve({
               </div>
             )}
             <div className="mt-6">{badge}</div>
+            <TrustedSetupNote className="mt-4" />
           </div>
 
           <div className="flex flex-col gap-4">

@@ -172,6 +172,13 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
 
 export const parseNet = (v: string | null | undefined): Net | null => (v === "mainnet" || v === "testnet" ? v : null);
 
+/** Enlace para compartir: siempre lleva ?net=<red> (el #fragmento, que puede traer la sal privada, se conserva). */
+export function withNet(url: string, net: Net): string {
+  const u = new URL(url);
+  u.searchParams.set("net", net);
+  return u.toString();
+}
+
 /** Cookie de red del navegador. */
 export function readNetCookie(cookieHeader: string | undefined | null): Net | null {
   const m = (cookieHeader ?? "").match(new RegExp(`(?:^|;\\s*)${NET_COOKIE}=([^;]+)`));

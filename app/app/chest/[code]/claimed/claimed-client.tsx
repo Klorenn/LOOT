@@ -8,6 +8,7 @@ import { Em } from "@/components/page-header";
 import { KV, Mono } from "@/components/kv";
 import { chestPath } from "@/lib/chest-code";
 import { loadPlayer } from "@/lib/wallet";
+import { withNet } from "@/lib/network";
 import { useNet } from "@/components/network-provider";
 
 type ClaimTx = {
@@ -162,7 +163,7 @@ export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
               className="btn-landing btn-landing-s"
               onClick={() => {
                 void navigator.clipboard?.writeText(
-                  tx?.explorer || window.location.href,
+                  tx?.explorer || withNet(window.location.href, IS_MAINNET ? "mainnet" : "testnet"),
                 );
               }}
             >

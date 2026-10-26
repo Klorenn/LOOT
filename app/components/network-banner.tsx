@@ -27,6 +27,24 @@ export function MainnetStrip() {
   );
 }
 
+export const TRANSCRIPT_URL =
+  "https://github.com/Klorenn/LOOT/blob/main/circuits/ceremony/release-2026-10-26/TRANSCRIPT.md";
+
+/** Honestidad sobre el trusted setup (solo mainnet): 1 contribuyente + beacon del ledger de Stellar. */
+export function TrustedSetupNote({ className = "" }: { className?: string }) {
+  const { IS_MAINNET } = useNet();
+  if (!IS_MAINNET) return null;
+  return (
+    <p className={`text-[13px] leading-[1.5] text-[var(--dim)] ${className}`}>
+      Trusted setup: 1 contributor + a Stellar ledger beacon (not pre-announced).{" "}
+      <a href={TRANSCRIPT_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[var(--text)]">
+        See the transcript
+      </a>
+      .
+    </p>
+  );
+}
+
 /** Aviso de beta sin auditar (solo mainnet). `compact` para el footer. */
 export function BetaNotice({ compact = false }: { compact?: boolean }) {
   const { IS_MAINNET, CAPS } = useNet();
@@ -35,6 +53,10 @@ export function BetaNotice({ compact = false }: { compact?: boolean }) {
     return (
       <p className="font-mono text-[12px] text-[var(--gold)]">
         Beta · unaudited contracts · use only what you can afford to lose
+        {" · "}
+        <a href={TRANSCRIPT_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+          trusted setup
+        </a>
       </p>
     );
   }
@@ -50,6 +72,7 @@ export function BetaNotice({ compact = false }: { compact?: boolean }) {
         {Number.isFinite(CAPS.maxPrizePerPlaceXlm) ? `${CAPS.maxPrizePerPlaceXlm} XLM per claim` : "no per-claim cap"},{" "}
         {Number.isFinite(CAPS.maxTotalPrizeXlm) ? `${CAPS.maxTotalPrizeXlm} XLM per chest in total` : "no total cap"}.
       </p>
+      <TrustedSetupNote className="mt-2" />
     </div>
   );
 }
