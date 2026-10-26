@@ -1,91 +1,291 @@
-# Loot
+<div align="center">
 
-> Formerly **ChestZK**. Same product: puzzle chests with ZK proofs on Stellar.
+<img src="assets/banner.png" alt="Loot — puzzle chests that bots can't rob" width="100%" />
 
-Prize chests on Stellar with ZK proofs (Groth16 / BN254). Knowledge pays. Copying does not.
+<h3>Puzzle chests that bots can't rob.</h3>
 
-## Why Stellar
+<p>Creators lock XLM in puzzle chests. Players solve the riddle and claim the prize with a<br/>
+zero-knowledge proof bound to their own address, so a bot can't copy the answer.</p>
 
-Native BN254 verification + cheap claims → knowledge-gated airdrops/events that bots cannot steal by replaying the ledger. Passkey smart wallets (C…) enter without seed phrases; OZ Channels (or fee-bump) sponsors fees.
+<p>
+  <a href="https://www.findloot.xyz"><img alt="Live on Stellar mainnet" src="https://img.shields.io/badge/Stellar-mainnet-7B6CFF?style=for-the-badge&logo=stellar&logoColor=white" /></a>
+  <img alt="Soroban" src="https://img.shields.io/badge/Soroban-smart%20contracts-111114?style=for-the-badge" />
+  <img alt="Circom" src="https://img.shields.io/badge/Circom-Groth16%20%C2%B7%20BN254-111114?style=for-the-badge" />
+  <a href="https://www.npmjs.com/package/@findloot/sdk"><img alt="npm @findloot/sdk" src="https://img.shields.io/npm/v/@findloot/sdk?style=for-the-badge&label=%40findloot%2Fsdk&color=CB3837&logo=npm" /></a>
+  <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge" />
+</p>
 
-## Testnet
+<p>
+  <a href="https://www.findloot.xyz"><b>Live app</b></a> ·
+  <a href="https://www.npmjs.com/package/@findloot/sdk"><b>SDK</b></a> ·
+  <a href="#how-it-works"><b>How it works</b></a> ·
+  <a href="#why-zero-knowledge-zk"><b>Why ZK</b></a> ·
+  <a href="#why-an-sdk"><b>Why an SDK</b></a> ·
+  <a href="#use-cases"><b>Use cases</b></a> ·
+  <a href="#contracts"><b>Contracts</b></a> ·
+  <a href="#local-development"><b>Run locally</b></a>
+</p>
+
+<img src="assets/demo.gif" alt="Loot demo" width="800" />
+
+</div>
+
+---
+
+## What is Loot
+
+A community posts a riddle with a prize. Someone solves it, and a bot watching the network copies the answer and claims first. **Loot fixes that.**
+
+On Loot, a creator locks XLM in a **puzzle chest** on Stellar. To claim, a player proves they know the answer with a **zero-knowledge proof** that never reveals the answer and is **bound to the player's own address**. If someone copies the proof and swaps in their own address, the on-chain verifier rejects it.
+
+- 🟣 **Live on Stellar mainnet and testnet.** Mainnet has prize caps.
+- 🌐 **Try it:** [findloot.xyz](https://www.findloot.xyz). The Testnet/Mainnet switch is in the app.
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["🧑‍🎨 Creator<br/>writes riddle + answer"] -->|"Poseidon(answer, salt)"| B["🔒 Chest on Soroban<br/>fingerprint + XLM prize"]
+    C["🧑 Player<br/>solves the riddle"] --> D["⚙️ Browser builds Groth16 proof<br/>(answer, salt, playerSecret private)<br/>chestId + recipient public"]
+    D -->|"proof + nullifier"| E["🛰️ OpenZeppelin Relayer<br/>pays the gas"]
+    E --> F{"✅ Soroban verifier<br/>BN254 host functions"}
+    B --> F
+    F -->|"valid · fresh nullifier"| G["💰 XLM sent to the player's address"]
+    F -->|"copied proof · wrong recipient · reused nullifier"| H["❌ Rejected"]
+```
+
+1. **Lock.** The creator publishes a riddle. Only the fingerprint `Poseidon(answer, salt)` goes on-chain, with the XLM prize.
+2. **Solve.** The player types an answer. The browser generates a Groth16 proof that the answer matches the fingerprint.
+3. **Bind.** The proof commits to the `recipient` address and a nullifier `Poseidon(playerSecret, chestId)`, so it pays one address, once.
+4. **Claim.** The Soroban contract verifies the proof on-chain and releases the prize. The relayer pays the fees, so the player needs no gas.
+
+## Why zero-knowledge (ZK)?
+
+Without ZK, a puzzle prize on a public blockchain has two problems.
+
+**1. The answer leaks.** If the contract stores the answer, or the player sends it in plain text to claim, anyone can read it on-chain or in the mempool. The first person to solve it pays a fee to reveal it, and everyone else gets it for free.
+
+**2. Bots steal the claim (front-running).** Even if the answer is hidden until the claim, the claim transaction itself shows it. A bot watching the network copies it, puts in its own address and pays more to land first. The real solver loses. Our **Attack mode** shows this live: a normal chest loses to a copy bot in seconds.
+
+**What ZK changes:**
+
+| Without ZK | With Loot (ZK) |
+|---|---|
+| The answer or its hash is visible and can be replayed | Only a fingerprint `Poseidon(answer, salt)` is on-chain, and the answer is never sent |
+| A bot can copy the claim and change the address | The proof is **bound to the recipient address**, so a changed address gives `InvalidProof` |
+| The same proof can be replayed | A **nullifier** `Poseidon(playerSecret, chestId)` is spent on-chain, so each proof works only once |
+| You need a trusted server to check answers | The **Soroban contract verifies the proof on-chain**, with no server or admin deciding |
+
+In simple words, the player proves *"I know the answer"* without showing it, and the proof only pays **their** wallet, **once**. Nobody, including us, has to be trusted to judge who won.
+
+**Why Groth16 on Stellar:** Groth16 proofs are small and cheap to verify. Stellar's BN254 host functions let a Soroban contract verify them on-chain at a low cost, and Stellar's low fees plus a relayer mean players pay nothing.
+
+## Why an SDK?
+
+Loot is not only an app. It is a **building block**. The cryptography is the hard part: the circuit, the trusted setup, answer normalization, Poseidon hashing, the verifier and contract bindings. Most teams can't or shouldn't rebuild that.
+
+[`@findloot/sdk`](https://www.npmjs.com/package/@findloot/sdk) packages it so any developer can:
+
+- **Create chests** from their own backend or frontend, with any prize and any number of winners.
+- **Hash answers the same way the circuit does**, so a fingerprint made in your app always matches the proof made in ours.
+- **Read and claim chests** using typed contract bindings ([`@findloot/chest`](https://www.npmjs.com/package/@findloot/chest)).
+- **Skip the crypto**: no Circom, no Rust and no Soroban knowledge needed to start.
+
+The result is copy-proof rewards on Stellar in a few lines of TypeScript, instead of weeks of ZK work. Every app that uses the SDK also brings new people to Stellar, often with their first wallet and their first transaction.
+
+## Use cases
+
+A Loot chest fits any case where **you lock value and only the person who knows a secret can claim it**, without exposing that secret and without knowing the winner's wallet ahead of time. These are possible uses of the SDK, not all of them are built yet.
+
+### For developers and products
+
+- **Onboarding:** give new users a welcome chest so their first Stellar transaction is claiming their first XLM.
+- **E-commerce and brands:** a QR code on a receipt, a package or a poster that is redeemed for real crypto.
+- **Learning platforms:** finish a lesson or pass a quiz, and the correct answer opens the reward.
+- **Open source bounties:** whoever fixes the bug gets the secret and gets paid.
+- **Communities (Discord, Telegram):** surprise drops and rewards for active members or moderators.
+- **Events and hackathons:** a code shown only at the talk or the booth, as proof of attendance with a prize.
+- **Payments and wallets:** send money with a link or QR to someone who doesn't have a wallet yet.
+- **Games:** in-game loot that pays real XLM, if you have one.
+
+### For NGOs and social impact
+
+- **Aid without exposing people:** an NGO locks funds and gives each person a private code. They claim to their own wallet, and the chain never shows the code or links it to their identity.
+- **Transparent donations:** donors can see on-chain how much was locked and claimed, while the people who received it stay private.
+- **Each proof works once:** the nullifier is spent on-chain, so the same proof can never be replayed.
+- **Incentives for training:** reward people who finish financial-education or digital-skills courses.
+- **No intermediary holding the money:** the contract releases the funds, not a person or a server.
+
+> Real-world use needs care. Loot is not audited, so start with small amounts and follow the local rules for aid and payments.
+
+## Features
 
 | | |
 |---|---|
-| Chest | `CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ` |
-| Verifier | `CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE` |
-| Prize token (native XLM SAC) | `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` |
-| Test token CHEST (fallback chest #2) | `CD3RI5RAQX4CB62IVD5XD6HIE5TZWJ55VF7GKAT23NPBVW3JLP6TP4AA` |
-| Judge chest | **#6** (10 XLM × 10 slots) — Stellar question about the creator of SCP; answer not published |
-| Attack-demo chest | **#7** (100 × 0.1 XLM, public answer on purpose; only used to build a proof the contract rejects) |
-| Normal chest (attack demo, no ZK) | `CDMYX46WAU66OOAVXLBPTVXZ7EZF5NTS3X3T6S2AKSOADEBZD7OGEXCA` · chest **#1** · 30 slots · XLM · answer in plain text |
+| 🛡️ **Copy-proof claims** | Proofs are bound to the claimer's address. A front-running bot gets `InvalidProof`. |
+| 🔁 **Each proof works once** | A nullifier is spent on-chain, so a proof can never be replayed. |
+| 🔑 **Passkey wallets** | Sign up with Face ID or a fingerprint through passkey smart wallets (passkey-kit). No seed phrase, no extension. |
+| 👛 **Bring your wallet** | Freighter, xBull and others through Stellar Wallets Kit. |
+| ⛽ **Gasless for players** | OpenZeppelin Relayer pays the transaction fees. |
+| 🎁 **Chests with slots** | Prize per place, several winners, link and QR to share, a creator panel to close a chest. |
+| 🧪 **Attack mode** | A side-by-side demo: a normal chest loses to a copy bot, a Loot chest doesn't (testnet only). |
+| 📦 **SDK** | [`@findloot/sdk`](https://www.npmjs.com/package/@findloot/sdk) to create, read and claim chests from your own app. |
 
-## Threat model
+## Architecture
 
-**Protects against copying.** On a normal chest the answer travels in plain text: anyone who sees the transaction (relayer, validators, explorers, a failed tx on the ledger) can copy it, and after the first claim it is public for every remaining slot. In ChestZK the recipient address is a public input of the Groth16 proof, so a copied proof only pays the original solver (`InvalidProof #6`).
-
-**Answer secrecy depends on the answer.** Only `Poseidon(answer, salt)` is stored, but players need the salt to prove. Short answers (a number 0–1000) can be brute-forced; use phrases or rare words.
-
-**The proof is bound to your address: if a bot copies it and changes the recipient, the contract rejects it. And each proof works only once.** One claim per proof, not per human. Each proof works once (nullifier) and only pays the address it was made for. The circuit does not bind the player secret to the recipient, so anyone who knows the answer can claim several slots with different secrets. Account farms are bounded by the chest's slots (`max_claims`); proof-of-personhood is future work.
-
-## Run
-
-```bash
-cd app
-cp .env.example .env.local   # fill RELAYER_SECRET (+ optional RELAYER_API_KEY)
-pnpm install && pnpm dev
-```
-
-Open http://localhost:3000 → **Abrir un cofre** → answer `8`.
-
-### Routes
-
-| Route | |
+| Layer | Tech |
 |---|---|
-| `/enter` | Passkey smart wallet (Face ID) · classic fallback |
-| `/chest/:id` | Answer + claim |
-| `/chest/:id/proving` | Groth16 + submit |
-| `/attack` | Stolen-proof demo → rejected |
-| `/create` | Create a chest from your own account (you fund the prize) · public or private-link |
-| `/panel` | List + **close** chest |
+| **Circuit** | Circom 2 · circomlib Poseidon · Groth16 on BN254 (snarkjs) |
+| **Contracts** | Rust · Soroban · Groth16 verifier using Protocol 25 BN254 host functions · chest registry |
+| **Wallets** | passkey-kit smart wallets · Stellar Wallets Kit |
+| **Fees** | OpenZeppelin Relayer (Channels) |
+| **App** | Next.js · React · Tailwind CSS · `@stellar/stellar-sdk` |
+| **SDK** | `@findloot/sdk` (helpers) · `@findloot/chest` (generated contract bindings) |
 
-Spanish URLs 301 → English.
+**Circuit inputs** ([`circuits/chest.circom`](circuits/chest.circom))
 
-### Env
+| Private | Public inputs | Public outputs |
+|---|---|---|
+| `answer`, `salt`, `playerSecret` | `chestId`, `recipient` | `fingerprint = Poseidon(answer, salt)`, `nullifier = Poseidon(playerSecret, chestId)` |
 
-- `RELAYER_SECRET` — relayer key (claims, passkey fee-bump). Must be its own low-balance account, never the prize-funding one; no fallback to `CREATOR_SECRET`. On Vercel set `RELAYER_SECRET` (or `RELAYER_API_KEY` + `RELAYER_BASE_URL`).
-- `CREATOR_SECRET` — local only: closing legacy server-created chests from `/panel` (`/api/chests/:id/close`, no fallback to the relayer key) and `bot/` scripts. Creators now sign `create_chest` with their own account.
-- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` — Reown (WalletConnect) project id. Without it, mobile wallet apps (LOBSTR, Freighter mobile, xBull app…) cannot connect on phones; the wallet picker shows a notice and the console warns. It is a `NEXT_PUBLIC_*` var, so it is inlined **at build time**: set it in Vercel, then **redeploy**. See [docs/WALLETS.md](docs/WALLETS.md).
-- `ADMIN_KEY` — only for `/panel` and `/api/chests/:id/close`; not needed to create chests.
-- `BLOB_READ_WRITE_TOKEN` — Vercel Blob (PRIVATE store: written with access:"private", read server-side only; blob URLs never reach the client) for chest metadata (question, hint, difficulty, salt of public chests). **Required in production/Vercel**: without it `/api/chests/meta` returns 503. Local dev without a token falls back to `data/chests.json` + `data/pending.json`. Metadata is write-once: reserved by fingerprint before creation, confirmed against `get_chest` (creator + fingerprint) after.
-- Private-link chests: the salt is never stored; it travels only in the URL fragment (`/chest/<code>#s=<salt>`). Lose the link, lose the chest.
-- `RELAYER_API_KEY` — [OZ Channels testnet](https://channels.openzeppelin.com/testnet/gen) (preferred; no Docker)
+## See it in action
 
-## Demo script (2 min)
+<table>
+  <tr>
+    <td align="center" width="50%"><img src="assets/claim.gif" alt="Sign up and claim a chest" /><br/><sub><b>1. Sign up and claim</b></sub></td>
+    <td align="center" width="50%"><img src="assets/explore.gif" alt="Explore chests" /><br/><sub><b>2. Explore chests</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><img src="assets/sdk.gif" alt="Build with the SDK" width="50%" /><br/><sub><b>3. Build with the SDK</b></sub></td>
+  </tr>
+</table>
 
-1. `/enter` → passkey → `/chest/2` → `8` → opened  
-2. `/attack` → RECHAZADO (InvalidProof)  
-3. Optional `/create` → QR  
-
-## Bot
-
-```bash
-cd app && node ../bot/attack.mjs --live
-```
-
-Expect contract error `#6` InvalidProof.
-
-Normal-chest side (real theft, answer read from the ledger):
+## SDK quickstart
 
 ```bash
-node --env-file app/.env.local bot/steal-normal.mjs
+npm i @findloot/sdk
 ```
 
-## Stack
+```ts
+import {
+  createChestClient,
+  fingerprintAnswer,
+  CONTRACTS,
+  NETWORK,
+} from "@findloot/sdk";
 
-- `circuits/` Circom + snarkjs Groth16  
-- `contracts/chest` · `contracts/verifier`  
-- `app/` Next 16 · passkey-kit · Glass Noir  
-- Scans: `audits/` (scanned with Kuyfi, 0 findings; black-box scan, not an audit)
+// Fingerprint = Poseidon(answer, salt). The answer is normalized first
+// (trim, lowercase, no accents or spaces).
+const { fingerprintHex, normalized } = await fingerprintAnswer("alexandria", 7n);
 
-Tag: `mvp` · See `NOTES.md` / `BUGS.md` / `ROADMAP.md`.
+// Contract client for the Loot registry (testnet defaults)
+const client = createChestClient({
+  rpcUrl: NETWORK.rpcUrl,
+  networkPassphrase: NETWORK.passphrase,
+  publicKey: "G…", // creator address
+});
+
+// then: client.create_chest({ …, fingerprint, token: CONTRACTS.xlm, … })
+console.log(fingerprintHex, CONTRACTS.chest, CONTRACTS.xlm);
+```
+
+**Exports:** `createChestClient`, `networks`, `fingerprintAnswer`, `answerToField`, `poseidon2`, `fieldToHex`, `normalizeAnswer`, `NETWORK`, `CONTRACTS`, `DEFAULT_AMOUNT_PER_SLOT_STROOPS` (10 XLM). The SDK ships testnet defaults; contract bindings live in [`@findloot/chest`](https://www.npmjs.com/package/@findloot/chest).
+
+## Contracts
+
+**Mainnet** · from [`deployments/registry-mainnet.json`](deployments/registry-mainnet.json)
+
+| Contract | ID |
+|---|---|
+| Chest registry | [`CCMMITTW22KQHEYLZUFXDSWF3JJC36A2KIYQU6T2C6YGDAFXMEIQ64QP`](https://stellar.expert/explorer/public/contract/CCMMITTW22KQHEYLZUFXDSWF3JJC36A2KIYQU6T2C6YGDAFXMEIQ64QP) |
+| Verifier | [`CALYISOENO2N4575DWF2K2PHB5UAEHCWI5ZJCZXYNHC4OXYHJWVBGZKY`](https://stellar.expert/explorer/public/contract/CALYISOENO2N4575DWF2K2PHB5UAEHCWI5ZJCZXYNHC4OXYHJWVBGZKY) |
+| Prize token (native XLM SAC) | `CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA` |
+
+**Testnet**
+
+| Contract | ID |
+|---|---|
+| Chest registry | [`CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ`](https://stellar.expert/explorer/testnet/contract/CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ) |
+| Verifier | [`CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE`](https://stellar.expert/explorer/testnet/contract/CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE) |
+| Prize token (native XLM SAC) | `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` |
+| Normal chest (attack demo, no ZK) | `CDMYX46WAU66OOAVXLBPTVXZ7EZF5NTS3X3T6S2AKSOADEBZD7OGEXCA` |
+
+## Repo structure
+
+```text
+.
+├── app/                    # Next.js app (findloot.xyz): pages, API routes, components
+│   ├── app/                #   routes: create, chest/[code], explore, attack, sdk, wallet, api/…
+│   └── components/
+├── circuits/               # Circom circuit, build artifacts, trusted-setup ceremony
+│   ├── chest.circom
+│   ├── ceremony/
+│   └── scripts/setup.sh
+├── contracts/              # Soroban (Rust)
+│   ├── chest/              #   chest registry: create, claim, nullifiers, slots, close
+│   ├── verifier/           #   Groth16 verifier (testnet)
+│   ├── verifier-mainnet/   #   Groth16 verifier (mainnet)
+│   └── normal-chest/       #   plain-text chest for the attack demo
+├── packages/
+│   ├── sdk/                # @findloot/sdk
+│   └── chestzk-chest/      # @findloot/chest (contract bindings)
+├── bot/                    # copy-bot attack scripts
+├── deployments/            # registry-mainnet.json
+├── scripts/mainnet/        # deploy and verify the mainnet registry
+├── security/  audits/      # automated scan reports
+├── docs/                   # MAINNET-REGISTRY.md, WALLETS.md
+└── ROADMAP.md
+```
+
+## Local development
+
+**Requirements:** Node.js + pnpm, and for contracts/circuits: Rust + `stellar-cli`, Circom + snarkjs.
+
+```bash
+# App
+cd app
+cp .env.example .env.local   # set RELAYER_SECRET, CREATOR_SECRET (testnet needs nothing else)
+pnpm install
+pnpm dev                     # http://localhost:3000
+pnpm build                   # production build
+pnpm lint
+pnpm test                    # vitest
+
+# Contracts
+cd contracts/chest && cargo test
+
+# Circuit (Groth16 setup)
+cd circuits && npm install && ./scripts/setup.sh
+```
+
+Optional: `RELAYER_BASE_URL` / `RELAYER_API_KEY` for [OpenZeppelin Channels](https://channels.openzeppelin.com/testnet/gen). Mainnet turns on only when all `MAINNET_*` variables in [`app/.env.example`](app/.env.example) are set.
+
+## Security
+
+- **Not audited.** The circuit and contracts have **not** had an external audit. Use small prizes.
+- Mainnet has prize caps per place and per chest (`MAINNET_MAX_PRIZE_PER_PLACE_XLM`, `MAINNET_MAX_TOTAL_PRIZE_XLM`) and relayer rate limits.
+- Automated static-scan reports are in [`security/`](security/) and [`audits/`](audits/). They are tool output, not an audit.
+- Found an issue? Please open a [GitHub issue](https://github.com/Klorenn/LOOT/issues) or reach out on X [@kl0ren](https://x.com/kl0ren).
+
+## Roadmap
+
+- [x] Circuit, Soroban verifier and chest registry on testnet
+- [x] Passkey smart wallets, gasless claims, creator panel, attack mode
+- [x] `@findloot/sdk` published on npm
+- [x] Mainnet with prize caps
+- [ ] More tests and an internal security review of the circuit and contracts
+- [ ] External audit of the circuit and verifier
+- [ ] Embeddable widget and a full creator panel
+- [ ] Pilots with Stellar events and communities
+
+## Team
+
+| | Role | GitHub | X |
+|---|---|---|---|
+| **Pau Koh** | Builder | [@Klorenn](https://github.com/Klorenn) | [@kl0ren](https://x.com/kl0ren) |
+
+## License
+
+MIT © 2026 Pau Koh
+
+<div align="center"><sub>Built on Stellar · <a href="https://www.findloot.xyz">findloot.xyz</a></sub></div>
