@@ -12,7 +12,7 @@ zero-knowledge proof bound to their own address, so a bot can't copy the answer.
   <img alt="Soroban" src="https://img.shields.io/badge/Soroban-smart%20contracts-111114?style=for-the-badge" />
   <img alt="Circom" src="https://img.shields.io/badge/Circom-Groth16%20%C2%B7%20BN254-111114?style=for-the-badge" />
   <a href="https://www.npmjs.com/package/@findloot/sdk"><img alt="npm @findloot/sdk" src="https://img.shields.io/npm/v/@findloot/sdk?style=for-the-badge&label=%40findloot%2Fsdk&color=CB3837&logo=npm" /></a>
-  <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge" />
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge" /></a>
 </p>
 
 <p>
@@ -286,6 +286,6 @@ Optional: `RELAYER_BASE_URL` / `RELAYER_API_KEY` for [OpenZeppelin Channels](htt
 
 ## License
 
-MIT © 2026 Pau Koh
+[MIT](LICENSE) © 2026 Pau Koh
 
 <div align="center"><sub>Built on Stellar · <a href="https://www.findloot.xyz">findloot.xyz</a></sub></div>
