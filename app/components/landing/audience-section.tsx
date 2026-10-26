@@ -4,8 +4,6 @@ import Link from "next/link";
 import { BuildersIllustration } from "@/components/landing/builders-illustration";
 import { CreatorsIllustration } from "@/components/landing/creators-illustration";
 import { PlayersIllustration } from "@/components/landing/players-illustration";
-import { chestPath } from "@/lib/chest-code";
-import { useNet } from "@/components/network-provider";
 
 type Card = {
   k: string;
@@ -20,7 +18,6 @@ type Card = {
 
 /** "Who it is for": tres públicos, cada uno con su ilustración (Figma 46-235). */
 export function AudienceSection({ docsUrl }: { docsUrl: string }) {
-  const { SAMPLE_CHEST_ID } = useNet();
   const cards: Card[] = [
     {
       k: "Players",
@@ -28,8 +25,8 @@ export function AudienceSection({ docsUrl }: { docsUrl: string }) {
       art: <PlayersIllustration />,
       h: "Bots can’t steal your win.",
       b: "Your answer stays private. Nobody can copy it and take your prize.",
-      cta: "Open the demo chest →",
-      href: chestPath(SAMPLE_CHEST_ID),
+      cta: "Explore chests →",
+      href: "/explore",
     },
     {
       k: "Creators",

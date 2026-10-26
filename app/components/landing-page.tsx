@@ -21,7 +21,6 @@ import { SmoothScroll } from "@/components/smooth-scroll";
 import { StackMarquee } from "@/components/stack-marquee";
 import { AudienceSection } from "@/components/landing/audience-section";
 import { SdkBlock } from "@/components/landing/sdk-block";
-import { chestPath } from "@/lib/chest-code";
 import { PRIZE, stroopsToXlm } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";
@@ -55,7 +54,7 @@ function useStats(): Stats {
 }
 
 export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
-  const { SAMPLE_CHEST_ID, NETWORK_LC, IS_MAINNET, mainnetReady } = useNet();
+  const { NETWORK_LC, IS_MAINNET, mainnetReady } = useNet();
   const root = useRef<HTMLDivElement>(null);
   const stats = useStats();
   const { ready, address } = useSession();
@@ -116,7 +115,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 </Link>
               )}
               <Link
-                href={`/login?next=${chestPath(SAMPLE_CHEST_ID)}`}
+                href="/explore"
                 className="btn-landing btn-landing-p btn-landing-sm"
               >
                 Launch app →
@@ -169,7 +168,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 </p>
                 <div data-hero-fade className="mt-8 flex flex-wrap gap-3">
                   <Link
-                    href={`/login?next=${chestPath(SAMPLE_CHEST_ID)}`}
+                    href="/explore"
                     className="btn-landing btn-landing-p"
                   >
                     Open a chest →

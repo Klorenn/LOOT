@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { ExampleTag } from "@/components/example-tag";
 import { LogoChest } from "@/components/logo-chest";
-import { chestPath } from "@/lib/chest-code";
 import { DEMO_CHEST, PRIZE } from "@/lib/config";
 import { useNet } from "@/components/network-provider";
 import { switchNetwork } from "@/lib/network";
@@ -305,7 +304,6 @@ export function AttackSection() {
 }
 
 export function CtaSection() {
-  const { SAMPLE_CHEST_ID } = useNet();
   return (
     <section
       aria-labelledby="cta-h"
@@ -332,7 +330,7 @@ export function CtaSection() {
         </p>
         <div data-fade className="mt-10 flex flex-wrap justify-center gap-3">
           <Link
-            href={`/login?next=${chestPath(SAMPLE_CHEST_ID)}`}
+            href="/explore"
             className="btn-landing btn-landing-p"
           >
             Open a chest →

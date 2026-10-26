@@ -12,7 +12,6 @@ import {
   readWonChests,
   type WonChestsResult,
 } from "@/lib/chain";
-import { chestPath } from "@/lib/chest-code";
 import { PRIZE, stroopsToXlm, tokenDecimals } from "@/lib/config";
 import { expertAddress, shortAddr } from "@/lib/format";
 import { HANDLE_HINT, HANDLE_RE, setHandle, useHandle } from "@/lib/handle";
@@ -22,7 +21,7 @@ import { useNet } from "@/components/network-provider";
 type Load<T> = { s: "loading" } | { s: "ok"; v: T } | { s: "error" };
 
 export default function ProfilePage() {
-  const { CONTRACTS, SAMPLE_CHEST_ID, NETWORK_LABEL, NETWORK } = useNet();
+  const { CONTRACTS, NETWORK_LABEL, NETWORK } = useNet();
   const router = useRouter();
   const { address, player, disconnect } = useSession();
   const [balance, setBalance] = useState<Load<bigint>>({ s: "loading" });
@@ -142,8 +141,8 @@ export default function ProfilePage() {
             <Link href="/wallet?tab=receive" className="btn-landing btn-landing-s">
               Wallet
             </Link>
-            <Link href={chestPath(SAMPLE_CHEST_ID)} className="btn-landing btn-landing-p">
-              Open a chest
+            <Link href="/explore" className="btn-landing btn-landing-p">
+              Explore chests
             </Link>
           </div>
         </div>

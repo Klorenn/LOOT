@@ -20,7 +20,7 @@ const stamp = (iso: string) =>
   `${new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC`;
 
 export default function ClaimedChestsPage() {
-  const { CONTRACTS, SAMPLE_CHEST_ID, NETWORK_LC, NETWORK, IS_MAINNET } = useNet();
+  const { CONTRACTS, NETWORK_LC, NETWORK, IS_MAINNET } = useNet();
   const { address } = useSession();
   const [data, setData] = useState<Load>({ s: "loading" });
   const seq = useRef(0);
@@ -104,7 +104,7 @@ export default function ClaimedChestsPage() {
             body="Only claims from the last ~7 days appear here (event window). Solve a chest and it shows up in a few seconds."
             chest="closed"
             actions={[
-              { href: chestPath(SAMPLE_CHEST_ID), label: "Open a chest →", primary: true },
+              { href: "/explore", label: "Explore chests →", primary: true },
               { href: "/#security", label: "See why proofs can’t be stolen" },
             ]}
           />
