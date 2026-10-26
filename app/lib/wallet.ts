@@ -4,6 +4,7 @@ import { hash, Keypair } from "@stellar/stellar-sdk";
 import { NETWORK, isMainnet, passkeyEnabled } from "./client-cfg";
 import { getPasskeyKit } from "./passkey-client";
 import { MAINNET_PASSKEY_NOTE } from "./passkey-policy";
+import { PasskeyTxPendingError, WalletNotDeployedError, assertWalletDeployed, postPasskeyTx } from "./passkey-submit";
 
 const STORAGE_KEY = "chestzk.player";
 /** Claves de storage por red: testnet conserva las de siempre; mainnet usa un prefijo propio, así una
@@ -121,16 +122,14 @@ export function assertPasskeyAllowed(): void {
 
 export async function submitPasskeyTx(xdr: string): Promise<string> {
   assertPasskeyAllowed();
-  const res = await fetch("/api/passkey/send", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ xdr }),
-  });
-  const data = await res.json();
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || "passkey submit failed");
-  }
-  return data.hash as string;
+  // lanza PasskeyTxPendingError si la tx no se confirmó (nunca se trata como éxito)
+  return postPasskeyTx(xdr);
+}
+
+/** ¿Existe el wallet en la cadena? Un fallo de RPC cuenta como "no verificable" (lanza). */
+async function walletExists(contractId: string): Promise<boolean> {
+  const { contractInstanceExists } = await import("./chain");
+  return contractInstanceExists(contractId);
 }
 
 /**
@@ -186,6 +185,16 @@ function readAccounts(): Record<string, string> {
     return JSON.parse(localStorage.getItem(sk(ACCOUNTS_KEY)) || "{}");
   } catch {
     return {};
+  }
+}
+
+function forgetAccount(keyId: string) {
+  try {
+    const all = readAccounts();
+    delete all[keyId];
+    localStorage.setItem(sk(ACCOUNTS_KEY), JSON.stringify(all));
+  } catch {
+    /* storage bloqueado: nada que olvidar */
   }
 }
 
@@ -253,7 +262,14 @@ async function enrollSmartWallet(opts: EnrollOpts = {}): Promise<Player> {
 
   opts.onStage?.("passkey", { address: created.contractId });
   opts.onStage?.("deploy");
-  const hashTx = await submitPasskeyTx(created.signedTx);
+  let hashTx: string;
+  try {
+    hashTx = await submitPasskeyTx(created.signedTx);
+  } catch (e) {
+    // deploy sin confirmar: la cuenta NO existe todavía; no se guarda nada
+    if (e instanceof PasskeyTxPendingError) throw new WalletNotDeployedError();
+    throw e;
+  }
   opts.onStage?.("confirm");
   try {
     await kit.confirmWalletCreation(created, hashTx);
@@ -262,6 +278,9 @@ async function enrollSmartWallet(opts: EnrollOpts = {}): Promise<Player> {
     // clients; the deploy already succeeded on-chain — keep going.
     console.warn("confirmWalletCreation:", e);
   }
+  // Nunca se guarda una sesión (ni el mapa keyId → C…) para un contrato que no existe: si el deploy no quedó
+  // en la cadena, falla con "Your account wasn't created yet" y no se persiste nada.
+  await assertWalletDeployed(() => walletExists(created.contractId));
   // Skip connectWallet after fresh create: passkey-kit 0.19 treats a null
   // signer expiration as defined and calls null.toString() (crash). We already
   // have contractId + keyId from createWallet; reconnect path uses connectWallet.
@@ -303,6 +322,11 @@ export async function reconnectPasskey(): Promise<Player> {
   if (!cred) throw new DOMException("No credential returned", "NotAllowedError");
   const contractId = readAccounts()[cred.id];
   if (!contractId) throw new NoPasskeyAccountError();
+  // Un mapa guardado por un alta que nunca llegó a la cadena (versiones anteriores) se descarta.
+  if (isMainnet() && (await walletExists(contractId).then((e) => !e, () => false))) {
+    forgetAccount(cred.id);
+    throw new NoPasskeyAccountError();
+  }
   const player: Player = {
     kind: "passkey",
     publicKey: contractId,

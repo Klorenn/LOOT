@@ -10,6 +10,8 @@ import { resourceFeeOf } from "@/lib/sim-fee";
 import { decideSponsor, relayerBalance, reserveFee } from "@/lib/relay-limits";
 import { withRpcUrl } from "@/lib/rpc";
 import { relayLimit } from "@/lib/rate-limit";
+import { inclusionFee } from "@/lib/inclusion-fee";
+import { Server } from "@stellar/stellar-sdk/rpc";
 
 type Body = {
   chestId: number;
@@ -96,7 +98,7 @@ export async function POST(req: NextRequest) {
     class FeeCapError extends Error {}
 
     // Escritura: RPC primario; fallback solo ante error de red (ver lib/rpc.ts).
-    // Fee de inclusión ~100 stroops; solo se sube ante TRY_AGAIN (y la fee total sigue acotada por maxFee).
+    // Fee de inclusión dinámica (ver lib/inclusion-fee.ts); se sube más ante TRY_AGAIN (y la fee total sigue acotada por maxFee).
     const attempt = (inclusion: string) =>
       withRpcUrl(
         async (rpcUrl) => {
@@ -148,12 +150,14 @@ export async function POST(req: NextRequest) {
 
     const release = c.IS_MAINNET ? reserveFee(c, maxFee) : () => {};
     let sent: Awaited<ReturnType<typeof attempt>>;
+    // Inclusión dinámica (mainnet: max(p90 de getFeeStats, 200)); 100 stroops puede no incluirse con congestión.
+    const baseInclusion = await withRpcUrl((u) => inclusionFee(new Server(u, { allowHttp: true }), c));
     try {
       try {
-        sent = await attempt("100");
+        sent = await attempt(baseInclusion.toString());
       } catch (e) {
         if (e instanceof FeeCapError || !/TRY_AGAIN/i.test((e as { message?: string })?.message ?? String(e))) throw e;
-        sent = await attempt("10000"); // TRY_AGAIN: sube la inclusión (la fee total sigue bajo el tope)
+        sent = await attempt((baseInclusion > BigInt(10000) ? baseInclusion : BigInt(10000)).toString()); // TRY_AGAIN: sube la inclusión (la fee total sigue bajo el tope)
       }
     } catch (e) {
       if (e instanceof FeeCapError) {

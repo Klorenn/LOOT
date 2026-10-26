@@ -466,3 +466,16 @@ export async function readSacTransfers(address: string): Promise<SacTransfer[]> 
     });
   return [...parse(out.events, "out"), ...parse(inn.events, "in")].sort((x, y) => y.ledger - x.ledger);
 }
+
+/** ¿Existe la instancia del contrato `id` en la cadena (no archivada)? Lanza si el RPC no responde. */
+export async function contractInstanceExists(id: string): Promise<boolean> {
+  const key = xdr.LedgerKey.contractData(
+    new xdr.LedgerKeyContractData({
+      contract: Address.fromString(id).toScAddress(),
+      key: xdr.ScVal.scvLedgerKeyContractInstance(),
+      durability: xdr.ContractDataDurability.persistent(),
+    }),
+  );
+  const r = await withRpc((s) => s.getLedgerEntries(key));
+  return r.entries.length > 0;
+}

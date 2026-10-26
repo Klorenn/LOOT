@@ -36,7 +36,7 @@ import {
 import { WalletPicker } from "@/components/wallet-picker";
 import { HandlePrompt } from "@/components/handle-prompt";
 import { getHandle, hasSkippedHandle } from "./handle";
-import { passkeyEnabled } from "./client-cfg";
+import { isMainnet, passkeyEnabled } from "./client-cfg";
 import { MAINNET_PASSKEY_SIGNOUT } from "./passkey-policy";
 
 type EnrollOptsStage = EnrollOpts["onStage"];
@@ -216,6 +216,27 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setPlayer(null);
   }, []);
 
+  // Una sesión passkey de mainnet cuyo contrato no existe (alta que nunca llegó a la cadena) se limpia.
+  const [neverCreated, setNeverCreated] = useState(false);
+  useEffect(() => {
+    if (!ready || !player || player.kind !== "passkey" || !isMainnet() || !passkeyEnabled()) return;
+    let off = false;
+    import("./chain")
+      .then(({ contractInstanceExists }) => contractInstanceExists(player.publicKey))
+      .then((exists) => {
+        if (off || exists) return;
+        clearPlayer();
+        setPlayer(null);
+        setNeverCreated(true);
+      })
+      .catch(() => {
+        /* RPC caído: no se cierra la sesión por una duda */
+      });
+    return () => {
+      off = true;
+    };
+  }, [ready, player]);
+
   // Mainnet no admite cuentas passkey (ver lib/passkey-policy.ts): una sesión passkey guardada en
   // mainnet se cierra con un aviso.
   const [signedOutNotice, setSignedOutNotice] = useState(false);
@@ -243,6 +264,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       {children}
       <WalletPicker open={pickerOpen} onClose={closePicker} onSelect={pickWallet} />
       <HandlePrompt address={promptFor} onClose={() => setPromptFor(null)} />
+      {neverCreated && (
+        <div
+          role="status"
+          className="fixed inset-x-4 bottom-4 z-[320] mx-auto flex max-w-[480px] items-start gap-3 rounded-[12px] border border-[var(--line)] bg-[var(--s1)] p-4 text-[14px] leading-[1.5] text-[var(--muted)] shadow-lg"
+          style={{ borderLeftWidth: 3, borderLeftColor: "var(--gold)" }}
+        >
+          <p className="flex-1">Your passkey account was never created on Mainnet, so you were signed out. Please create it again.</p>
+          <button type="button" onClick={() => setNeverCreated(false)} className="font-mono text-[12px] text-[var(--text)] underline underline-offset-2">
+            Dismiss
+          </button>
+        </div>
+      )}
       {signedOutNotice && (
         <div
           role="status"

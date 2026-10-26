@@ -91,7 +91,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     } else if (/signup is temporarily unavailable/i.test(errMsg(e))) {
       setFailKind("unavailable");
       setView("fail");
-    } else if (/passkey submit|relay|HTTP 5|fetch failed|network/i.test(errMsg(e))) {
+    } else if (/passkey submit|relay|HTTP 5|fetch failed|network|wasn.t created yet/i.test(errMsg(e))) {
       setFailKind("relayer");
       setView("fail");
     } else {
@@ -285,8 +285,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
         {view === "fail" && failKind === "relayer" && (
           <InlineAlert
             tone="gold"
-            title="Relayer unavailable"
-            body="The passkey was created but the account could not be deployed. Try again in a moment."
+            title="Account not created yet"
+            body="Your account wasn’t created yet — please try again in a moment. Nothing was charged."
           />
         )}
         {view === "fail" && failKind === "wallet" && (

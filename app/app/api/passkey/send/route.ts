@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  FeeBumpTransaction,
   Keypair,
   Operation,
   Transaction,
@@ -13,6 +14,8 @@ import type { RelayVerdict } from "@/lib/relay-policy";
 
 type RelayKind = Extract<RelayVerdict, { ok: true }>["kind"];
 import { pickRpcUrl } from "@/lib/rpc";
+import { inclusionFee } from "@/lib/inclusion-fee";
+import { TxPendingError, waitForConfirmation, waitSeconds } from "@/lib/tx-confirm";
 import { relayLimit } from "@/lib/rate-limit";
 import { relayMaxFee, relayerSecretFor, vetRelayTx } from "@/lib/relay-guard";
 import { decideSponsor, relayerBalance, reserveFee, reserveRegistration } from "@/lib/relay-limits";
@@ -20,7 +23,6 @@ import { decideSponsor, relayerBalance, reserveFee, reserveRegistration } from "
 type Body = { xdr: string };
 
 const UINT32_MAX = 0xffffffff;
-const INCLUSION = 100;
 
 /** La simulación pasó del tope de fee del relayer (p. ej. el deploy de wallet en mainnet antes de extender el TTL del wasm). */
 class RelayCapError extends Error {
@@ -60,22 +62,23 @@ function assembleDeployTx(
   raw: Transaction,
   sim: Api.SimulateTransactionSuccessResponse,
   kp: Keypair,
+  inclusion: bigint,
 ): Transaction {
   const minRf = BigInt(sim.minResourceFee);
-  const needsBump = minRf + BigInt(INCLUSION) > BigInt(UINT32_MAX);
-  // Mainnet: sin fee-bump, y la fee de la tx FINAL no puede pasar del tope.
-  if (minRf + BigInt(INCLUSION) > relayMaxFee(c, kind)) throw new RelayCapError(sim.minResourceFee);
+  const needsBump = minRf + inclusion > BigInt(UINT32_MAX);
+  // Mainnet: sin fee-bump, y la fee de la tx FINAL (recursos + inclusión) no puede pasar del tope.
+  if (minRf + inclusion > relayMaxFee(c, kind)) throw new RelayCapError(sim.minResourceFee);
   if (c.IS_MAINNET && needsBump) throw new Error("fee-bump is not allowed on mainnet");
 
   // First build under uint32 so TransactionBuilder accepts the envelope.
   const buildRf = needsBump
-    ? BigInt(UINT32_MAX - INCLUSION)
+    ? BigInt(UINT32_MAX) - inclusion
     : minRf;
   const sorobanData = sim.transactionData.build();
   sorobanData.resourceFee(xdr.Int64.fromString(buildRf.toString()));
 
   let inner = TransactionBuilder.cloneFrom(raw, {
-    fee: String(INCLUSION),
+    fee: String(inclusion),
     sorobanData,
     networkPassphrase: c.NETWORK.passphrase,
   }).build();
@@ -101,7 +104,7 @@ function assembleDeployTx(
 
   const bump = TransactionBuilder.buildFeeBumpTransaction(
     kp,
-    String(INCLUSION),
+    String(inclusion),
     inner,
     c.NETWORK.passphrase,
   );
@@ -134,12 +137,14 @@ async function submitAsChannel(
 
   const rpcUrl = await pickRpcUrl();
   const rpc = new Server(rpcUrl, { allowHttp: true });
+  // Mainnet: max(p90 de getFeeStats, 200) con tope; con 100 stroops una tx puede no incluirse nunca.
+  const inclusion = await inclusionFee(rpc, c);
 
   if (canRebuild) {
     const invokeOp = op as Operation.InvokeHostFunction;
     const account = await rpc.getAccount(kp.publicKey());
     const built = new TransactionBuilder(account, {
-      fee: String(INCLUSION),
+      fee: String(inclusion),
       networkPassphrase: c.NETWORK.passphrase,
     })
       .addOperation(
@@ -161,18 +166,15 @@ async function submitAsChannel(
       );
     }
 
-    console.info("[passkey/send] minResourceFee", sim.minResourceFee);
-    if (BigInt(sim.minResourceFee) + BigInt(INCLUSION) > relayMaxFee(c, kind)) {
+    console.info("[passkey/send] minResourceFee", sim.minResourceFee, "inclusionFee", inclusion.toString());
+    if (BigInt(sim.minResourceFee) + inclusion > relayMaxFee(c, kind)) {
       console.warn(`[passkey/send] ${kind} on ${c.NETWORK_LC}: minResourceFee ${sim.minResourceFee} above cap ${relayMaxFee(c, kind)}`);
       throw new RelayCapError(sim.minResourceFee);
     }
 
-    const signed = assembleDeployTx(c, kind, built, sim, kp);
-    const sent = await rpc.sendTransaction(signed);
-    if (sent.status === "ERROR") {
-      throw new Error(`send ERROR: ${JSON.stringify(sent)}`);
-    }
-    return waitForHash(rpc, sent.hash, "local-channel");
+    const signed = assembleDeployTx(c, kind, built, sim, kp, inclusion);
+    const sent = await sendWithRetry(rpc, signed);
+    return waitForHash(c, rpc, sent.hash, "local-channel");
   }
 
   if (c.IS_MAINNET) throw new Error("fee-bump is not allowed on mainnet");
@@ -183,29 +185,30 @@ async function submitAsChannel(
     c.NETWORK.passphrase,
   );
   feeBump.sign(kp);
-  const sent = await rpc.sendTransaction(feeBump);
-  if (sent.status === "ERROR") {
-    throw new Error(`fee-bump ERROR: ${JSON.stringify(sent)}`);
-  }
-  return waitForHash(rpc, sent.hash, "fee-bump");
+  const sent = await sendWithRetry(rpc, feeBump);
+  return waitForHash(c, rpc, sent.hash, "fee-bump");
 }
 
+/** sendTransaction con reintentos ante TRY_AGAIN_LATER (la misma tx firmada es idempotente). */
+async function sendWithRetry(rpc: Server, tx: Transaction | FeeBumpTransaction): Promise<{ hash: string }> {
+  for (let i = 0; i < 4; i++) {
+    const sent = await rpc.sendTransaction(tx);
+    if (sent.status === "ERROR") throw new Error(`send ERROR: ${JSON.stringify(sent)}`);
+    if (sent.status !== "TRY_AGAIN_LATER") return { hash: sent.hash };
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error("network busy: the transaction was not accepted, try again");
+}
+
+/** Espera la confirmación; si no llega, lanza TxPendingError (nunca "ok" para una tx sin confirmar). */
 async function waitForHash(
+  c: NetConfig,
   rpc: Server,
   hash: string,
   via: string,
-): Promise<{ hash: string; via: string; pending?: boolean }> {
-  for (let i = 0; i < 40; i++) {
-    await new Promise((r) => setTimeout(r, 1000));
-    const st = await rpc.getTransaction(hash);
-    if (st.status === Api.GetTransactionStatus.SUCCESS) {
-      return { hash, via };
-    }
-    if (st.status === Api.GetTransactionStatus.FAILED) {
-      throw new Error(`tx failed ${hash}`);
-    }
-  }
-  return { hash, via, pending: true };
+): Promise<{ hash: string; via: string }> {
+  await waitForConfirmation((h) => rpc.getTransaction(h), hash, { attempts: waitSeconds(c.IS_MAINNET) });
+  return { hash, via };
 }
 
 /**
@@ -327,6 +330,14 @@ export async function POST(req: NextRequest) {
       if (relayKind === "wallet_deploy" && c.IS_MAINNET)
         return NextResponse.json({ error: SIGNUP_UNAVAILABLE, code: "passkey_signup_unavailable" }, { status: 503 });
       return NextResponse.json({ error: "Transaction not relayed: fee above the relayer cap", code: "fee_cap" }, { status: 503 });
+    }
+    if (e instanceof TxPendingError) {
+      // enviada pero sin confirmar a tiempo: NO es un éxito. El cliente no debe dar nada por creado.
+      console.warn("passkey/send: tx_pending", e.hash);
+      return NextResponse.json(
+        { ok: false, code: "tx_pending", hash: e.hash, error: "The transaction was not confirmed in time." },
+        { status: 504 },
+      );
     }
     const message = e instanceof Error ? e.message : String(e);
     console.error("passkey/send", e);
