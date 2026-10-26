@@ -13,6 +13,7 @@ import {
   HeroStats,
   HowSection,
   SecuritySection,
+  UseCasesSection,
   type Stats,
 } from "@/components/landing-sections";
 import { ScrollProgress } from "@/components/scroll-progress";
@@ -143,16 +144,15 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                   data-reveal-h1
                   className="max-w-[14ch] text-[clamp(52px,7vw,92px)] leading-[0.98] font-semibold tracking-[-0.04em]"
                 >
-                  Puzzle chests that bots{" "}
-                  <span className="text-[var(--proof)]">can’t rob.</span>
+                  Solve the riddle.{" "}
+                  <span className="text-[var(--proof)]">Win the prize.</span>
                 </h1>
                 <p
                   data-hero-fade
                   className="mt-6 max-w-[36rem] text-[18px] leading-[1.55] text-[var(--muted)]"
                 >
-                  Solve it, prove it in zero knowledge, claim the prize. Every
-                  proof is sealed to the solver’s address, so a copied proof is
-                  worth nothing.
+                  Anyone can lock XLM behind a riddle. Solve it and the prize is
+                  yours. Bots can&apos;t steal it.
                 </p>
                 <div data-hero-fade className="mt-8 flex flex-wrap gap-3">
                   <Link
@@ -187,6 +187,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
           <StackMarquee />
 
           <HowSection />
+          <UseCasesSection />
           <AttackSection />
           <AudienceSection docsUrl={DOCS_URL} />
 
@@ -207,33 +208,33 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 data-reveal-h2
                 className="mt-4 text-[clamp(36px,4.5vw,56px)] leading-[1.02] font-semibold tracking-[-0.04em]"
               >
-                Fast ledger. Sealed proofs.
+                Built on Stellar.
               </h2>
               <div className="mt-16 grid grid-cols-1 border-t border-[var(--line)] sm:grid-cols-2 lg:grid-cols-4">
                 {[
                   {
-                    k: "Proof",
-                    h: "Groth16",
+                    k: "Privacy",
+                    h: "Answer stays secret",
                     hc: "text-[var(--proof)]",
-                    b: "Prover address as public input.",
+                    b: "You prove you know it without showing it.",
                   },
                   {
-                    k: "Replay",
-                    h: "Nullifiers",
+                    k: "Cost",
+                    h: `0 ${PRIZE.code} to play`,
                     hc: "",
-                    b: "Each proof works once.",
+                    b: "We cover the network fees for you.",
                   },
                   {
-                    k: "Settlement",
-                    h: "One ledger",
+                    k: "Speed",
+                    h: "Paid in seconds",
                     hc: "text-[var(--ok)]",
-                    b: "Final once the claim lands in a Stellar ledger.",
+                    b: "Stellar confirms the payout in about 5 seconds.",
                   },
                   {
                     k: "Prize",
-                    h: `Native ${PRIZE.code}`,
+                    h: `Real ${PRIZE.code}`,
                     hc: "text-[var(--gold)]",
-                    b: "Paid through the Stellar asset contract. No trustline needed.",
+                    b: "Sent straight to your wallet. No setup needed.",
                   },
                 ].map((s, i) => (
                   <div
@@ -291,7 +292,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 </div>
               </div>
               <p className="mt-6 font-mono text-[12px] text-[var(--dim)]">
-                Counted from on-chain events; the testnet RPC keeps about 7 days.
+                Live data from the last 7 days on testnet.
               </p>
             </div>
           </section>

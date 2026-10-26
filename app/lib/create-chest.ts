@@ -5,6 +5,7 @@ import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { latestLedgerHint } from "./chain";
 import { CONTRACTS, FACTORY, NETWORK } from "./config";
 import { createArgs, scheduleError } from "./factory";
+import type { Quiz } from "./quiz";
 import { getPasskeyKit } from "./passkey-client";
 import { SendError } from "./send";
 import { submitPasskeyTx, type Player } from "./wallet";
@@ -33,6 +34,8 @@ export type ChestMetaInput = {
   question: string;
   hint?: string;
   difficulty?: number;
+  /** Cofre cuestionario: solo la parte pública (lib/quiz.ts). */
+  quiz?: Quiz;
   /** premio total en XLM (solo para metadatos de listado) */
   prize: number;
   places: number;
@@ -71,6 +74,7 @@ export function reserveMeta(player: Player, fingerprintHex: string, meta: ChestM
     question: meta.question,
     hint: meta.hint,
     difficulty: meta.difficulty,
+    quiz: meta.quiz,
     prize: meta.prize,
     listed: meta.listed,
     salt: meta.listed ? meta.salt : undefined,

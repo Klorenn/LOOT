@@ -4,6 +4,7 @@ import { getChestMeta, type ChestMeta } from "./chest-store";
 import { DEMO_CHEST, stroopsToXlm, tokenDecimals, tokenLabel, PRIZE } from "./config";
 import { factoryAddressAt, factoryIndexOf, readFactoryChest, type FactoryChest } from "./factory";
 import { getChest as demoCatalog } from "./chests-demo";
+import type { Quiz } from "./quiz";
 
 /**
  * Vista unificada de un cofre (legacy o factory) para la UI. Solo servidor:
@@ -23,6 +24,8 @@ export type ChestView = {
   question: string;
   hint?: string;
   difficulty?: 1 | 2 | 3 | 4;
+  /** Cofre cuestionario: preguntas y opciones públicas (nunca las respuestas). */
+  quiz?: Quiz;
   creator: string;
   fingerprintHex: string;
   /** Solo cofres públicos (o sin metadatos: sal derivada de la pregunta). Los privados no la tienen. */
@@ -72,6 +75,7 @@ export function factoryView(c: FactoryChest, meta: ChestMeta | null): ChestView 
     question: c.question,
     hint: isDemo ? DEMO_CHEST.hint : meta?.hint,
     difficulty: isDemo ? 3 : meta?.difficulty,
+    quiz: isDemo ? undefined : meta?.quiz,
     creator: c.creator,
     fingerprintHex: c.fingerprintHex,
     // Sin metadatos no se sirve ninguna sal: el cliente prueba la derivada de la pregunta (cofres de
@@ -111,6 +115,7 @@ export function legacyView(c: OnChainChest, meta: ChestMeta | null): ChestView {
     question: isDemo ? DEMO_CHEST.question : (meta?.question ?? demo?.question ?? "—"),
     hint: isDemo ? DEMO_CHEST.hint : meta?.hint,
     difficulty: isDemo ? 3 : (meta?.difficulty ?? demo?.difficulty),
+    quiz: isDemo ? undefined : meta?.quiz,
     creator: c.creator,
     fingerprintHex: c.fingerprintHex,
     salt: isDemo ? DEMO_CHEST.salt : priv ? undefined : (meta?.salt ?? demo?.salt),

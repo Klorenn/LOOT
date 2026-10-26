@@ -2,6 +2,15 @@
 
 import Link from "next/link";
 import { DEMO_PATH } from "@/lib/demo";
+import {
+  Flag,
+  Gift,
+  GraduationCap,
+  MapPin,
+  Megaphone,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { ExampleTag } from "@/components/example-tag";
 import { LogoChest } from "@/components/logo-chest";
 import { chestPath } from "@/lib/chest-code";
@@ -52,31 +61,25 @@ const FP_SHORT = `0x${fp.slice(0, 4)}…${fp.slice(-4)}`;
 const STEPS: { n: string; t: string; b: string; detail: React.ReactNode }[] = [
   {
     n: "01",
-    t: "Solve locally",
-    b: "Crack the riddle in your browser. Only a hash of the answer exists.",
+    t: "Solve a riddle",
+    b: "Every chest locks a prize behind a question.",
     detail: <span className="text-[var(--muted)]">hash → {FP_SHORT}</span>,
   },
   {
     n: "02",
-    t: "Seal it to you",
-    b: "A ZK proof binds the answer to your Stellar address as a public input.",
-    detail: <span className="text-[var(--proof)]">recipient → your address</span>,
+    t: "Your answer is checked, and stays secret",
+    b: "A zero-knowledge proof shows you know it without revealing it.",
+    detail: <span className="text-[var(--proof)]">proof → verified</span>,
   },
   {
     n: "03",
-    t: "Claim the prize",
-    b: "Soroban checks the proof against the recipient sealed inside it, then pays out.",
+    t: "Claim your prize",
+    b: "Right answer? The contract pays you. Nobody else can take it.",
     detail: (
       <span className="text-[var(--gold)]">
         +{PRIZE.perSlot} {PRIZE.code}
       </span>
     ),
-  },
-  {
-    n: "04",
-    t: "Each proof works once",
-    b: "Every claim spends a nullifier. Replaying the same proof reverts.",
-    detail: <span className="text-[var(--red)]">replay → reverted</span>,
   },
 ];
 
@@ -99,21 +102,20 @@ export function HowSection() {
           data-reveal-h2
           className="mt-4 max-w-[16ch] text-[clamp(36px,4.5vw,56px)] leading-[1.02] font-semibold tracking-[-0.04em]"
         >
-          Four steps. One rightful owner.
+          Gamified escrow.
         </h2>
         <p
           data-fade
           className="mt-5 max-w-[40rem] text-[18px] leading-[1.55] text-[var(--muted)]"
         >
-          The answer never leaves your device. The proof carries your address.
-          The contract only pays the address inside the proof.
+          A prize locked behind a riddle. Solve it, claim it.
         </p>
-        <div className="mt-16 grid grid-cols-1 border-t border-[var(--line)] sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-16 grid grid-cols-1 border-t border-[var(--line)] md:grid-cols-3">
           {STEPS.map(({ n, t, b, detail }, i) => (
             <div
               key={n}
               data-fade
-              className={`pt-8 pr-6 pb-2 ${i ? "border-[var(--line)] sm:pl-7 lg:border-l" : ""} ${i === 2 ? "sm:border-l-0 lg:border-l" : ""} ${i === 1 || i === 3 ? "sm:border-l" : ""}`}
+              className={`pt-8 pr-6 pb-2 ${i ? "border-[var(--line)] md:border-l md:pl-7" : ""}`}
             >
               <div className="font-mono text-[12px] text-[var(--dim)]">{n}</div>
               <h3 className="mt-3 text-[22px] font-semibold tracking-[-0.02em]">
@@ -126,6 +128,67 @@ export function HowSection() {
             </div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+const USE_CASES: { icon: LucideIcon; t: string; b: string }[] = [
+  { icon: MapPin, t: "Treasure hunts", b: "Hide clues in a place. First to solve wins." },
+  { icon: Megaphone, t: "Marketing", b: "Put a riddle on your product or ad. Fans win real prizes." },
+  { icon: Flag, t: "Hackathons & CTFs", b: "The answer is the flag. The bounty pays out on its own." },
+  { icon: GraduationCap, t: "Classrooms", b: "Students win when they get it right." },
+  { icon: Users, t: "Communities", b: "A weekly puzzle for your Discord or Telegram." },
+  { icon: Gift, t: "Gifts", b: "A gift only the right person can open." },
+];
+
+export function UseCasesSection() {
+  return (
+    <section
+      id="use-cases"
+      aria-labelledby="use-cases-h"
+      className="border-b border-[var(--line)] py-32"
+    >
+      <div className="mx-auto max-w-[1200px] px-6">
+        <p
+          data-fade
+          className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)]"
+        >
+          Use cases
+        </p>
+        <h2
+          id="use-cases-h"
+          data-reveal-h2
+          className="mt-4 max-w-[18ch] text-[clamp(36px,4.5vw,56px)] leading-[1.02] font-semibold tracking-[-0.04em]"
+        >
+          Any prize. Any riddle.
+        </h2>
+        <p
+          data-fade
+          className="mt-5 max-w-[40rem] text-[18px] leading-[1.55] text-[var(--muted)]"
+        >
+          If you can ask a question, you can lock a prize behind it.
+        </p>
+        <div className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {USE_CASES.map(({ icon: Icon, t, b }) => (
+            <div
+              key={t}
+              data-fade
+              className="flex flex-col rounded-[14px] border border-[var(--line)] bg-[var(--s1)] p-6"
+            >
+              <Icon aria-hidden className="size-6 text-[var(--proof)]" strokeWidth={1.75} />
+              <h3 className="mt-5 text-[20px] font-semibold tracking-[-0.02em]">{t}</h3>
+              <p className="mt-2 text-[15px] leading-[1.55] text-[var(--muted)]">{b}</p>
+            </div>
+          ))}
+        </div>
+        <Link
+          href="/create"
+          data-fade
+          className="btn-landing btn-landing-s mt-10 inline-flex"
+        >
+          Create a chest
+        </Link>
       </div>
     </section>
   );
@@ -154,13 +217,13 @@ export function AttackSection() {
             data-reveal-h2
             className="mt-4 text-[clamp(36px,4.5vw,56px)] leading-[1.02] font-semibold tracking-[-0.04em]"
           >
-            Copy the proof. Lose the race anyway.
+            Bots can&apos;t steal your prize.
           </h2>
           <p
             data-fade
             className="mt-5 text-[18px] leading-[1.55] text-[var(--muted)]"
           >
-            Front-running bots resend winning transactions with a higher fee. The proof is bound to your address: if a bot copies it and changes the recipient, the contract rejects it. And each proof works only once.
+            Even if a bot copies your answer, the prize still goes to you.
           </p>
           <Link
             href="/attack"
@@ -266,16 +329,16 @@ const REPORTS_URL = "#";
 
 const SECURITY_ITEMS: { k: string; h: string; hc: string; b: string }[] = [
   {
-    k: "Recipient",
-    h: "Proof sealed to you",
+    k: "Owner",
+    h: "Only you can claim",
     hc: "text-[var(--proof)]",
-    b: "Your address is a public input of the proof. A copied proof fails for any other address.",
+    b: "Your answer is tied to your address. A copy won't work for anyone else.",
   },
   {
-    k: "Replay",
-    h: "Each proof works once",
+    k: "Once",
+    h: "One claim per answer",
     hc: "",
-    b: "Every claim spends a nullifier on-chain and only pays the address the proof was made for. Replaying the same proof reverts.",
+    b: "The same answer can't be used twice.",
   },
   {
     k: "Funds",
@@ -342,13 +405,11 @@ export function SecuritySection({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }
               data-fade
               className="mt-6 text-[32px] leading-[1.1] font-semibold tracking-[-0.03em]"
             >
-              Before the breach.
+              Security-scanned contracts.
             </h3>
             <p data-fade className="mt-4 text-[17px] leading-[1.6] text-[var(--muted)]">
-              Kuyfi is an open-source, black-box security scanner for deployed
-              Soroban contracts. It reads a contract straight from on-chain
-              bytecode, no source code required, and tests it like an attacker
-              would.
+              We test our live contracts with Kuyfi, an open-source scanner that
+              attacks them the way a hacker would.
             </p>
             <a
               data-fade

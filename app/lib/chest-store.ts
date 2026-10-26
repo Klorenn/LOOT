@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { del, get, list, put } from "@vercel/blob";
+import type { Quiz } from "./quiz";
 
 /**
  * Metadatos off-chain de los cofres (pregunta, pista, dificultad y, solo si el cofre es público, la sal).
@@ -24,6 +25,8 @@ export type ChestMeta = {
   question: string;
   hint?: string;
   difficulty?: 1 | 2 | 3 | 4;
+  /** Cofre cuestionario: solo preguntas y opciones públicas, nunca las respuestas (ver lib/quiz.ts). */
+  quiz?: Quiz;
   /** Solo en cofres públicos: hace falta para armar la prueba. Los privados viajan en #s= del link. */
   salt?: string;
   /** false = cofre privado: no aparece en /explore y su sal no se guarda. Ausente = legado (público). */

@@ -6,13 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
     "@creit.tech/stellar-wallets-kit": "^2.7.1",
     "@findloot/chest": "file:../packages/chestzk-chest",
     "@noble/hashes": "^2.4.0",
+    "@shadcn/react": "^0.3.1",
     "@stellar/stellar-sdk": "^16.3.0",
     "@vercel/blob": "^2.8.2",
     "circomlibjs": "^0.1.7",
@@ -42,7 +44,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "3.2.4"
   },
   "packageManager": "pnpm@10.27.0"
 }
