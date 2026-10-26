@@ -10,6 +10,18 @@ describe("mainnet passkey policy copy", () => {
   });
 });
 
+describe("copy is byte-identical to main when the flag is absent", () => {
+  it("keeps main's exact notes", () => {
+    // literales copiados de origin/main (lib/passkey-policy.ts)
+    expect(MAINNET_PASSKEY_NOTE).toBe(
+      "On Mainnet, connect a Stellar wallet (Freighter, xBull, LOBSTR…). Passkey accounts are testnet-only for now.",
+    );
+    expect(MAINNET_PASSKEY_SIGNOUT).toBe(
+      "Passkey accounts are testnet-only for now. You were signed out of your passkey account on Mainnet: connect a Stellar wallet (Freighter, xBull, LOBSTR…).",
+    );
+  });
+});
+
 describe("wallet kit phone detection", () => {
   afterEach(() => vi.unstubAllGlobals());
 
