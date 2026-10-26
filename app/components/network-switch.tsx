@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useNet } from "@/components/network-provider";
 import { switchNetwork, type Net } from "@/lib/network";
 
@@ -70,5 +71,51 @@ export function NetworkMenuItem({ onClick }: { onClick?: () => void }) {
       <span>{soon ? "Mainnet (coming soon)" : `Switch to ${target === "mainnet" ? "Mainnet" : "Testnet"}`}</span>
       <NetworkBadge className="!text-[12px]" />
     </button>
+  );
+}
+
+/**
+ * Control segmentado "Testnet | Mainnet" siempre visible en la barra superior: la red activa resaltada
+ * (Mainnet en dorado), la otra es un botón. Mainnet queda deshabilitada ("soon") hasta que esté configurada.
+ * El icono "i" lleva a /network (datos en vivo de la red activa).
+ */
+export function NetworkSegmented({ className = "" }: { className?: string }) {
+  const { IS_MAINNET, mainnetReady } = useNet();
+  const seg = (net: Net, label: string) => {
+    const active = (net === "mainnet") === IS_MAINNET;
+    const soon = net === "mainnet" && !mainnetReady;
+    const on = net === "mainnet" ? "bg-[var(--gold)] text-[#14110a]" : "bg-[var(--ok)] text-[#04170d]";
+    return (
+      <button
+        key={net}
+        type="button"
+        aria-pressed={active}
+        disabled={soon}
+        title={soon ? "Mainnet is not live yet" : active ? `${label} is active` : `Switch to ${label}`}
+        onClick={() => !active && switchNetwork(net)}
+        className={`h-8 rounded-full px-3 font-mono text-[12px] font-semibold tracking-[0.02em] transition-colors ${
+          active ? on : "text-[var(--muted)] hover:text-[var(--text)]"
+        } disabled:cursor-not-allowed disabled:opacity-50`}
+      >
+        {soon ? `${label} · soon` : label}
+      </button>
+    );
+  };
+  return (
+    <span className={`inline-flex items-center gap-2 ${className}`}>
+      <span
+        role="group"
+        aria-label="Network"
+        data-network-toggle
+        data-network={IS_MAINNET ? "mainnet" : "testnet"}
+        className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--s1)] p-[3px]"
+      >
+        {seg("testnet", "Testnet")}
+        {seg("mainnet", "Mainnet")}
+      </span>
+      <Link href="/network" aria-label="Network facts" title="Live network facts" className="font-mono text-[12px] text-[var(--dim)] hover:text-[var(--text)]">
+        ⓘ
+      </Link>
+    </span>
   );
 }

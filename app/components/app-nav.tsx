@@ -7,7 +7,7 @@ import { BrandMark } from "@/components/logo-chest";
 import { AccountMenu } from "@/components/account-menu";
 import { useSession } from "@/lib/session";
 import { useNet } from "@/components/network-provider";
-import { NetworkSwitch } from "@/components/network-switch";
+import { NetworkSegmented } from "@/components/network-switch";
 
 const ALL_LINKS = [
   { href: "/explore", label: "Explore" },
@@ -30,8 +30,8 @@ export function AppNav() {
   const [menu, setMenu] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 h-[72px] border-b border-[var(--line)] bg-[var(--bg)]">
-      <div className="mx-auto flex h-full max-w-[1200px] items-center justify-between gap-4 px-6">
+    <nav className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--bg)]">
+      <div className="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between gap-4 px-6">
         <Link href="/" className="focus-landing shrink-0">
           <BrandMark />
         </Link>
@@ -76,8 +76,8 @@ export function AppNav() {
               {menu ? "Close" : "Menu"}
             </button>
           </span>
-          <span className="hidden sm:inline-flex">
-            <NetworkSwitch compact />
+          <span className="hidden md:inline-flex">
+            <NetworkSegmented />
           </span>
           {!ready ? (
             <span
@@ -107,6 +107,10 @@ export function AppNav() {
             </>
           )}
         </div>
+      </div>
+      {/* móvil: el selector de red va arriba, siempre a la vista */}
+      <div className="flex justify-center border-t border-[var(--line)] py-2 md:hidden">
+        <NetworkSegmented />
       </div>
       {menu && (
         <ul

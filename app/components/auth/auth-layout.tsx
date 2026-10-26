@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BrandMark } from "@/components/logo-chest";
 import { Chest } from "@/components/chest";
 import { CellsCanvas } from "@/components/cells-canvas";
+import { NetworkSegmented } from "@/components/network-switch";
 import { useNet } from "@/components/network-provider";
 
 const FOOT = [
@@ -33,6 +34,9 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
             ← Back to home
           </Link>
         </header>
+        <div className="mt-4">
+          <NetworkSegmented />
+        </div>
 
         <main id="main" className="mx-auto my-auto w-full max-w-[400px] py-10">
           {children}

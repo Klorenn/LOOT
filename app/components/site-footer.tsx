@@ -20,6 +20,7 @@ export function SiteFooter() {
         ["/explore", "Open chests"],
         ["/create", "Create a chest"],
         ["/dashboard", "Dashboard"],
+        ["/network", "Network facts"],
         ...(IS_MAINNET ? [] : [["/attack", "Attack demo"]]),
       ],
     ],
