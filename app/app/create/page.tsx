@@ -16,7 +16,7 @@ import { useSession } from "@/lib/session";
 import { stroopsToXlm } from "@/lib/config";
 import { balanceInfo, parseXlmAmount, SendError } from "@/lib/send";
 import { confirmMeta, createChestOnChain, estimateCreateFee, reserveMeta } from "@/lib/create-chest";
-import { capError } from "@/lib/caps";
+import { capError, capHint, clampClaims, perClaimError } from "@/lib/caps";
 import { withNet } from "@/lib/network";
 import { BetaNotice } from "@/components/network-banner";
 import { SponsorNotice } from "@/components/sponsor-notice";
@@ -71,7 +71,7 @@ export default function CreateChestPage() {
   const [prize, setPrize] = useState(String(TEMPLATES[2].prize));
   const [difficulty, setDifficulty] = useState(2);
   const [expires, setExpires] = useState("");
-  const [maxClaims, setMaxClaims] = useState(TEMPLATES[2].maxClaims);
+  const [maxClaims, setMaxClaims] = useState(() => clampClaims(xlmToStroops(Number(TEMPLATES[2].prize)), TEMPLATES[2].maxClaims, CAPS));
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +155,7 @@ export default function CreateChestPage() {
     setHint(t.hint);
     setAnswer("");
     setPrize(String(t.prize));
-    setMaxClaims(t.maxClaims);
+    setMaxClaims(clampClaims(xlmToStroops(Number(t.prize)), t.maxClaims, CAPS));
     setHashHex(null);
     setHashOk(false);
     setResult(null);
@@ -226,7 +226,7 @@ export default function CreateChestPage() {
       e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
     if (step === 2 && !prizeStroops) e.prize = "Enter a reward greater than 0 (up to 7 decimals).";
     if (step === 2 && prizeStroops) {
-      const cb = capError(prizeStroops, Math.max(1, maxClaims), CAPS);
+      const cb = perClaimError(prizeStroops, CAPS); // el total se valida en el paso de claims y al enviar
       if (cb) e.prize = cb;
     }
     if (step === 3 && (!Number.isSafeInteger(maxClaims) || maxClaims < 1)) e.maxClaims = "At least 1 claim.";
@@ -747,7 +747,7 @@ export default function CreateChestPage() {
                   </Field>
                   <Field
                     label="Max claims"
-                    hint="Each proof works once, but anyone who knows the answer can claim until the slots run out."
+                    hint={`Each proof works once, but anyone who knows the answer can claim until the slots run out.${capHint(CAPS) ? ` ${capHint(CAPS)}.` : ""}`}
                     error={fieldErr.maxClaims}
                   >
                     <Input
