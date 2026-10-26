@@ -31,6 +31,7 @@ async function simulateRead(
   method: string,
   args: xdr.ScVal[],
 ) {
+  if (!contractId) throw new Error(`contract id not configured (${method})`);
   const tx = new TransactionBuilder(new Account(SIM_SOURCE, "0"), {
     fee: BASE_FEE,
     networkPassphrase: NETWORK.passphrase,

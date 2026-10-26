@@ -20,8 +20,11 @@ function env(v: string | undefined): string {
 // Los NEXT_PUBLIC_* deben leerse con acceso literal para que Next los inline en el cliente.
 const ENV_RPC = env(process.env.NEXT_PUBLIC_RPC_URL);
 const ENV_HORIZON = env(process.env.NEXT_PUBLIC_HORIZON_URL);
-const ENV_REGISTRY = env(process.env.NEXT_PUBLIC_REGISTRY_ID);
-const ENV_VERIFIER = env(process.env.NEXT_PUBLIC_VERIFIER_ID);
+const isContractId = (s: string) => /^C[A-Z2-7]{55}$/.test(s);
+/** Ids inválidos (placeholders como `C...`) cuentan como no configurados. */
+const validId = (s: string) => (isContractId(s) ? s : "");
+const ENV_REGISTRY = validId(env(process.env.NEXT_PUBLIC_REGISTRY_ID));
+const ENV_VERIFIER = validId(env(process.env.NEXT_PUBLIC_VERIFIER_ID));
 
 const uniq = (xs: string[]) => [...new Set(xs.filter(Boolean))];
 
@@ -106,8 +109,6 @@ export const NETWORK_URLS = {
   testnet: env(process.env.NEXT_PUBLIC_TESTNET_URL) || "https://www.findloot.xyz",
   mainnet: env(process.env.NEXT_PUBLIC_MAINNET_URL) || "https://mainnet.findloot.xyz",
 };
-
-const isContractId = (s: string) => /^C[A-Z2-7]{55}$/.test(s);
 
 /** Lo que falta o está mal en la config de mainnet (vacío en testnet). Alimenta el banner rojo. */
 export const CONFIG_ISSUES: string[] = IS_MAINNET
