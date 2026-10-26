@@ -1,6 +1,6 @@
 # @findloot/chest
 
-JS client for the Loot (ChestZK) Soroban registry on Stellar testnet.
+JS client for the Loot Soroban chest registry on Stellar testnet.
 
 ```bash
 npm i @findloot/chest

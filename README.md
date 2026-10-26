@@ -223,8 +223,7 @@ console.log(fingerprintHex, CONTRACTS.chest, CONTRACTS.xlm);
 ├── deployments/            # registry-mainnet.json
 ├── scripts/mainnet/        # deploy and verify the mainnet registry
 ├── security/  audits/      # automated scan reports
-├── docs/                   # MAINNET-REGISTRY.md, WALLETS.md
-└── ROADMAP.md
+└── docs/                   # MAINNET-REGISTRY.md, WALLETS.md
 ```
 
 ## Local development

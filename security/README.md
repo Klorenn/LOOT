@@ -1,9 +1,9 @@
 # Security scanning (Kuyfi)
 
-ChestZK contracts are **scanned with Kuyfi**, a black-box Soroban scanner
+Loot contracts are **scanned with Kuyfi**, a black-box Soroban scanner
 (v0.1.0, MIT, https://github.com/alex0tico/kuyfi). This is **not an audit**: Kuyfi's
 own docs say it does not replace a code audit, and its findings are signals for
-manual review. Wording everywhere (UI, README, pitch): "scanned with Kuyfi".
+manual review.
 
 Kuyfi has two parts:
 
@@ -164,7 +164,7 @@ and either the fix commit or the false-positive reasoning, in the "Closed" table
   lists it as `.` and sends it 0 vectors: the host invokes it with a signature payload
   and auth contexts that a black-box caller cannot build
   (`docs/technical-writeup.md` §8 in the Kuyfi repo). Anything about passkey
-  authorization in ChestZK is **not covered** by a Kuyfi scan and needs manual review.
+  authorization in Loot is **not covered** by a Kuyfi scan and needs manual review.
 - Testnet only. Black-box: it sees types, not intent. A clean report does not mean
   the logic is right.
 - Findings are signals for manual review; there is no proof of exploitability or of

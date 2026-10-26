@@ -23,3 +23,6 @@ contracts/*/target/
 .claude/
 favicon-chestzk.zip
 loot-handoff.zip
+
+# local agent tooling
+.atl/
