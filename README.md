@@ -153,10 +153,7 @@ A Loot chest fits any case where **you lock value and only the person who knows 
 <table>
   <tr>
     <td align="center" width="50%"><img src="assets/claim.gif" alt="Sign up and claim a chest" /><br/><sub><b>1. Sign up and claim</b></sub></td>
-    <td align="center" width="50%"><img src="assets/explore.gif" alt="Explore chests" /><br/><sub><b>2. Explore chests</b></sub></td>
-  </tr>
-  <tr>
-    <td align="center" colspan="2"><img src="assets/sdk.gif" alt="Build with the SDK" width="50%" /><br/><sub><b>3. Build with the SDK</b></sub></td>
+    <td align="center" width="50%"><img src="assets/sdk.gif" alt="Build with the SDK" /><br/><sub><b>2. Build with the SDK</b></sub></td>
   </tr>
 </table>
 
