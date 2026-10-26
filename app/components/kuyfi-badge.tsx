@@ -22,7 +22,7 @@ function Dot({ color }: { color: string }) {
 }
 
 /** Automated black-box scan result for a deployed contract. Not an audit. */
-export async function KuyfiBadge({ contractId }: { contractId: string }) {
+export async function KuyfiBadge({ contractId, note }: { contractId: string; note?: string }) {
   const summary = await getKuyfiSummary(contractId);
 
   if (!summary) {
@@ -48,6 +48,7 @@ export async function KuyfiBadge({ contractId }: { contractId: string }) {
         <Dot color={dotColor} />
         Kuyfi scan
       </span>
+      {note && <span className="text-[var(--gold)]">{note}</span>}
       <time dateTime={summary.scannedAt} className="text-[var(--dim)]">
         {date}
       </time>

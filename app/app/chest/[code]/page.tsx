@@ -2,6 +2,7 @@ import { KuyfiBadge } from "@/components/kuyfi-badge";
 import { resolveChestParam } from "@/lib/chest-route";
 import { ChestSolve } from "./chest-solve";
 import { cfg } from "@/lib/cfg";
+import { kuyfiTarget } from "@/lib/mainnet-record";
 
 export default async function ChestPage({
   params,
@@ -11,8 +12,9 @@ export default async function ChestPage({
   const { CONTRACTS } = await cfg();
   const { code } = await params;
   const chestId = resolveChestParam(code);
+  const k = kuyfiTarget(CONTRACTS.chest);
   // KuyfiBadge es server component (lee el reporte real); se pasa como slot al cliente.
   return (
-    <ChestSolve chestId={chestId} badge={<KuyfiBadge contractId={CONTRACTS.chest} />} />
+    <ChestSolve chestId={chestId} badge={<KuyfiBadge contractId={k.contractId} note={k.note} />} />
   );
 }

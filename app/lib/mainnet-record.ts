@@ -21,5 +21,35 @@ export const MAINNET_RECORD = {
   },
 } as const;
 
-/** Registro testnet que escaneó Kuyfi (reportes en public/security/kuyfi). */
+/**
+ * Gemelos en testnet con el MISMO bytecode que los de mainnet: Kuyfi (OSINT + Chaos Monkey) corrió ahí.
+ * /network comprueba en vivo que el wasm del gemelo sea idéntico al de mainnet antes de afirmarlo.
+ */
+export const KUYFI_TWINS = {
+  registry: "CBUPONATL6LLUAAMUHXTHX5CDN3VJRL3GAPZYMXG53CGJGQ6VS3GC2CR",
+  verifier: "CB3MSD3R7ZYP5JCKGDGBXRUXR4JWPFUQWAJ5YQK6OPCEGULQOCL3NUUG",
+} as const;
+
+/** Evidencia de pruebas (números reales del repo: cargo test en contracts/chest y contracts/verifier-mainnet). */
+export const TEST_EVIDENCE = {
+  registryCargoTests: 9,
+  verifierCargoTests: 3,
+  /** claim real en testnet con las llaves de la ceremonia; con el receptor cambiado la prueba da InvalidProof */
+  e2eClaimTx: "dd40ecb041d56347b2471e21b5b0eb5684a6de9edcb8758fb5de366421094497",
+  testnetExplorer: "https://stellar.expert/explorer/testnet",
+} as const;
+
+/** Registro testnet que escaneó Kuyfi originalmente (reportes en public/security/kuyfi). */
 export const KUYFI_SCANNED_TESTNET_REGISTRY = "CCOIK76OU7VHRK5PCE3RKQUDO6C6I7YMBHM3G24FVMZJ2I2ZESBGPHYZ";
+
+/** Contrato de mainnet -> su gemelo escaneado en testnet (mismo bytecode). */
+export const KUYFI_TWIN_OF: Record<string, string> = {
+  CCMMITTW22KQHEYLZUFXDSWF3JJC36A2KIYQU6T2C6YGDAFXMEIQ64QP: KUYFI_TWINS.registry,
+  CALYISOENO2N4575DWF2K2PHB5UAEHCWI5ZJCZXYNHC4OXYHJWVBGZKY: KUYFI_TWINS.verifier,
+};
+
+/** Qué reporte Kuyfi mostrar para un contrato: en mainnet, el del gemelo con la etiqueta honesta. */
+export function kuyfiTarget(contractId: string): { contractId: string; note?: string } {
+  const twin = KUYFI_TWIN_OF[contractId];
+  return twin ? { contractId: twin, note: "same bytecode, scanned on testnet" } : { contractId };
+}

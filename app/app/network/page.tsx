@@ -3,13 +3,11 @@ import { KuyfiBadge } from "@/components/kuyfi-badge";
 import { PageHeader } from "@/components/page-header";
 import { cfg } from "@/lib/cfg";
 import { shortAddr } from "@/lib/format";
-import { MAINNET_RECORD } from "@/lib/mainnet-record";
+import { KUYFI_TWINS, MAINNET_RECORD, TEST_EVIDENCE, kuyfiTarget } from "@/lib/mainnet-record";
 import { networkFacts } from "@/lib/onchain-facts";
 
 export const metadata: Metadata = { title: "Network" };
 export const dynamic = "force-dynamic";
-
-const WASM_SHORT = (h: string | null) => (h ? `${h.slice(0, 8)}…${h.slice(-6)}` : "unavailable");
 
 function Row({ k, children }: { k: string; children: React.ReactNode }) {
   return (
@@ -17,6 +15,16 @@ function Row({ k, children }: { k: string; children: React.ReactNode }) {
       <dt className="font-mono text-[12px] tracking-[0.06em] text-[var(--dim)] uppercase">{k}</dt>
       <dd className="min-w-0 break-all font-mono text-[13px] text-[var(--text)]">{children}</dd>
     </div>
+  );
+}
+
+/** Prueba en vivo de que el gemelo de testnet corre el mismo wasm que el contrato de mainnet. */
+function TwinLine({ same, twin, wasm }: { same: boolean | null; twin: string; wasm: string | null }) {
+  return (
+    <span className="mt-2 block text-[12px] text-[var(--dim)]">
+      testnet twin {shortAddr(twin, 6)} · wasm {wasm ? `${wasm.slice(0, 8)}…${wasm.slice(-6)}` : "unavailable"} ·{" "}
+      {same === true ? <span className="text-[var(--ok)]">identical to the mainnet wasm (checked live)</span> : same === false ? <span className="text-[var(--red)]">DIFFERENT from the mainnet wasm: the scan does not apply</span> : "could not compare right now"}
+    </span>
   );
 }
 
@@ -117,23 +125,48 @@ export default async function NetworkPage() {
           )}
         </Section>
 
-        <Section title="Security scan">
-          <Row k="Registry"><KuyfiBadge contractId={CONTRACTS.chest} /></Row>
-          <Row k="Verifier"><KuyfiBadge contractId={CONTRACTS.verifier} /></Row>
+        <Section title="Tests and evidence">
+          <Row k="Registry unit tests">{TEST_EVIDENCE.registryCargoTests} cargo tests pass (contracts/chest)</Row>
+          <Row k="Verifier unit tests">
+            {TEST_EVIDENCE.verifierCargoTests} cargo tests pass, including a real proof verified against the ceremony keys (contracts/verifier-mainnet)
+          </Row>
+          <Row k="Testnet end-to-end">
+            Real claim with the ceremony keys, and the same proof with the recipient swapped is rejected with InvalidProof.{" "}
+            <a href={`${TEST_EVIDENCE.testnetExplorer}/tx/${TEST_EVIDENCE.e2eClaimTx}`} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[var(--proof)]">
+              claim tx {shortAddr(TEST_EVIDENCE.e2eClaimTx, 10)}
+            </a>
+          </Row>
           {IS_MAINNET && (
+            <Row k="Mainnet deploy check">init by the admin account, a second init is rejected, the verifier carries the ceremony keys (scripts/mainnet/verify-registry.mjs)</Row>
+          )}
+        </Section>
+
+        <Section title="Security scan (Kuyfi)">
+          {IS_MAINNET ? (
             <>
-              <Row k="Scanned build">
-                Kuyfi scanned the testnet registry (wasm {WASM_SHORT(f.scannedRegistryWasm)}).{" "}
-                {f.sameAsScanned === true && <span className="text-[var(--ok)]">The mainnet registry runs the same wasm.</span>}
-                {f.sameAsScanned === false && (
-                  <span className="text-[var(--gold)]">The mainnet registry wasm ({WASM_SHORT(f.wasm.registry)}) is a different build: the scan result is not a claim about it.</span>
-                )}
-                {f.sameAsScanned === null && <span className="text-[var(--dim)]">Could not compare the wasm hashes right now.</span>}
+              <Row k="Registry">
+                <KuyfiBadge {...kuyfiTarget(CONTRACTS.chest)} />
+                <TwinLine same={f.twins.registry.same} twin={KUYFI_TWINS.registry} wasm={f.twins.registry.wasm} />
               </Row>
-              <Row k="Verifier">New ceremony keys, scan pending.</Row>
+              <Row k="Verifier">
+                <KuyfiBadge {...kuyfiTarget(CONTRACTS.verifier)} />
+                <TwinLine same={f.twins.verifier.same} twin={KUYFI_TWINS.verifier} wasm={f.twins.verifier.wasm} />
+              </Row>
+              <Row k="Result">
+                {f.twins.registry.same === true && f.twins.verifier.same === true
+                  ? "Kuyfi black-box scan of the identical bytecode on testnet: 0 findings (registry + verifier). Read-only OSINT of both mainnet contracts is in the repo reports."
+                  : "The scan result applies only while the testnet twins run the identical bytecode; that comparison did not confirm right now (see above)."}
+              </Row>
+            </>
+          ) : (
+            <>
+              <Row k="Registry"><KuyfiBadge contractId={CONTRACTS.chest} /></Row>
+              <Row k="Verifier"><KuyfiBadge contractId={CONTRACTS.verifier} /></Row>
             </>
           )}
-          <Row k="Status">{IS_MAINNET ? "Beta · Scanned with Kuyfi (black-box, 0 findings, testnet build) · not a formal audit" : "Beta · Scanned with Kuyfi (black-box, 0 findings) · not a formal audit"}</Row>
+          <Row k="Caveat">
+            Fuzzing covers externally reachable inputs; it does not exercise successful claim paths or the Groth16 math. Those are covered by the unit tests and the testnet end-to-end claim above. This is not a formal audit.
+          </Row>
         </Section>
 
         {IS_MAINNET && (

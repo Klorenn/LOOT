@@ -17,17 +17,18 @@ export function ConfigBanner() {
   );
 }
 
-/** Franja dorada permanente mientras mainnet esté activa: fondos reales. */
+/** Franja dorada permanente mientras mainnet esté activa: fondos reales. Lleva a /network. */
 export function MainnetStrip() {
   const { IS_MAINNET } = useNet();
   if (!IS_MAINNET) return null;
   return (
-    <div role="status" className="w-full bg-[var(--gold)] px-4 py-1 text-center font-mono text-[12px] font-medium text-[#14110a]">
-      MAINNET · real funds · Beta · Scanned with Kuyfi (black-box, 0 findings) · not a formal audit ·{" "}
-      <Link href="/network" className="underline underline-offset-2">
-        details
-      </Link>
-    </div>
+    <Link
+      href="/network"
+      role="status"
+      className="block w-full bg-[var(--gold)] px-4 py-1 text-center font-mono text-[12px] font-medium tracking-[0.04em] text-[#14110a]"
+    >
+      MAINNET · REAL FUNDS
+    </Link>
   );
 }
 
@@ -49,18 +50,18 @@ export function TrustedSetupNote({ className = "" }: { className?: string }) {
   );
 }
 
-/** Aviso de beta (solo mainnet): honesto, un escaneo black-box no es una auditoría formal. `compact` para el footer. */
+export const TESTED_LINE = "Contracts tested · unit tests · testnet end-to-end · Kuyfi scan";
+
+/** Aviso de mainnet: qué se probó (detalle y evidencia en /network). `compact` para el footer. Nunca dice "audited". */
 export function BetaNotice({ compact = false }: { compact?: boolean }) {
   const { IS_MAINNET, CAPS } = useNet();
   if (!IS_MAINNET) return null;
   if (compact) {
     return (
       <p className="font-mono text-[12px] text-[var(--gold)]">
-        Beta · Scanned with Kuyfi (black-box, 0 findings) · not a formal audit · use only what you can afford to lose
-        {" · "}
-        <a href={TRANSCRIPT_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-          trusted setup
-        </a>
+        <Link href="/network" className="underline underline-offset-2">
+          {TESTED_LINE}
+        </Link>
       </p>
     );
   }
@@ -70,14 +71,13 @@ export function BetaNotice({ compact = false }: { compact?: boolean }) {
       className="rounded-[10px] border border-[var(--line)] bg-[var(--s1)] p-4 text-[14px] leading-[1.55] text-[var(--muted)]"
       style={{ borderLeftWidth: 3, borderLeftColor: "var(--gold)" }}
     >
-      <p className="font-medium text-[var(--text)]">Beta · Scanned with Kuyfi (black-box, 0 findings) · not a formal audit</p>
-      <p className="mt-1">
-        These are real funds on Stellar mainnet. The Kuyfi scan is automated and black-box, not a formal audit, and covers the testnet
-        deployment; the mainnet verifier uses new ceremony keys (scan pending).{" "}
+      <p className="font-medium text-[var(--text)]">
         <Link href="/network" className="underline underline-offset-2">
-          Live network facts
+          {TESTED_LINE}
         </Link>
-        . Limits while in beta:{" "}
+      </p>
+      <p className="mt-1">
+        Real funds on Stellar mainnet. Kuyfi black-box scan of the identical bytecode on testnet: 0 findings (registry + verifier). Beta limits:{" "}
         {Number.isFinite(CAPS.maxPrizePerPlaceXlm) ? `${CAPS.maxPrizePerPlaceXlm} XLM per claim` : "no per-claim cap"},{" "}
         {Number.isFinite(CAPS.maxTotalPrizeXlm) ? `${CAPS.maxTotalPrizeXlm} XLM per chest in total` : "no total cap"}.
       </p>
