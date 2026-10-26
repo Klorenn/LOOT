@@ -7,7 +7,7 @@ import { CellsCanvas } from "@/components/cells-canvas";
 import { ActivityList } from "@/components/wallet/activity-list";
 import { ReceivePanel } from "@/components/wallet/receive-panel";
 import { SendPanel } from "@/components/wallet/send-panel";
-import { PRIZE, stroopsToXlm } from "@/lib/config";
+import { PRIZE, stroopsToXlm, NETWORK_LC } from "@/lib/config";
 import { expertAddress } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { balanceInfo } from "@/lib/send";
@@ -89,7 +89,7 @@ function WalletInner() {
   const balanceText = bal ? stroopsToXlm(bal.balance) : "—";
   const emptyAct =
     player.kind === "passkey"
-      ? "No activity in the last ~7 days (the testnet RPC only keeps recent events). Older history is on Stellar Expert."
+      ? "No activity in the last ~7 days (the RPC only keeps recent events). Older history is on Stellar Expert."
       : "No activity yet.";
 
   const activityCard = (limit: number) => (
@@ -131,7 +131,7 @@ function WalletInner() {
             <span className="ml-3 text-[clamp(20px,3vw,28px)] text-[var(--gold)]">{PRIZE.code}</span>
           </p>
           <p className="mt-3 text-[15px] text-[var(--muted)]">
-            {assets ? `${assets.length} ${assets.length === 1 ? "asset" : "assets"}` : "—"} · Stellar testnet
+            {assets ? `${assets.length} ${assets.length === 1 ? "asset" : "assets"}` : "—"} · Stellar {NETWORK_LC}
           </p>
           <div className="mt-6 flex gap-3">
             <button type="button" onClick={() => go("receive")} className="btn-landing btn-landing-s">

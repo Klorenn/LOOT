@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/logo-chest";
 import { CellsBackground } from "@/components/cells-background";
-import { CONTRACTS, NETWORK } from "@/lib/config";
+import { BetaNotice } from "@/components/network-banner";
+import { NetworkSwitch } from "@/components/network-switch";
+import { CONTRACTS, IS_MAINNET, NETWORK } from "@/lib/config";
 
-const SHORT = `${CONTRACTS.chest.slice(0, 4)}…${CONTRACTS.chest.slice(-4)}`;
+const SHORT = CONTRACTS.chest ? `${CONTRACTS.chest.slice(0, 4)}…${CONTRACTS.chest.slice(-4)}` : "not configured";
 const NET = NETWORK.name.charAt(0) + NETWORK.name.slice(1).toLowerCase();
 
 const COLUMNS = [
@@ -13,7 +15,7 @@ const COLUMNS = [
       ["/explore", "Open chests"],
       ["/create", "Create a chest"],
       ["/dashboard", "Dashboard"],
-      ["/attack", "Attack demo"],
+      ...(IS_MAINNET ? [] : [["/attack", "Attack demo"]]),
     ],
   ],
   [
@@ -22,7 +24,7 @@ const COLUMNS = [
       ["/sdk", "Docs"],
       ["#", "Circuits"],
       [
-        `https://stellar.expert/explorer/testnet/contract/${CONTRACTS.chest}`,
+        `${NETWORK.explorerUrl}/contract/${CONTRACTS.chest}`,
         "Soroban contract",
       ],
       ["https://github.com/Klorenn/LOOT", "GitHub"],
@@ -31,10 +33,10 @@ const COLUMNS = [
   [
     "Stellar",
     [
-      ["https://stellar.expert/explorer/testnet", "Stellar Expert"],
+      [NETWORK.explorerUrl, "Stellar Expert"],
       ["https://freighter.app", "Freighter wallet"],
       ["https://developers.stellar.org/docs/build", "Soroban docs"],
-      ["https://friendbot.stellar.org", "Testnet faucet"],
+      ...(NETWORK.friendbotUrl ? [[NETWORK.friendbotUrl, "Testnet faucet"]] : []),
     ],
   ],
   [
@@ -71,6 +73,10 @@ export function SiteFooter() {
               />
               {NET} · contract {SHORT}
             </p>
+            <div className="mt-2 flex flex-col gap-2">
+              <NetworkSwitch />
+              <BetaNotice compact />
+            </div>
           </div>
           {COLUMNS.map(([title, links]) => (
             <div key={title} data-fade>

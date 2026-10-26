@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   DEMO_CHEST,
+  IS_MAINNET,
   stroopsToXlm,
   tokenDecimals,
   tokenLabel,
@@ -46,7 +47,7 @@ export async function GET(
   }
 
   // Cofre #1 legacy: misma pregunta en UI, pero la huella era de "42".
-  if (n === 1) {
+  if (n === 1 && !IS_MAINNET) {
     return NextResponse.json({
       id: 1,
       question: `Legacy chest (demo v0) — use /chest/${DEMO_CHEST.id}`,

@@ -13,7 +13,7 @@ import {
   type WonChestsResult,
 } from "@/lib/chain";
 import { chestPath } from "@/lib/chest-code";
-import { CONTRACTS, DEMO_CHEST, PRIZE, stroopsToXlm, tokenDecimals } from "@/lib/config";
+import { CONTRACTS, PRIZE, stroopsToXlm, tokenDecimals, SAMPLE_CHEST_ID, NETWORK_LABEL } from "@/lib/config";
 import { expertAddress, shortAddr } from "@/lib/format";
 import { HANDLE_HINT, HANDLE_RE, setHandle, useHandle } from "@/lib/handle";
 import { useSession } from "@/lib/session";
@@ -119,7 +119,7 @@ export default function ProfilePage() {
                 className="size-[6px] rounded-full bg-[var(--ok)]"
                 aria-hidden
               />
-              <span className="text-[var(--ok)]">Testnet</span>
+              <span className="text-[var(--ok)]">{NETWORK_LABEL}</span>
             </p>
             <h1 className="mt-3 text-[clamp(40px,6vw,56px)] leading-[1] font-semibold tracking-[-0.04em]">
               {handle ? `@${handle}` : accountType}
@@ -140,7 +140,7 @@ export default function ProfilePage() {
             <Link href="/wallet?tab=receive" className="btn-landing btn-landing-s">
               Wallet
             </Link>
-            <Link href={chestPath(DEMO_CHEST.id)} className="btn-landing btn-landing-p">
+            <Link href={chestPath(SAMPLE_CHEST_ID)} className="btn-landing btn-landing-p">
               Open a chest
             </Link>
           </div>
@@ -263,7 +263,7 @@ export default function ProfilePage() {
                   value: (
                     <span>
                       <span className="mr-2 inline-block size-[6px] rounded-full bg-[var(--ok)]" />
-                      Testnet
+                      {NETWORK_LABEL}
                     </span>
                   ),
                 },

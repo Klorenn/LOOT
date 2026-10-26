@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BrandMark } from "@/components/logo-chest";
 import { Chest } from "@/components/chest";
 import { CellsCanvas } from "@/components/cells-canvas";
+import { IS_MAINNET } from "@/lib/config";
 
 const FOOT = [
   ["Help", "#"],
@@ -37,7 +38,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
         <footer className="flex items-center justify-between font-mono text-[12px] text-[var(--dim)]">
           <span className="flex items-center gap-2">
             <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden />
-            Stellar testnet · no real funds
+            {IS_MAINNET ? "Stellar mainnet · real funds" : "Stellar testnet · no real funds"}
           </span>
           <span className="flex gap-4">
             {FOOT.map(([label, href]) => (

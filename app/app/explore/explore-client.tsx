@@ -9,6 +9,7 @@ import { StatusLabel } from "@/components/status-label";
 import { DifficultyBars } from "@/components/difficulty-bars";
 import { Mono } from "@/components/kv";
 import type { ChestRowData, ChestStatus } from "@/lib/listing";
+import { NETWORK_LC } from "@/lib/config";
 
 type Filter = "all" | ChestStatus;
 const FILTERS: { key: Filter; label: string }[] = [
@@ -40,7 +41,7 @@ export function ExploreClient({ rows, error }: { rows: ChestRowData[]; error: bo
         eyebrow={
           <span className="inline-flex items-center gap-2">
             <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden />
-            {error ? "Stellar testnet" : `${open} open ${open === 1 ? "chest" : "chests"} · Stellar testnet`}
+            {error ? `Stellar ${NETWORK_LC}` : `${open} open ${open === 1 ? "chest" : "chests"} · Stellar ${NETWORK_LC}`}
           </span>
         }
         title={
@@ -58,7 +59,7 @@ export function ExploreClient({ rows, error }: { rows: ChestRowData[]; error: bo
             tone="gold"
             label="Chain read failed"
             title="We couldn’t read the chests."
-            body="The Stellar testnet RPC didn’t answer. Nothing is wrong with your account; reload in a moment."
+            body={`The Stellar ${NETWORK_LC} RPC didn’t answer. Nothing is wrong with your account; reload in a moment.`}
             chest="none"
             actions={[{ href: "/explore", label: "Reload", primary: true }]}
           />

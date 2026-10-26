@@ -7,7 +7,7 @@ import { CellsBackground } from "@/components/cells-background";
 import { Em } from "@/components/page-header";
 import { KV, Mono } from "@/components/kv";
 import { chestPath } from "@/lib/chest-code";
-import { DEMO_CHEST } from "@/lib/config";
+import { SAMPLE_CHEST_ID, NETWORK } from "@/lib/config";
 import { loadPlayer } from "@/lib/wallet";
 
 type ClaimTx = {
@@ -134,7 +134,7 @@ export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href={chestPath(DEMO_CHEST.id)} className="btn-landing btn-landing-p">
+            <Link href={chestPath(SAMPLE_CHEST_ID)} className="btn-landing btn-landing-p">
               Open another chest →
             </Link>
             {tx?.explorer ? (
@@ -148,7 +148,7 @@ export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
               </a>
             ) : (
               <a
-                href="https://stellar.expert/explorer/testnet"
+                href={NETWORK.explorerUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="btn-landing btn-landing-s"

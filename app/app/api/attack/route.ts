@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { legacyOff } from "@/lib/mainnet-guard";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
-import { Client, networks } from "@findloot/chest";
-import { NETWORK } from "@/lib/config";
+import { Client } from "@findloot/chest";
+import { NETWORK, CONTRACTS } from "@/lib/config";
 import { withRpcUrl } from "@/lib/rpc";
 
 type Body = {
@@ -42,6 +43,8 @@ function validBody(b: Partial<Body> | null): b is Body {
  * Debe fallar con InvalidProof — eso ES el demo del modo ataque.
  */
 export async function POST(req: NextRequest) {
+  const off = legacyOff();
+  if (off) return off;
   const logs: string[] = [];
   const push = (m: string) => {
     logs.push(`[${new Date().toISOString().slice(11, 19)}] ${m}`);
@@ -73,7 +76,8 @@ export async function POST(req: NextRequest) {
       await withRpcUrl(
         async (rpcUrl) => {
           const client = new Client({
-            ...networks.testnet,
+            networkPassphrase: NETWORK.passphrase,
+            contractId: CONTRACTS.chest,
             rpcUrl,
             allowHttp: true,
             publicKey: kp.publicKey(),

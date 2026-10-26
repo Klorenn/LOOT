@@ -8,7 +8,7 @@ import { CopyField } from "@/components/copy-field";
 import { IconSmartAccountKit as PasskeyGlyph } from "@/components/stack-logos";
 import { InlineAlert } from "@/components/inline-alert";
 import { chestPath } from "@/lib/chest-code";
-import { DEMO_CHEST } from "@/lib/config";
+import { SAMPLE_CHEST_ID, NETWORK_LC, IS_MAINNET } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { HANDLE_HINT, HANDLE_RE, setHandle } from "@/lib/handle";
 import { safeNext } from "@/lib/safe-next";
@@ -200,7 +200,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       : view === "deploy"
         ? "Passkey created. Deploying your smart account through the relayer."
         : view === "done"
-          ? "Your smart account is live on testnet. Balance 0 XLM, and that’s fine: fees are covered."
+          ? `Your smart account is live on ${NETWORK_LC}. Balance 0 XLM, and that’s fine: fees are covered.`
           : isLogin
             ? "Use the passkey saved on this device. No password, no seed phrase."
             : "One passkey creates a passkey smart account on Stellar. Fees are paid by the relayer, so you need 0 XLM.";
@@ -287,7 +287,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             <InlineAlert
               tone="gold"
               title="No account for this passkey"
-              body="This passkey isn’t linked to a Loot passkey smart account on testnet."
+              body={`This passkey isn’t linked to a Loot passkey smart account on ${NETWORK_LC}.`}
             />
             <Link href={`/register${q}`} className="btn-landing btn-landing-p w-full">
               Create account →
@@ -367,7 +367,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
               />
             </div>
             <p className="text-[13px] text-[var(--dim)]">
-              Fee paid by the relayer. Usually a few seconds on testnet.
+              Fee paid by the relayer. Usually a few seconds on {NETWORK_LC}.
             </p>
           </>
         )}
@@ -377,7 +377,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           <>
             <CopyField value={doneAddr} />
             <Link
-              href={next ?? chestPath(DEMO_CHEST.id)}
+              href={next ?? chestPath(SAMPLE_CHEST_ID)}
               className="btn-landing btn-landing-p w-full"
             >
               Open your first chest →
@@ -489,7 +489,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
                 <a href="#" className="text-[var(--text)] underline">
                   Privacy Policy
                 </a>
-                . Testnet only.
+                . {IS_MAINNET ? "Mainnet: real funds." : "Testnet only."}
               </p>
             )}
           </>

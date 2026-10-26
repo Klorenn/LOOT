@@ -13,7 +13,7 @@ import {
 import { ExampleTag } from "@/components/example-tag";
 import { LogoChest } from "@/components/logo-chest";
 import { chestPath } from "@/lib/chest-code";
-import { DEMO_CHEST, PRIZE } from "@/lib/config";
+import { DEMO_CHEST, PRIZE, SAMPLE_CHEST_ID, IS_MAINNET, NETWORK_URLS } from "@/lib/config";
 
 /** Valores reales de /api/stats (eventos on-chain); "—" mientras carga o si el RPC falla. */
 export type Stats = { paid: string; claims: string; created: string };
@@ -224,13 +224,23 @@ export function AttackSection() {
           >
             Even if a bot copies your answer, the prize still goes to you.
           </p>
-          <Link
-            href="/attack"
-            data-fade
-            className="btn-landing btn-landing-s mt-8 inline-flex"
-          >
-            Run the demo
-          </Link>
+          {IS_MAINNET ? (
+            <a
+              href={`${NETWORK_URLS.testnet.replace(/\/+$/, "")}/attack`}
+              data-fade
+              className="btn-landing btn-landing-s mt-8 inline-flex"
+            >
+              Run the demo on testnet
+            </a>
+          ) : (
+            <Link
+              href="/attack"
+              data-fade
+              className="btn-landing btn-landing-s mt-8 inline-flex"
+            >
+              Run the demo
+            </Link>
+          )}
         </div>
 
         <div
@@ -306,7 +316,7 @@ export function CtaSection() {
         </p>
         <div data-fade className="mt-10 flex flex-wrap justify-center gap-3">
           <Link
-            href={`/login?next=${chestPath(DEMO_CHEST.id)}`}
+            href={`/login?next=${chestPath(SAMPLE_CHEST_ID)}`}
             className="btn-landing btn-landing-p"
           >
             Open a chest →

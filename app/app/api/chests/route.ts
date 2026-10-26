@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { legacyOff } from "@/lib/mainnet-guard";
 import { Keypair } from "@stellar/stellar-sdk";
-import { Client, networks } from "@findloot/chest";
-import { DEMO_CHEST, NETWORK } from "@/lib/config";
+import { Client } from "@findloot/chest";
+import { DEMO_CHEST, NETWORK, CONTRACTS } from "@/lib/config";
 import { withRpcUrl } from "@/lib/rpc";
 import { listChests } from "@/lib/chest-store";
 
@@ -12,7 +13,8 @@ async function existsOnChain(id: number): Promise<boolean | null> {
   try {
     return await withRpcUrl(async (rpcUrl) => {
       const client = new Client({
-        ...networks.testnet,
+        networkPassphrase: NETWORK.passphrase,
+        contractId: CONTRACTS.chest,
         rpcUrl,
         allowHttp: true,
         publicKey: Keypair.fromSecret(secret).publicKey(),
@@ -28,6 +30,8 @@ async function existsOnChain(id: number): Promise<boolean | null> {
 }
 
 export async function GET() {
+  const off = legacyOff();
+  if (off) return off;
   // Solo cofres públicos; la sal no sale en el listado.
   const stored = (await listChests()).map(({ salt: _s, ...c }) => (void _s, c));
   const demo = {

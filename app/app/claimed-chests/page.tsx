@@ -8,7 +8,7 @@ import { StateBlock } from "@/components/state-block";
 import { Mono } from "@/components/kv";
 import { readWonChests, type WonChestsResult } from "@/lib/chain";
 import { chestPath } from "@/lib/chest-code";
-import { CONTRACTS, DEMO_CHEST, stroopsToXlm, tokenDecimals, tokenLabel } from "@/lib/config";
+import { CONTRACTS, stroopsToXlm, tokenDecimals, tokenLabel, SAMPLE_CHEST_ID, NETWORK_LC } from "@/lib/config";
 import { getChest } from "@/lib/chests-demo";
 import { expertTx, shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";
@@ -90,7 +90,7 @@ export default function ClaimedChestsPage() {
             tone="gold"
             label="History unavailable"
             title="We couldn’t read your claims."
-            body={`The testnet RPC didn’t answer (${data.msg.slice(0, 120)}). Nothing was lost; try again.`}
+            body={`The ${NETWORK_LC} RPC didn’t answer (${data.msg.slice(0, 120)}). Nothing was lost; try again.`}
             chest="none"
             actions={[{ label: "Retry", onClick: () => void load(), primary: true }]}
           />
@@ -99,10 +99,10 @@ export default function ClaimedChestsPage() {
             tone="dim"
             label="No claims yet"
             title="Your chests are still locked."
-            body="Only claims from the last ~7 days appear here (testnet event window). Solve a chest and it shows up in a few seconds."
+            body="Only claims from the last ~7 days appear here (event window). Solve a chest and it shows up in a few seconds."
             chest="closed"
             actions={[
-              { href: chestPath(DEMO_CHEST.id), label: "Open a chest →", primary: true },
+              { href: chestPath(SAMPLE_CHEST_ID), label: "Open a chest →", primary: true },
               { href: "/#security", label: "See why proofs can’t be stolen" },
             ]}
           />
@@ -179,7 +179,7 @@ export default function ClaimedChestsPage() {
             <p className="mt-4 text-[13px] text-[var(--dim)]">
               Read from on-chain <code>claimed</code> events (last ~7 days
               {data.s === "ok" && data.v.truncated ? "; the list was cut, more events exist" : ""}).
-              Tx links open stellar.expert testnet.
+              Tx links open stellar.expert ({NETWORK_LC}).
             </p>
           </>
         )}

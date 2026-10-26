@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { QrTile } from "@/components/qr-tile";
 import { expertAddress } from "@/lib/format";
+import { IS_MAINNET } from "@/lib/config";
 
 /** Una sola QR: la dirección conectada, en un tile #F5F2EC de 264 px. */
 export function ReceivePanel({ address }: { address: string }) {
@@ -58,7 +59,7 @@ export function ReceivePanel({ address }: { address: string }) {
         </p>
       )}
       <p className="mt-5 text-[13px] leading-[1.5] text-[var(--dim)]">
-        Only send XLM on Stellar testnet to this address. Testnet funds have no real value.
+        {IS_MAINNET ? "Only send XLM on Stellar mainnet to this address. These are real funds; double-check the address." : "Only send XLM on Stellar testnet to this address. Testnet funds have no real value."}
       </p>
     </section>
   );

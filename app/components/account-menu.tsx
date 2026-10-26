@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/avatar";
+import { NetworkMenuItem } from "@/components/network-switch";
 import { shortAddr } from "@/lib/format";
 import { useHandle } from "@/lib/handle";
 import { useSession } from "@/lib/session";
@@ -93,6 +94,7 @@ export function AccountMenu({ address }: { address: string }) {
               </p>
             </div>
           </div>
+          <NetworkMenuItem onClick={() => setOpen(false)} />
           {ITEMS.map((i) => (
             <Link
               key={i.href}

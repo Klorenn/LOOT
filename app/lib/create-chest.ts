@@ -2,9 +2,10 @@
 
 import { Keypair, rpc, scValToNative } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
-import { Client, networks } from "@findloot/chest";
+import { Client } from "@findloot/chest";
 import { latestLedgerHint } from "./chain";
 import type { Quiz } from "./quiz";
+import { capError } from "./caps";
 import { CONTRACTS, NETWORK } from "./config";
 import { getPasskeyKit } from "./passkey-client";
 import { SendError } from "./send";
@@ -79,7 +80,8 @@ export function confirmMeta(chestId: number, fingerprintHex: string, txHash?: st
 
 function newClient(publicKey: string, signTransaction?: unknown): Client {
   return new Client({
-    ...networks.testnet,
+    networkPassphrase: NETWORK.passphrase,
+    contractId: CONTRACTS.chest,
     rpcUrl: NETWORK.rpcUrl,
     allowHttp: true,
     publicKey,
@@ -122,6 +124,8 @@ export async function createChestOnChain(
 ): Promise<{ chestId: number; hash: string }> {
   if (!Number.isSafeInteger(input.deadline) || input.deadline <= Math.floor(Date.now() / 1000))
     throw new SendError("The chest needs an expiry in the future; otherwise the prize could never be recovered.");
+  const capBad = capError(input.prizeStroops, input.maxClaims);
+  if (capBad) throw new SendError(capBad);
   const hash = await invokeAsCreator(player, (c, o) => c.create_chest(createArgs(player, input), o) as never, onPhase);
   return { chestId: Number(await returnValueFromTx(hash)), hash };
 }
@@ -185,4 +189,22 @@ async function invokePasskey(player: Player, build: Build, onPhase?: Phase): Pro
   onPhase?.("pending");
   const hash = await submitPasskeyTx(xdrStr);
   return hash;
+}
+
+/**
+ * Fee de red estimada ANTES de firmar: simula create_chest (cuenta pública para C/passkey, la propia
+ * para G) y devuelve resourceFee + fee base en stroops. null si la simulación no se puede hacer
+ * (p. ej. saldo insuficiente): la UI muestra "—" y no bloquea.
+ */
+export async function estimateCreateFee(player: Player, input: CreateInput): Promise<bigint | null> {
+  try {
+    const client = newClient(player.kind === "passkey" ? SIM_ACCOUNT : player.publicKey);
+    const at = (await client.create_chest(createArgs(player, input), { simulate: true } as never)) as unknown as {
+      simulationData?: { transactionData: { build(): { resourceFee(): { toString(): string } } } };
+    };
+    const rf = at.simulationData?.transactionData.build().resourceFee().toString();
+    return rf ? BigInt(rf) + BigInt(100) : null;
+  } catch {
+    return null;
+  }
 }

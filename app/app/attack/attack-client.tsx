@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { PageHeader, Em } from "@/components/page-header";
 import { ExampleTag } from "@/components/example-tag";
 import { Terminal } from "@/components/terminal";
-import { ATTACK_CHEST } from "@/lib/config";
+import { ATTACK_CHEST, NETWORK } from "@/lib/config";
 import { loadPlayer, enrollPreferPasskey } from "@/lib/wallet";
 import { recipientField } from "@/lib/recipient";
 import { proveChest } from "@/lib/zk";
@@ -16,7 +16,7 @@ type LogLine = { t: string; msg: string; side: Side };
 const BOT_ADDR = "GAVLW5IKB7VFBRJ3EHBE4BRZ5OX3AOW3ICMLMB6KVKCQDO6WJ2SPHDN3";
 const BOT_SHORT = `${BOT_ADDR.slice(0, 4)}…${BOT_ADDR.slice(-4)}`;
 
-const EXPLORER_TX = "https://stellar.expert/explorer/testnet/tx/";
+const EXPLORER_TX = `${NETWORK.explorerUrl}/tx/`;
 
 export function AttackClient({
   zkBadge,

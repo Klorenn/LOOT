@@ -21,7 +21,7 @@ import { StackMarquee } from "@/components/stack-marquee";
 import { AudienceSection } from "@/components/landing/audience-section";
 import { SdkBlock } from "@/components/landing/sdk-block";
 import { chestPath } from "@/lib/chest-code";
-import { DEMO_CHEST, PRIZE, stroopsToXlm } from "@/lib/config";
+import { PRIZE, stroopsToXlm, SAMPLE_CHEST_ID, NETWORK_LC } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { useSession } from "@/lib/session";
 
@@ -110,7 +110,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 </Link>
               )}
               <Link
-                href={`/login?next=${chestPath(DEMO_CHEST.id)}`}
+                href={`/login?next=${chestPath(SAMPLE_CHEST_ID)}`}
                 className="btn-landing btn-landing-p btn-landing-sm"
               >
                 Launch app →
@@ -137,7 +137,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                     className="status-dot inline-block size-[6px] rounded-full bg-[var(--ok)]"
                     aria-hidden
                   />
-                  Live on Stellar testnet
+                  Live on Stellar {NETWORK_LC}
                 </p>
                 <h1
                   data-reveal-h1
@@ -155,7 +155,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 </p>
                 <div data-hero-fade className="mt-8 flex flex-wrap gap-3">
                   <Link
-                    href={`/login?next=${chestPath(DEMO_CHEST.id)}`}
+                    href={`/login?next=${chestPath(SAMPLE_CHEST_ID)}`}
                     className="btn-landing btn-landing-p"
                   >
                     Open a chest →
@@ -264,7 +264,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                     </small>
                   </b>
                   <div className="mt-2 text-[15px] text-[var(--muted)]">
-                    paid to solvers (testnet, last 7 days)
+                    paid to solvers ({NETWORK_LC}, last 7 days)
                   </div>
                 </div>
                 <div
@@ -291,7 +291,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
                 </div>
               </div>
               <p className="mt-6 font-mono text-[12px] text-[var(--dim)]">
-                Live data from the last 7 days on testnet.
+                Live data from the last 7 days on {NETWORK_LC}.
               </p>
             </div>
           </section>

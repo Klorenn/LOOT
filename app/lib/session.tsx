@@ -25,7 +25,7 @@ import {
 } from "./wallet";
 import {
   connectFreighter,
-  assertWalletOnTestnet,
+  assertWalletOnNetwork,
   connectGWallet,
   disconnectGWallet,
   restoreGWallet,
@@ -125,7 +125,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       p = await enrollWithPasskey();
     } else {
       const { address, walletId } = await connectGWallet(id);
-      await assertWalletOnTestnet(walletId); // WrongNetworkError: no se guarda la sesión
+      await assertWalletOnNetwork(walletId); // WrongNetworkError: no se guarda la sesión
       p = enrollWalletAccount(address, walletId);
       try {
         localStorage.setItem("chestzk.lastWallet", walletId);

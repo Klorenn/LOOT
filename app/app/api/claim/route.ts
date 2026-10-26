@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
-import { Client, networks } from "@findloot/chest";
-import { NETWORK } from "@/lib/config";
+import { Client } from "@findloot/chest";
+import { NETWORK, CONTRACTS } from "@/lib/config";
 import { withRpcUrl } from "@/lib/rpc";
 
 type Body = {
@@ -58,7 +58,8 @@ export async function POST(req: NextRequest) {
     const sent = await withRpcUrl(
       async (rpcUrl) => {
         const client = new Client({
-          ...networks.testnet,
+          networkPassphrase: NETWORK.passphrase,
+          contractId: CONTRACTS.chest,
           rpcUrl,
           allowHttp: true,
           publicKey: kp.publicKey(),
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
       hash,
       ledger,
       explorer: hash
-        ? `https://stellar.expert/explorer/testnet/tx/${hash}`
+        ? `${NETWORK.explorerUrl}/tx/${hash}`
         : null,
       result: sent.result,
     });

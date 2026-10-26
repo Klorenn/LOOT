@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
-import { Client, networks } from "@findloot/chest";
-import { NETWORK } from "@/lib/config";
+import { Client } from "@findloot/chest";
+import { CONTRACTS, NETWORK } from "@/lib/config";
+import { legacyOff } from "@/lib/mainnet-guard";
 import { withRpcUrl } from "@/lib/rpc";
 import { requireAdmin } from "@/lib/admin-auth";
 
@@ -13,6 +14,8 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const off = legacyOff();
+  if (off) return off;
   const denied = requireAdmin(req);
   if (denied) return denied;
   try {
@@ -34,7 +37,8 @@ export async function POST(
     const sent = await withRpcUrl(
       async (rpcUrl) => {
         const client = new Client({
-          ...networks.testnet,
+          networkPassphrase: NETWORK.passphrase,
+          contractId: CONTRACTS.chest,
           rpcUrl,
           allowHttp: true,
           publicKey: kp.publicKey(),
@@ -71,7 +75,7 @@ export async function POST(
       refunded: refunded.toString(),
       hash,
       explorer: hash
-        ? `https://stellar.expert/explorer/testnet/tx/${hash}`
+        ? `${NETWORK.explorerUrl}/tx/${hash}`
         : null,
     });
   } catch (e) {

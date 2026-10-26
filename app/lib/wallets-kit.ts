@@ -5,6 +5,8 @@
  * preact + window y no puede evaluarse en SSR. Solo se piden direcciones; la
  * prueba ZK se envía por el relayer, así que no se firma nada con la wallet.
  */
+import { IS_MAINNET, NETWORK } from "./config";
+
 type Kit = typeof import("@creit.tech/stellar-wallets-kit/sdk").StellarWalletsKit;
 
 let loading: Promise<Kit> | null = null;
@@ -53,7 +55,7 @@ function loadKit(): Promise<Kit> {
           new onekey.OneKeyModule(),
           new bitget.BitgetModule(),
         ],
-        network: Networks.TESTNET,
+        network: IS_MAINNET ? Networks.PUBLIC : Networks.TESTNET,
         // Tema Loot para el modal del kit (contraste AA: foreground/strong 15:1, secondary 7:1,
         // primary-foreground sobre primary 6.5:1, danger 6:1; light/gray solo son bordes).
         theme: {
@@ -122,10 +124,11 @@ export async function listWallets(): Promise<WalletOption[]> {
 }
 
 /**
- * Red a la que está conectada la wallet elegida. Lanza WrongNetworkError si no es testnet; si la
- * wallet no sabe informarla (no todas lo implementan) se asume correcta.
+ * Red a la que está conectada la wallet elegida. Lanza WrongNetworkError si no es la red
+ * configurada (NETWORK.passphrase); si la wallet no sabe informarla (no todas lo implementan)
+ * se asume correcta.
  */
-export async function assertWalletOnTestnet(walletId: string): Promise<void> {
+export async function assertWalletOnNetwork(walletId: string): Promise<void> {
   const kit = await loadKit();
   kit.setWallet(walletId);
   let passphrase: string | undefined;
@@ -134,9 +137,11 @@ export async function assertWalletOnTestnet(walletId: string): Promise<void> {
   } catch {
     return;
   }
-  if (!passphrase || passphrase === "Test SDF Network ; September 2015") return;
+  if (!passphrase || passphrase === NETWORK.passphrase) return;
   const name = /Public Global/i.test(passphrase)
     ? "Mainnet"
+    : /Test SDF Network/i.test(passphrase)
+      ? "Testnet"
     : /Future/i.test(passphrase)
       ? "Futurenet"
       : "another network";

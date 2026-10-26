@@ -308,6 +308,7 @@ export function enrollWalletAccount(address: string, walletId: string): Player {
 
 /** Classic G… + Friendbot (demo / no biometrics). El premio es XLM: sin trustline. */
 export async function enrollClassic(): Promise<Player> {
+  if (!NETWORK.friendbotUrl) throw new Error("Demo accounts are testnet only.");
   const kp = Keypair.random();
   const playerSecret = playerSecretFor(kp.publicKey());
 

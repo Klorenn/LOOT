@@ -175,7 +175,7 @@ export async function planSend(
     const baseG = dest.kind === "G" ? dest.input : dest.kind === "M" ? dest.baseG! : null;
     if (baseG && !(await loadG(baseG))) {
       throw new SendError(
-        "That account doesn’t exist on the network yet. A passkey wallet can’t create accounts: fund it first from a G… wallet or Friendbot.",
+        "That account doesn’t exist on the network yet. A passkey wallet can’t create accounts: fund it first from a G… wallet or an exchange / faucet.",
       );
     }
     const { balance } = await balanceInfo(player);

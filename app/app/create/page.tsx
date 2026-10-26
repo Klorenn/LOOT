@@ -13,9 +13,11 @@ import { answerToField, normalizeAnswer, randomSalt } from "@/lib/answer";
 import { poseidon2, fieldToHex } from "@/lib/zk";
 import { chestPath } from "@/lib/chest-code";
 import { useSession } from "@/lib/session";
-import { NETWORK, stroopsToXlm } from "@/lib/config";
+import { NETWORK, stroopsToXlm, NETWORK_LC, CONFIG_INCOMPLETE } from "@/lib/config";
 import { balanceInfo, parseXlmAmount, SendError } from "@/lib/send";
-import { confirmMeta, createChestOnChain, reserveMeta } from "@/lib/create-chest";
+import { confirmMeta, createChestOnChain, estimateCreateFee, reserveMeta } from "@/lib/create-chest";
+import { capError } from "@/lib/caps";
+import { BetaNotice } from "@/components/network-banner";
 import { QuizBuilder } from "@/components/quiz-builder";
 import { draftToQuiz, emptyDraftQuestion, type DraftQuestion } from "@/lib/quiz-draft";
 import { QUIZ_LIMITS, quizIsGuessable } from "@/lib/quiz";
@@ -170,8 +172,25 @@ export default function CreateChestPage() {
     };
   }, [player, step, result]);
 
+  // Fee de red estimada por simulación, visible antes de firmar (paso de revisión)
+  const [feeEst, setFeeEst] = useState<bigint | null | "pending">(null);
+  useEffect(() => {
+    if (!player || step < 4 || !prizeStroops || !Number.isSafeInteger(maxClaims) || maxClaims < 1) return;
+    let off = false;
+    setFeeEst("pending");
+    estimateCreateFee(player, {
+      fingerprintHex: "00".repeat(32),
+      prizeStroops,
+      maxClaims,
+      deadline: Math.floor(Date.now() / 1000) + 86_400,
+    }).then((f) => !off && setFeeEst(f));
+    return () => {
+      off = true;
+    };
+  }, [player, step, prizeStroops, maxClaims]);
+
   async function friendbot() {
-    if (!player) return;
+    if (!player || !NETWORK.friendbotUrl) return;
     setFaucetBusy(true);
     setError(null);
     try {
@@ -199,7 +218,15 @@ export default function CreateChestPage() {
     } else if (step === 1 && !hashOk)
       e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
     if (step === 2 && !prizeStroops) e.prize = "Enter a reward greater than 0 (up to 7 decimals).";
+    if (step === 2 && prizeStroops) {
+      const cb = capError(prizeStroops, Math.max(1, maxClaims));
+      if (cb) e.prize = cb;
+    }
     if (step === 3 && (!Number.isSafeInteger(maxClaims) || maxClaims < 1)) e.maxClaims = "At least 1 claim.";
+    if (step === 3 && prizeStroops && Number.isSafeInteger(maxClaims) && maxClaims >= 1) {
+      const cb = capError(prizeStroops, maxClaims);
+      if (cb) e.maxClaims = cb;
+    }
     if (step === 3) {
       const ee = expiryError(expires);
       if (ee) e.expires = ee;
@@ -220,6 +247,9 @@ export default function CreateChestPage() {
   async function onFund() {
     if (!validateStep()) return;
     if (!player || !prizeStroops) return;
+    if (CONFIG_INCOMPLETE) return setError("Mainnet configuration is incomplete; chest creation is disabled.");
+    const capBad = capError(prizeStroops, maxClaims);
+    if (capBad) return setError(capBad);
     setBusy(true);
     setError(null);
     try {
@@ -269,7 +299,7 @@ export default function CreateChestPage() {
       setResult({
         chestId,
         link: listed ? base : `${base}#s=${salt.toString()}`,
-        explorer: `https://stellar.expert/explorer/${process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "public" : "testnet"}/tx/${hash}`,
+        explorer: `${NETWORK.explorerUrl}/tx/${hash}`,
         priv: !listed,
         saved,
         fingerprintHex,
@@ -326,7 +356,7 @@ export default function CreateChestPage() {
       <main>
         <PageHeader
           tint="ok"
-          eyebrow="Chest created · testnet"
+          eyebrow={`Chest created · ${NETWORK_LC}`}
           title={
             <>
               Chest #{result.chestId} is <Em tone="ok">live.</Em>
@@ -398,7 +428,7 @@ export default function CreateChestPage() {
   return (
     <main>
       <PageHeader
-        eyebrow={`New chest · step ${step + 1} of ${STEPS.length} · Stellar testnet`}
+        eyebrow={`New chest · step ${step + 1} of ${STEPS.length} · Stellar ${NETWORK_LC}`}
         title={
           <>
             Create a <Em>chest</Em>
@@ -414,7 +444,7 @@ export default function CreateChestPage() {
             <Link href="/login?next=/create" className="text-[var(--proof)] underline-offset-2 hover:underline">
               Log in
             </Link>{" "}
-            when you&apos;re ready to fund a chest on testnet.
+            when you&apos;re ready to fund a chest on {NETWORK_LC}.
           </p>
         </div>
       )}
@@ -653,6 +683,7 @@ export default function CreateChestPage() {
 
               {step === 2 && (
                 <>
+                  <BetaNotice />
                   <Field
                     label="Reward per claim (XLM)"
                     hint="Decimals allowed, e.g. 0.1. Escrowed from your account when you create the chest."
@@ -723,6 +754,7 @@ export default function CreateChestPage() {
 
               {step === 4 && (
                 <div className="space-y-3 font-mono text-[13px]">
+                  <BetaNotice />
                   <p>
                     <span className="text-[var(--dim)]">Puzzle · </span>
                     {question.slice(0, 80)}
@@ -764,6 +796,22 @@ export default function CreateChestPage() {
                       </span>
                     </p>
                     <p>
+                      <span className="text-[var(--dim)]">Network fee (simulated) · </span>
+                      {feeEst === "pending"
+                        ? "…"
+                        : feeEst
+                          ? `${stroopsToXlm(feeEst)} XLM${player?.kind === "passkey" ? " (paid by the relayer)" : ""}`
+                          : "—"}
+                    </p>
+                    <p>
+                      <span className="text-[var(--dim)]">Total from your account · </span>
+                      <span className="text-[var(--gold)]">
+                        {totalStroops
+                          ? `${stroopsToXlm(totalStroops + (player?.kind !== "passkey" && typeof feeEst === "bigint" ? feeEst : BigInt(0)))} XLM`
+                          : "—"}
+                      </span>
+                    </p>
+                    <p>
                       <span className="text-[var(--dim)]">Your balance · </span>
                       {bal ? `${stroopsToXlm(bal.balance)} XLM` : "…"}
                     </p>
@@ -773,27 +821,35 @@ export default function CreateChestPage() {
                           Not enough XLM to fund this chest.
                         </p>
                         <div className="flex flex-wrap items-center gap-3">
-                          <button
-                            type="button"
-                            disabled={faucetBusy}
-                            onClick={() => void friendbot()}
-                            className="btn-landing btn-landing-s disabled:opacity-40"
-                          >
-                            {faucetBusy ? "Requesting…" : "Fund with Friendbot"}
-                          </button>
-                          <Link
-                            href="/wallet?tab=receive"
-                            className="text-[var(--proof)] underline underline-offset-2"
-                          >
-                            Add XLM in Wallet
-                          </Link>
+                          {NETWORK.friendbotUrl ? (
+                            <button
+                              type="button"
+                              disabled={faucetBusy}
+                              onClick={() => void friendbot()}
+                              className="btn-landing btn-landing-s disabled:opacity-40"
+                            >
+                              {faucetBusy ? "Requesting…" : "Fund with Friendbot"}
+                            </button>
+                          ) : (
+                            <Link href="/wallet?tab=receive" className="btn-landing btn-landing-s">
+                              Add XLM
+                            </Link>
+                          )}
+                          {NETWORK.friendbotUrl && (
+                            <Link
+                              href="/wallet?tab=receive"
+                              className="text-[var(--proof)] underline underline-offset-2"
+                            >
+                              Add XLM in Wallet
+                            </Link>
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
                   <p className="text-[var(--dim)]">
                     {player?.kind === "passkey"
-                      ? "The prize comes from your balance. The network fee is covered by the relayer on testnet."
+                      ? "The prize comes from your balance. The network fee is covered by the relayer on " + NETWORK_LC + "."
                       : "The prize and the network fee come from your account."}
                   </p>
                 </div>

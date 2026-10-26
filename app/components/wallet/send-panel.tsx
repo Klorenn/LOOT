@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { InlineAlert } from "@/components/inline-alert";
 import { KV, Mono } from "@/components/kv";
 import { CopyButton } from "@/components/copy-button";
-import { PRIZE, stroopsToXlm } from "@/lib/config";
+import { PRIZE, stroopsToXlm, NETWORK_LC, IS_MAINNET } from "@/lib/config";
 import { expertTx, shortAddr } from "@/lib/format";
 import {
   parseDestination,
@@ -196,7 +196,7 @@ export function SendPanel({
                 {destErr ??
                   (parsedDest && !("error" in parsedDest) && parsedDest.kind === "M"
                     ? `Muxed address: pays ${shortAddr(parsedDest.baseG!, 6)} with id ${parsedDest.muxId}.`
-                    : "Any funded testnet account.")}
+                    : `Any funded ${NETWORK_LC} account.`)}
               </p>
             </div>
 
@@ -288,7 +288,7 @@ export function SendPanel({
                   { label: "To", value: <Mono>{plan.dest.input}</Mono> },
                   { label: "Amount", value: `${stroopsToXlm(plan.amount)} ${PRIZE.code}`, valueClass: "text-[var(--gold)]" },
                   { label: "Memo", value: memoLabel },
-                  { label: "Network", value: "Stellar testnet" },
+                  { label: "Network", value: `Stellar ${NETWORK_LC}` },
                   { label: "Fee", value: plan.plan.feeNote },
                 ]}
               />
@@ -336,7 +336,7 @@ export function SendPanel({
         <h3 className="font-mono text-[12px] tracking-[0.08em] text-[var(--dim)] uppercase">Before you send</h3>
         <dl className="mt-4 space-y-3 text-[14px]">
           {[
-            ["Network", "Stellar testnet (no real funds)"],
+            ["Network", IS_MAINNET ? "Stellar mainnet" : "Stellar testnet (no real funds)"],
             ["From", shortAddr(player.publicKey, 6)],
             [
               "Fee",

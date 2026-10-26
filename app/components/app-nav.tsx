@@ -6,14 +6,18 @@ import { useState } from "react";
 import { BrandMark } from "@/components/logo-chest";
 import { AccountMenu } from "@/components/account-menu";
 import { useSession } from "@/lib/session";
+import { NetworkSwitch } from "@/components/network-switch";
+import { IS_MAINNET } from "@/lib/config";
 
-const LINKS = [
+const ALL_LINKS = [
   { href: "/explore", label: "Explore" },
   { href: "/attack", label: "Attack demo" },
   { href: "/create", label: "Create" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/sdk", label: "SDK" },
 ] as const;
+// El modo ataque gasta fondos del relayer: solo testnet.
+const LINKS = ALL_LINKS.filter((l) => !(IS_MAINNET && l.href === "/attack"));
 
 /**
  * AppNav de Loot (72px). Reemplaza a components/app/app-nav.tsx (de otra persona, no se toca)
@@ -71,12 +75,8 @@ export function AppNav() {
               {menu ? "Close" : "Menu"}
             </button>
           </span>
-          <span className="hidden items-center gap-2 font-mono text-[13px] text-[var(--dim)] sm:inline-flex">
-            <span
-              className="size-[6px] rounded-full bg-[var(--ok)]"
-              aria-hidden
-            />
-            Testnet
+          <span className="hidden sm:inline-flex">
+            <NetworkSwitch compact />
           </span>
           {!ready ? (
             <span

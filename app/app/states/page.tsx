@@ -4,7 +4,7 @@ import { InlineAlert } from "@/components/inline-alert";
 import { ExampleTag } from "@/components/example-tag";
 import { StateBlock } from "@/components/state-block";
 import { chestPath } from "@/lib/chest-code";
-import { DEMO_CHEST } from "@/lib/config";
+import { DEMO_CHEST, SAMPLE_CHEST_ID } from "@/lib/config";
 
 const FP = `0x${DEMO_CHEST.fingerprintHex.slice(0, 4)}…${DEMO_CHEST.fingerprintHex.slice(-4)}`;
 
@@ -29,7 +29,7 @@ export default function StatesPage() {
           title="That answer doesn’t open this chest."
           body={`The proof can’t be generated because your answer’s hash doesn’t match ${FP}. Nothing was sent on-chain and no attempt was used.`}
           actions={[
-            { href: chestPath(DEMO_CHEST.id), label: "Try again", primary: true },
+            { href: chestPath(SAMPLE_CHEST_ID), label: "Try again", primary: true },
             { href: "/explore", label: "Back to chests" },
           ]}
         />
@@ -41,7 +41,7 @@ export default function StatesPage() {
           body="The nullifier is already stored on this chest, so replaying the same proof reverts. Each proof works once and only pays the address it was made for."
           chest="open"
           actions={[
-            { href: chestPath(DEMO_CHEST.id), label: "Open the demo chest", primary: true },
+            { href: chestPath(SAMPLE_CHEST_ID), label: "Open the demo chest", primary: true },
             { href: "/claimed-chests", label: "My claimed chests" },
           ]}
         />
@@ -62,7 +62,7 @@ export default function StatesPage() {
             </div>
           }
           actions={[
-            { href: chestPath(DEMO_CHEST.id), label: "Retry proof", primary: true },
+            { href: chestPath(SAMPLE_CHEST_ID), label: "Retry proof", primary: true },
             { href: "#", label: "Copy error log" },
           ]}
         />

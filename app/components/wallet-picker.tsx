@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { InlineAlert } from "@/components/inline-alert";
 import { IconSmartAccountKit as PasskeyGlyph } from "@/components/stack-logos";
 import { listWallets, WrongNetworkError, type WalletOption } from "@/lib/wallets-kit";
+import { NETWORK_LABEL, NETWORK_LC } from "@/lib/config";
 
 /** Wallets web: no hay nada que instalar (xBull también corre como PWA). */
 const WEB_IDS = new Set(["albedo", "hot-wallet", "xbull"]);
@@ -207,7 +208,7 @@ export function WalletPicker({
               Connect a wallet
             </h2>
             <p className="mt-1 flex items-center gap-2 font-mono text-[12px] text-[var(--dim)]">
-              <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden /> Stellar testnet
+              <span className="size-[6px] rounded-full bg-[var(--ok)]" aria-hidden /> Stellar {NETWORK_LC}
             </p>
           </div>
           <button
@@ -393,11 +394,11 @@ export function WalletPicker({
             <InlineAlert
               tone="gold"
               title="Wrong network"
-              body={`${view.wallet.name} is on ${view.network}. Loot runs on Stellar testnet.`}
+              body={`${view.wallet.name} is on ${view.network}. Loot runs on Stellar ${NETWORK_LC}.`}
             />
             <ol className="space-y-1 pl-5 text-[14px] leading-[1.6] text-[var(--muted)]" style={{ listStyle: "decimal" }}>
               <li>Open {view.wallet.name} and go to its network settings.</li>
-              <li>Switch to “Testnet”.</li>
+              <li>Switch to “{NETWORK_LABEL}”.</li>
               <li>Come back and check again.</li>
             </ol>
             <button

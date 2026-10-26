@@ -6,7 +6,7 @@ import { PageHeader, Em } from "@/components/page-header";
 import { StateBlock } from "@/components/state-block";
 import { StatusLabel } from "@/components/status-label";
 import { Mono } from "@/components/kv";
-import { PRIZE, stroopsToXlm } from "@/lib/config";
+import { PRIZE, stroopsToXlm, NETWORK, NETWORK_LC } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import type { DashboardData } from "@/lib/listing";
 import { useSession } from "@/lib/session";
@@ -86,7 +86,7 @@ export default function DashboardPage() {
             tone="gold"
             label="Chain read failed"
             title="We couldn’t read your chests."
-            body="The Stellar testnet RPC didn’t answer. Reload in a moment."
+            body={`The Stellar ${NETWORK_LC} RPC didn’t answer. Reload in a moment.`}
             chest="none"
             actions={[{ href: "/dashboard", label: "Reload", primary: true }]}
           />
@@ -149,7 +149,7 @@ export default function DashboardPage() {
                   <>
                     {" "}
                     <a
-                      href={`https://stellar.expert/explorer/${process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "public" : "testnet"}/tx/${notice.hash}`}
+                      href={`${NETWORK.explorerUrl}/tx/${notice.hash}`}
                       target="_blank"
                       rel="noreferrer"
                       className="underline underline-offset-2"
