@@ -28,11 +28,11 @@ export async function vetRelayTx(xdrB64: string, c: NetConfig, relayerPublicKey?
     xlmSac: c.XLM_SAC,
     walletWasmHashHex: WALLET_WASM_HASH,
     relayerPublicKey,
-    chestToken: (id) =>
+    chestInfo: (id) =>
       readChest(id)
-        .then((ch) => ch.token)
+        .then((ch) => ({ token: ch.token, creator: ch.creator }))
         .catch(() => null),
-    allowedChestIds: c.ALLOWED_CHEST_IDS,
+    allow: c.IS_MAINNET ? { ids: c.ALLOWED_CHEST_IDS, creators: c.CREATOR_ALLOWLIST } : undefined,
     // topes de la beta solo en mainnet (testnet sigue sin topes de premio ni de plazo)
     createLimits: c.IS_MAINNET
       ? {

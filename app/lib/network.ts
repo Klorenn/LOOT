@@ -1,3 +1,5 @@
+import { parseCreatorAllowlist } from "./meta-gate";
+
 /**
  * Redes de Loot. findloot.xyz sirve testnet Y mainnet: la red se elige por petición con la cookie
  * `loot_net` (testnet por defecto). Este módulo es puro (sin next/headers) y vale en servidor y cliente.
@@ -22,6 +24,8 @@ export type MainnetPublic = {
   sampleChestId: number;
   /** Ids extra permitidos en mainnet (MAINNET_LISTED_IDS, csv). */
   listedIds: number[];
+  /** Creadores aprobados (MAINNET_CREATOR_ALLOWLIST): sus cofres se listan y el relayer los patrocina. */
+  creatorAllowlist: string[];
 };
 
 const isContractId = (s: string) => /^C[A-Z2-7]{55}$/.test(s);
@@ -44,7 +48,9 @@ export function mainnetPublicFromEnv(): MainnetPublic {
     horizonUrl: clean(e.MAINNET_HORIZON_URL),
     maxPrizePerPlaceXlm: num(e.MAINNET_MAX_PRIZE_PER_PLACE_XLM ?? e.NEXT_PUBLIC_MAX_PRIZE_PER_PLACE_XLM, 1),
     maxTotalPrizeXlm: num(e.MAINNET_MAX_TOTAL_PRIZE_XLM ?? e.NEXT_PUBLIC_MAX_TOTAL_PRIZE_XLM, 30),
-    sampleChestId: num(e.MAINNET_SAMPLE_CHEST_ID, 1),
+    // sin MAINNET_SAMPLE_CHEST_ID no hay cofre de muestra (0): ya no se asume el #1, que cualquiera puede crear
+    sampleChestId: num(e.MAINNET_SAMPLE_CHEST_ID, 0),
+    creatorAllowlist: parseCreatorAllowlist(e.MAINNET_CREATOR_ALLOWLIST),
     listedIds: (clean(e.MAINNET_LISTED_IDS) || "")
       .split(",")
       .map((x) => Number(x.trim()))
@@ -74,6 +80,8 @@ export type NetConfig = {
   DEMO_CHEST_ID: number;
   /** Cofre al que apuntan los enlaces "abrir un cofre". */
   SAMPLE_CHEST_ID: number;
+  /** Creadores aprobados en mainnet (vacío en testnet). */
+  CREATOR_ALLOWLIST: readonly string[];
   /** Ids de cofre que mainnet muestra y deja reclamar/cerrar vía relayer. null = sin lista (testnet). */
   ALLOWED_CHEST_IDS: readonly number[] | null;
   LISTED_CHEST_IDS: readonly number[];
@@ -125,9 +133,10 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
       XLM_SAC: MAINNET_SAC,
       CAPS: { maxPrizePerPlaceXlm: mainnet.maxPrizePerPlaceXlm, maxTotalPrizeXlm: mainnet.maxTotalPrizeXlm },
       DEMO_CHEST_ID: 0,
-      SAMPLE_CHEST_ID: mainnet.sampleChestId,
-      ALLOWED_CHEST_IDS: [...new Set([mainnet.sampleChestId, ...mainnet.listedIds])],
-      LISTED_CHEST_IDS: [...new Set([mainnet.sampleChestId, ...mainnet.listedIds])],
+      SAMPLE_CHEST_ID: mainnet.sampleChestId || 1, // solo para enlaces "abrir un cofre"; no habilita nada
+      CREATOR_ALLOWLIST: mainnet.creatorAllowlist,
+      ALLOWED_CHEST_IDS: [...new Set([mainnet.sampleChestId, ...mainnet.listedIds].filter((n) => n > 0))],
+      LISTED_CHEST_IDS: [...new Set([mainnet.sampleChestId, ...mainnet.listedIds].filter((n) => n > 0))],
       HIDDEN_CHEST_IDS: [],
       CONFIG_ISSUES: issues,
       CONFIG_INCOMPLETE: !mainnetReady,
@@ -161,6 +170,7 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
     CAPS: { maxPrizePerPlaceXlm: Infinity, maxTotalPrizeXlm: Infinity },
     DEMO_CHEST_ID: 6,
     SAMPLE_CHEST_ID: 6,
+    CREATOR_ALLOWLIST: [],
     ALLOWED_CHEST_IDS: null,
     LISTED_CHEST_IDS: [6],
     HIDDEN_CHEST_IDS: [9, 10, 11],
@@ -199,7 +209,7 @@ export function injectMainnet(m: MainnetPublic) {
 export function mainnetPublic(): MainnetPublic {
   if (typeof window === "undefined") return mainnetPublicFromEnv();
   return (
-    injected ?? { registry: "", verifier: "", rpcUrl: "", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 1, listedIds: [] }
+    injected ?? { registry: "", verifier: "", rpcUrl: "", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 0, listedIds: [], creatorAllowlist: [] }
   );
 }
 

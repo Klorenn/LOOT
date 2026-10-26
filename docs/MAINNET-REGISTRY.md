@@ -63,7 +63,7 @@ MAINNET_REGISTRY_ID=<deployments/registry-mainnet.json .registry>
 MAINNET_VERIFIER_ID=<deployments/registry-mainnet.json .verifier>
 MAINNET_RPC_URL=<mainnet Soroban RPC>      # sent to browsers: use a domain-restricted key
 RELAYER_SECRET_MAINNET=S...                # never falls back to RELAYER_SECRET (testnet)
-MAINNET_SAMPLE_CHEST_ID=1                  # enabled chest (listed in /explore, claimable through the relayer)
+MAINNET_SAMPLE_CHEST_ID=                   # optional explicitly enabled id (unset = none; #1 is not assumed)
 MAINNET_LISTED_IDS=                        # optional extra enabled ids (csv)
 MAINNET_CREATOR_ALLOWLIST=G...,G...        # who may store chest metadata on mainnet (reserve) — add the creator wallet(s)
 MAINNET_MAX_PRIZE_PER_PLACE_XLM=1          # beta caps (defaults 1 / 30)
@@ -71,6 +71,8 @@ MAINNET_MAX_TOTAL_PRIZE_XLM=30
 ```
 
 ## Mainnet relayer limits
+- A chest is relayed/listed only if its id is enabled OR its ON-CHAIN creator is in `MAINNET_CREATOR_ALLOWLIST` (anyone can create
+  chest #1 on the public registry). `create_chest` through the relayer also requires an allowlisted creator.
 - Allowlist (`lib/relay-policy.ts`): registry `create_chest` (token = native XLM SAC, prize <= per-claim cap, prize x claims <= total
   cap, deadline in the future and <= 30 days), `claim` / `close_chest` only for ENABLED chest ids whose on-chain token is the XLM
   SAC, SAC `transfer` from the authorizing wallet, passkey wallet deploy (wasm 97ce0478…). One op, no source-account auth, no fee-bump.

@@ -1,3 +1,4 @@
+import { isChestAllowed } from "./chest-allow";
 import { Address, FeeBumpTransaction, Transaction, TransactionBuilder, scValToNative, xdr } from "@stellar/stellar-sdk";
 
 /**
@@ -16,10 +17,10 @@ export type RelayPolicy = {
   walletWasmHashHex: string;
   /** Cuenta del relayer: ninguna tx puede usarla como fuente (op o tx). */
   relayerPublicKey?: string;
-  /** Token del cofre leído on-chain (null = el cofre no existe). */
-  chestToken: (id: number) => Promise<string | null>;
-  /** Ids de cofre permitidos (mainnet). null = cualquiera (testnet). */
-  allowedChestIds: readonly number[] | null;
+  /** Token y creador del cofre leídos on-chain (null = el cofre no existe). */
+  chestInfo: (id: number) => Promise<{ token: string; creator: string } | null>;
+  /** Mainnet: ids habilitados y creadores aprobados. `allow` ausente (testnet) = sin restricción. */
+  allow?: { ids: readonly number[] | null; creators: readonly string[] };
   /** Solo mainnet: topes de create_chest. Sin esto (testnet) no hay topes de premio ni de plazo. */
   createLimits?: { maxPrizeStroops: bigint; maxTotalStroops: bigint; maxDeadlineSecs: number; nowSec: number };
 };
@@ -95,6 +96,7 @@ export async function checkRelayable(xdrB64: string, passphrase: string, p: Rela
       const creator = args[0] ? scAddress(args[0]) : null;
       if (!creator || !authorizers(auth).has(creator)) return no("create_chest must be authorized by its creator");
       if (args.length !== 6) return no("create_chest: unexpected arguments");
+      if (p.allow && !p.allow.creators.includes(creator)) return no("create_chest: creator is not approved on mainnet");
       let token: string, prize: bigint, claims: number, deadline: bigint;
       try {
         token = scAddress(args[2]) ?? "";
@@ -122,10 +124,12 @@ export async function checkRelayable(xdrB64: string, passphrase: string, p: Rela
         return no(`${method}: unreadable chest id`);
       }
       if (!Number.isSafeInteger(id) || id < 1) return no(`${method}: bad chest id`);
-      if (p.allowedChestIds && !p.allowedChestIds.includes(id)) return no(`${method}: chest ${id} is not enabled`);
-      const tk = await p.chestToken(id);
-      if (tk === null) return no(`${method}: chest ${id} not found`);
-      if (tk !== p.xlmSac) return no(`${method}: chest ${id} does not pay native XLM`);
+      const info = await p.chestInfo(id);
+      if (info === null) return no(`${method}: chest ${id} not found`);
+      if (info.token !== p.xlmSac) return no(`${method}: chest ${id} does not pay native XLM`);
+      // mainnet: id habilitado O creador ON-CHAIN aprobado (cualquiera puede crear el cofre #1 en el registro público)
+      if (p.allow && !isChestAllowed({ restricted: true, ids: p.allow.ids, creators: p.allow.creators }, id, info.creator))
+        return no(`${method}: chest ${id} is not enabled on mainnet`);
       return { ok: true, kind: method, resourceFee };
     }
     return no(`registry.${method} is not relayed`);

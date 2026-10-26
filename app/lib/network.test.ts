@@ -3,7 +3,7 @@ import { configFor, effectiveNet, readNetCookie, withNet, type MainnetPublic } f
 
 const REG = "CBKH5Z25DDQRGMJDXQWUADOND4DUM5CN4CVZOX7M3OFH2HL7KYFONRRV";
 const VER = "CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE";
-const ready: MainnetPublic = { registry: REG, verifier: VER, rpcUrl: "https://rpc.example", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 1, listedIds: [7] };
+const ready: MainnetPublic = { registry: REG, verifier: VER, rpcUrl: "https://rpc.example", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 1, listedIds: [7], creatorAllowlist: [REG.replace("CBKH","GBKH")] };
 const empty: MainnetPublic = { ...ready, registry: "", verifier: "", rpcUrl: "" };
 
 describe("configFor", () => {
@@ -18,6 +18,7 @@ describe("configFor", () => {
     expect(c.CAPS).toEqual({ maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30 });
     expect(c.DEMO_CHEST_ID).toBe(0);
     expect(c.ALLOWED_CHEST_IDS).toEqual([1, 7]);
+    expect(c.CREATOR_ALLOWLIST).toEqual(ready.creatorAllowlist);
     expect(c.LISTED_CHEST_IDS).toEqual([1, 7]);
     expect(c.mainnetReady).toBe(true);
   });
@@ -40,6 +41,14 @@ describe("configFor", () => {
   });
   it("placeholder ids are not valid", () => {
     expect(configFor("mainnet", { ...ready, registry: "C..." }).CONFIG_ISSUES).toContain("MAINNET_REGISTRY_ID");
+  });
+});
+
+describe("sample chest", () => {
+  it("unset sample id enables nothing (no default to #1)", () => {
+    const c = configFor("mainnet", { ...ready, sampleChestId: 0, listedIds: [] });
+    expect(c.ALLOWED_CHEST_IDS).toEqual([]);
+    expect(c.LISTED_CHEST_IDS).toEqual([]);
   });
 });
 

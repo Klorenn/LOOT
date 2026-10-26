@@ -12,18 +12,24 @@ const WASM = "97ce047884106b1c6c3bb40b8973cc48db1c4dad95c9e20462bf2c701daa764e";
 const relayer = Keypair.random().publicKey();
 const XLM = (n: number) => BigInt(Math.round(n * 1e7));
 const NOW = 1_800_000_000;
-const tokens: Record<number, string | null> = { 1: SAC, 2: OTHER, 3: SAC };
+const PAU = "GBTDED5SE2QAKFQ3Y6NY75QGCKQTQ3Z6H3ZYM4PWUX3X36QMOKEEJFPQ";
+const EVIL = "GBLCVZXOJR36M5YC2EX2JU5XDPKA5PVUOJFRMPXPOIRXIQS3NDSB3SP6";
+const chests: Record<number, { token: string; creator: string } | undefined> = {
+  1: { token: SAC, creator: EVIL }, // el #1 de un desconocido
+  2: { token: OTHER, creator: PAU }, // token ajeno
+  3: { token: SAC, creator: PAU }, // de un creador aprobado
+  4: { token: SAC, creator: EVIL },
+};
 const base: RelayPolicy = {
   registry: REGISTRY,
   xlmSac: SAC,
   walletWasmHashHex: WASM,
   relayerPublicKey: relayer,
-  chestToken: async (id) => tokens[id] ?? null,
-  allowedChestIds: null,
+  chestInfo: async (id) => chests[id] ?? null,
 };
 const mainnet: RelayPolicy = {
   ...base,
-  allowedChestIds: [1],
+  allow: { ids: [4], creators: [PAU, WALLET] },
   createLimits: { maxPrizeStroops: XLM(1), maxTotalStroops: XLM(30), maxDeadlineSecs: 30 * 86400, nowSec: NOW },
 };
 
@@ -98,10 +104,17 @@ describe("relay policy", () => {
     expect((await check(claimTx(99))).ok).toBe(false); // no existe
     expect((await check(build(call(REGISTRY, "claim", [])))).ok).toBe(false);
   });
-  it("mainnet: claim / close_chest only for allowlisted ids", async () => {
-    expect((await check(claimTx(1), mainnet)).ok).toBe(true);
-    expect((await check(claimTx(3), mainnet)).ok).toBe(false); // XLM pero fuera de la lista
-    expect((await check(build(call(REGISTRY, "close_chest", [u64(3)])), mainnet)).ok).toBe(false);
+  it("mainnet: claim / close_chest need an enabled id OR an approved on-chain creator", async () => {
+    expect((await check(claimTx(3), mainnet)).ok).toBe(true); // creador aprobado
+    expect((await check(build(call(REGISTRY, "close_chest", [u64(3)])), mainnet)).ok).toBe(true); // close también
+    expect((await check(claimTx(4), mainnet)).ok).toBe(true); // id habilitado
+    expect((await check(claimTx(1), mainnet)).ok).toBe(false); // el #1 de un desconocido
+    expect((await check(build(call(REGISTRY, "close_chest", [u64(1)])), mainnet)).ok).toBe(false);
+  });
+  it("mainnet create_chest: creator must be approved", async () => {
+    const m = (creator: string) => check(build(call(REGISTRY, "create_chest", createArgs({ creator }), [addrCred(creator)])), mainnet);
+    expect((await m(WALLET)).ok).toBe(true);
+    expect((await m(OTHER)).ok).toBe(false);
   });
   it("rejects init and unknown registry functions, and other contracts", async () => {
     for (const f of ["init", "set_admin", "upgrade"]) expect((await check(build(call(REGISTRY, f, [])))).ok).toBe(false);

@@ -5,6 +5,7 @@ import { Client } from "@findloot/chest";
 import { cfg } from "@/lib/cfg";
 import { relayMaxFee, relayerSecretFor } from "@/lib/relay-guard";
 import { readChest } from "@/lib/chain";
+import { isChestAllowed } from "@/lib/chest-allow";
 import { resourceFeeOf } from "@/lib/sim-fee";
 import { decideSponsor, relayerBalance, reserveFee } from "@/lib/relay-limits";
 import { withRpcUrl } from "@/lib/rpc";
@@ -75,19 +76,20 @@ export async function POST(req: NextRequest) {
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
 
-    // Solo cofres que pagan XLM nativo y, en mainnet, solo los habilitados: el relayer no gasta fees en otros.
+    // Solo cofres que pagan XLM nativo y, en mainnet, cofres habilitados (id) o de un creador aprobado (on-chain):
+    // cualquiera puede crear el cofre #1 en el registro público, así que el id solo no alcanza.
     const chestId = Number(body.chestId);
-    if (c.ALLOWED_CHEST_IDS && !c.ALLOWED_CHEST_IDS.includes(chestId)) {
-      return NextResponse.json({ error: "this chest is not enabled" }, { status: 403 });
-    }
-    let chestToken: string;
+    let chest: Awaited<ReturnType<typeof readChest>>;
     try {
-      chestToken = (await readChest(chestId)).token;
+      chest = await readChest(chestId);
     } catch {
       return NextResponse.json({ error: "chest not found" }, { status: 404 });
     }
-    if (chestToken !== c.XLM_SAC) {
+    if (chest.token !== c.XLM_SAC) {
       return NextResponse.json({ error: "this chest does not pay native XLM" }, { status: 403 });
+    }
+    if (!isChestAllowed({ restricted: c.IS_MAINNET, ids: c.ALLOWED_CHEST_IDS, creators: c.CREATOR_ALLOWLIST }, chestId, chest.creator)) {
+      return NextResponse.json({ error: "this chest is not enabled" }, { status: 403 });
     }
 
     const maxFee = relayMaxFee(c, "claim");
@@ -147,14 +149,18 @@ export async function POST(req: NextRequest) {
     const release = c.IS_MAINNET ? reserveFee(c, maxFee) : () => {};
     let sent: Awaited<ReturnType<typeof attempt>>;
     try {
-      sent = await attempt("100");
+      try {
+        sent = await attempt("100");
+      } catch (e) {
+        if (e instanceof FeeCapError || !/TRY_AGAIN/i.test((e as { message?: string })?.message ?? String(e))) throw e;
+        sent = await attempt("10000"); // TRY_AGAIN: sube la inclusión (la fee total sigue bajo el tope)
+      }
     } catch (e) {
       if (e instanceof FeeCapError) {
         console.warn("claim:", e.message);
         return NextResponse.json({ error: "claim fee above the relayer cap" }, { status: 503 });
       }
-      if (!/TRY_AGAIN/i.test((e as { message?: string })?.message ?? String(e))) throw e;
-      sent = await attempt("10000"); // TRY_AGAIN: sube la inclusión (la fee total sigue bajo el tope)
+      throw e;
     } finally {
       release();
     }
