@@ -16,7 +16,7 @@ const TESTNET_VK_FP = "161f9d198dd1bcc1aaaa5cc95566cf528ff582e4c27accddd808346d5
 
 function loadSdk() {
   const bases = [process.env.SDK_DIR && resolve(process.env.SDK_DIR, "package.json"), resolve(root, "app/package.json"),
-    resolve(root, "package.json"), "/Users/paukoh/Chest ZK/app/package.json"].filter(Boolean);
+    resolve(root, "package.json")].filter(Boolean);
   for (const b of bases) { try { if (existsSync(b)) return createRequire(b)("@stellar/stellar-sdk"); } catch {} }
   throw new Error("@stellar/stellar-sdk not found; set SDK_DIR=<dir containing node_modules>");
 }

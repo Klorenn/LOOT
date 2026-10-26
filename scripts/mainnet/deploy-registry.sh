@@ -14,8 +14,6 @@
 #                           (also read from a circuits/**/ceremony manifest field "verifierWasmSha256" if one exists)
 #   WASM_DIR                dir with chestzk_verifier.wasm and chestzk_chest.wasm; else built from contracts/ (needs rustup rustc)
 #   ADMIN                   G... for init(admin, ...). init does admin.require_auth(), so it must be SOURCE's address (default)
-#   SAMPLE_FINGERPRINT      64-hex (32 bytes) answer commitment of the sample chest (required with --execute)
-#   SAMPLE_PRIZE_XLM        default 30        SAMPLE_DEADLINE  unix secs, default 0 (= no deadline)
 #   RELAYER_FLOAT_XLM       default 5         HARD_CAP_XLM     default 80
 #   RPC_URL / HORIZON_URL   defaults https://mainnet.sorobanrpc.com / https://horizon.stellar.org
 #   DRYRUN_ALLOW_TESTNET_VK=1   dry-run ONLY: skip the ceremony/testnet-VK refusals (output is flagged NOT EXECUTABLE)
@@ -40,8 +38,6 @@ PASSPHRASE="$MAINNET_PASSPHRASE"
 RPC_URL="${RPC_URL:-https://mainnet.sorobanrpc.com}"
 HORIZON_URL="${HORIZON_URL:-https://horizon.stellar.org}"
 HARD_CAP_XLM="${HARD_CAP_XLM:-80}"
-SAMPLE_PRIZE_XLM="${SAMPLE_PRIZE_XLM:-30}"
-SAMPLE_DEADLINE="${SAMPLE_DEADLINE:-0}"
 RELAYER_FLOAT_XLM="${RELAYER_FLOAT_XLM:-5}"
 NATIVE_SAC="CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA"
 # VK fingerprint of the single-party (testnet) setup baked into the current contracts/verifier.
@@ -50,7 +46,7 @@ OUT_JSON="deployments/registry-mainnet.json"
 OUT_DIR="${WASM_DIR:-$ROOT/.build-mainnet-registry}"
 
 # Estimates (XLM) for items that cannot be simulated before their prerequisites exist on-chain.
-EST_DEPLOY=0.5; EST_INIT=0.05; EST_CREATE=0.1; EST_CLAIM=0.1
+EST_DEPLOY=0.5; EST_INIT=0.05
 # Budget lines from the plan (for comparison only).
 BUD_VER_UP=18.8; BUD_REG_UP=14.0
 
@@ -157,14 +153,11 @@ else
   echo "  testnet VK fingerprint not present in verifier wasm OK"
 fi
 if [ "$EXECUTE" = 1 ]; then
-  [[ "${SAMPLE_FINGERPRINT:-}" =~ ^[0-9a-fA-F]{64}$ ]] || die "--execute requires SAMPLE_FINGERPRINT (64 hex chars)"
   [ ! -f "$OUT_JSON" ] || die "$OUT_JSON already exists; move it away to redeploy (never overwritten)"
 fi
-SAMPLE_FP_ARG="${SAMPLE_FINGERPRINT:-$(printf '0%.0s' $(seq 64))}"
 
 NET=(--rpc-url "$RPC_URL" --network-passphrase "$PASSPHRASE")
 NETQ="--rpc-url $RPC_URL --network-passphrase '$PASSPHRASE'"
-PRIZE_STROOPS="$(awk -v p="$SAMPLE_PRIZE_XLM" 'BEGIN{printf "%d", p*10000000}')"
 
 # ---------------------------------------------------------------- simulate
 step "simulation vs mainnet (unsigned; simulateTransaction only)"
@@ -183,7 +176,7 @@ FAILED=0
 [ "$FAILED" = 0 ] || die "could not simulate wasm uploads against mainnet (nothing was sent)"
 VER_UP="$(xlm $((VU + INCL)))"; REG_UP="$(xlm $((RU + INCL)))"
 # A WASM already on-chain makes the upload cheap; deploy-tx simulation needs the wasm uploaded first.
-echo "  (deploy / init / create_chest / claim cannot be simulated before the wasm + instance exist: estimates used)"
+echo "  (deploy / init cannot be simulated before the wasm + instance exist: estimates used)"
 
 # ---------------------------------------------------------------- plan table
 step "plan and budget (XLM)"
@@ -193,10 +186,6 @@ ITEMS=(
   "3|upload registry wasm|simulated|$REG_UP|$BUD_REG_UP"
   "4|deploy registry instance|estimate|$EST_DEPLOY|0.5"
   "5|init(admin, verifier)|estimate|$EST_INIT|-"
-  "6|create_chest (sample)|estimate|$EST_CREATE|-"
-  "7|claim sim (fee for one claim)|estimate|$EST_CLAIM|-"
-  "8|sample chest prize (locked, refundable via close_chest)|funds|$SAMPLE_PRIZE_XLM|30"
-  "9|relayer float|funds|$RELAYER_FLOAT_XLM|-"
 )
 TOTAL=0; SPEND=0
 printf '  %-3s %-52s %-9s %10s %8s\n' "#" "item" "basis" "XLM" "budget"
@@ -227,7 +216,6 @@ echo "  \$ stellar contract upload --wasm $REG_WASM --source-account $SOURCE $NE
 echo "  \$ stellar contract deploy --wasm-hash $REG_HASH --source-account $SOURCE $NETQ"
 echo "  \$ stellar contract invoke --id <REGISTRY> --source-account $SOURCE $NETQ -- init --admin $ADMIN --verifier <VERIFIER>"
 echo "  \$ node scripts/mainnet/verify-registry.mjs <tmp json>   # abort unless verifier/admin match"
-echo "  \$ stellar contract invoke --id <REGISTRY> --source-account $SOURCE $NETQ -- create_chest --creator $ADMIN --fingerprint <SAMPLE_FINGERPRINT> --token $TOKEN --prize $PRIZE_STROOPS --max_claims 1 --deadline $SAMPLE_DEADLINE"
 echo
 echo "  NOTE: contracts/chest has a separate init() (no __constructor): deploy and init are TWO txs. Between them anyone can"
 echo "        call init(own_admin, evil_verifier) and own the registry. The script inits immediately and then reads the"
@@ -255,42 +243,33 @@ deploy() { # hash errfile -> contract id
   echo "$id"
 }
 
-step "1/7 upload verifier";  upload verifier "$VER_WASM" "$VER_HASH" "$LOG/1.err"
-step "2/7 deploy verifier";  VERIFIER="$(deploy "$VER_HASH" "$LOG/2.err")"; echo "  verifier: $VERIFIER"
-step "3/7 upload registry";  upload registry "$REG_WASM" "$REG_HASH" "$LOG/3.err"
-step "4/7 deploy registry";  REGISTRY="$(deploy "$REG_HASH" "$LOG/4.err")"; echo "  registry: $REGISTRY"
-step "5/7 init registry (front-run window: do not pause here)"
+step "1/6 upload verifier";  upload verifier "$VER_WASM" "$VER_HASH" "$LOG/1.err"
+step "2/6 deploy verifier";  VERIFIER="$(deploy "$VER_HASH" "$LOG/2.err")"; echo "  verifier: $VERIFIER"
+step "3/6 upload registry";  upload registry "$REG_WASM" "$REG_HASH" "$LOG/3.err"
+step "4/6 deploy registry";  REGISTRY="$(deploy "$REG_HASH" "$LOG/4.err")"; echo "  registry: $REGISTRY"
+step "5/6 init registry (front-run window: do not pause here)"
 stellar contract invoke --id "$REGISTRY" --source-account "$SOURCE" "${NET[@]}" -- init --admin "$ADMIN" --verifier "$VERIFIER" 2> >(tee "$LOG/5.err" >&2) \
   || die "init failed; registry $REGISTRY is UNINITIALISED or taken. Inspect with verify-registry.mjs before retrying; do not use it unverified."
 
-mkjson() { # sample_chest_id(or empty) sample_tx(or empty) -> stdout
+mkjson() { # -> stdout
   jq -n --arg pass "$PASSPHRASE" --arg rpc "$RPC_URL" --arg reg "$REGISTRY" --arg ver "$VERIFIER" --arg tok "$TOKEN" \
-    --arg admin "$ADMIN" --arg vh "$VER_HASH" --arg rh "$REG_HASH" --arg fp "$SAMPLE_FP_ARG" \
-    --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg cid "$1" --arg ctx "$2" \
+    --arg admin "$ADMIN" --arg vh "$VER_HASH" --arg rh "$REG_HASH" \
+    --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --arg t1 "$(txhash "$LOG/1.err")" --arg t2 "$(txhash "$LOG/2.err")" --arg t3 "$(txhash "$LOG/3.err")" \
-    --arg t4 "$(txhash "$LOG/4.err")" --arg t5 "$(txhash "$LOG/5.err")" --arg prize "$PRIZE_STROOPS" '{
+    --arg t4 "$(txhash "$LOG/4.err")" --arg t5 "$(txhash "$LOG/5.err")" '{
       network:"mainnet", passphrase:$pass, rpcUrl:$rpc,
       registry:$reg, verifier:$ver, token:$tok, admin:$admin,
       registryWasmHash:$rh, verifierWasmHash:$vh,
-      sampleChest: (if $cid=="" then null else {id:($cid|tonumber), fingerprint:$fp, prizeStroops:$prize, maxClaims:1} end),
       deployedAt:$at,
-      txs:{verifierUpload:$t1, verifierDeploy:$t2, registryUpload:$t3, registryDeploy:$t4, init:$t5, sampleChest:$ctx}
+      txs:{verifierUpload:$t1, verifierDeploy:$t2, registryUpload:$t3, registryDeploy:$t4, init:$t5}
     }'
 }
-step "6/7 verify on-chain state (admin/verifier must match)"
-mkjson "" "" > "$LOG/pre.json"
+step "6/6 verify on-chain state (admin/verifier must match)"
+mkjson > "$LOG/pre.json"
 node "$HERE/verify-registry.mjs" "$LOG/pre.json" || die "post-init verification FAILED: registry $REGISTRY was possibly front-run. STOP. Do not create chests. Abandon it and redeploy."
 mkdir -p deployments
 [ ! -f "$OUT_JSON" ] || die "$OUT_JSON appeared meanwhile; refusing to overwrite"
-cp "$LOG/pre.json" "$OUT_JSON"; echo "  wrote $OUT_JSON (without sample chest yet)"
-
-step "7/7 create sample chest"
-CHEST_ID="$(stellar contract invoke --id "$REGISTRY" --source-account "$SOURCE" "${NET[@]}" -- create_chest \
-  --creator "$ADMIN" --fingerprint "$SAMPLE_FINGERPRINT" --token "$TOKEN" --prize "$PRIZE_STROOPS" \
-  --max_claims 1 --deadline "$SAMPLE_DEADLINE" 2> >(tee "$LOG/7.err" >&2) | tail -1 | tr -d '"')"
-[[ "$CHEST_ID" =~ ^[0-9]+$ ]] || die "unexpected create_chest output: $CHEST_ID (registry/verifier already recorded in $OUT_JSON)"
-mkjson "$CHEST_ID" "$(txhash "$LOG/7.err")" > "$LOG/final.json"
-cp "$LOG/final.json" "$OUT_JSON"
-echo; echo "wrote $OUT_JSON"; jq . "$OUT_JSON"
+cp "$LOG/pre.json" "$OUT_JSON"; echo "  wrote $OUT_JSON"
+echo; jq . "$OUT_JSON"
 node "$HERE/verify-registry.mjs" "$OUT_JSON" || warn "final verification reported mismatches"
-echo "next: node scripts/mainnet/verify-registry.mjs"
+echo "next: Pau creates the sample chest from /create on the mainnet site (30 claims x 1 XLM, with an expiry: deadline 0 is refused)."

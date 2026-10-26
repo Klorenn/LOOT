@@ -1,105 +1,66 @@
-# Mainnet registry deploy (one sample chest)
+# Mainnet: registry + ceremony verifier
 
-Deploys the **registry** (`contracts/chest`, `ChestZk`) plus the **post-ceremony Groth16 verifier**
-(`contracts/verifier`) and creates ONE sample chest. Script: `scripts/mainnet/deploy-registry.sh`
-(dry-run by default). Read-only checker: `scripts/mainnet/verify-registry.mjs`.
+Mainnet runs on the REGISTRY contract (`contracts/chest`) with the post-ceremony Groth16 verifier. Only the contracts are
+deployed by script; the sample chest is created by Pau from `/create` on the mainnet site (30 claims x 1 XLM, with an expiry).
 
-## Contract facts (read from source)
-
-- Registry has **no `__constructor`**. It has `init(admin, verifier)`, a separate call. `init` only does
-  `admin.require_auth()`, stores `Verifier` and `NextId=1`, and rejects a second call (`AlreadyInit` = #10).
-  `admin` is not stored and there is no getter for the verifier.
-- The token is **not** part of `init`; it is passed per chest in `create_chest(creator, fingerprint, token, prize, max_claims, deadline)`.
-  Mainnet native XLM SAC: `CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA`.
-- `contracts/verifier` currently embeds the **testnet (single-party) VK**, fingerprint
-  `161f9d19...0991c1`. It must be rebuilt from the ceremony export before mainnet.
-
-## Commands
+## Verifier (ceremony)
+`contracts/verifier-mainnet/` is a copy of `circuits/ceremony/release-2026-10-26/verifier` (ceremony VK). It must be built like the
+release, with plain cargo, NOT `stellar contract build` (that changes the wasm bytes):
 
 ```bash
-# 0. Build (rustup toolchain; Homebrew rustc 1.90 shadows rustup 1.99)
-PATH=$HOME/.cargo/bin:$PATH stellar contract build --manifest-path contracts/verifier/Cargo.toml --out-dir $WASM_DIR
-PATH=$HOME/.cargo/bin:$PATH stellar contract build --manifest-path contracts/chest/Cargo.toml    --out-dir $WASM_DIR
-
-# 1. Dry-run (simulates every uploadable tx against https://mainnet.sorobanrpc.com, signs nothing)
-SOURCE=<identity> WASM_DIR=$WASM_DIR \
-VERIFIER_WASM_SHA256=<sha256 of the post-ceremony verifier wasm> \
-  scripts/mainnet/deploy-registry.sh
-#   unfunded SOURCE / bare key: add SIM_SOURCE_ADDRESS=<any funded mainnet G...>
-
-# 2. Execute (spends XLM)
-SOURCE=<identity> WASM_DIR=$WASM_DIR VERIFIER_WASM_SHA256=<...> SAMPLE_FINGERPRINT=<64 hex> \
-  scripts/mainnet/deploy-registry.sh --execute
-
-# 3. Re-check any time (read-only)
-node scripts/mainnet/verify-registry.mjs            # deployments/registry-mainnet.json
+cd contracts/verifier-mainnet && cargo +stable build --release --target wasm32v1-none
+shasum -a 256 target/wasm32v1-none/release/chestzk_verifier.wasm   # 8df17eda8f2f901a9636804e0e173586723420d38af6407974218b53f98905b5
 ```
+`contracts/verifier` is the single-party TESTNET verifier and must never reach mainnet (the script refuses its VK fingerprint).
+Prover assets: mainnet serves `/zk/mainnet/chest_final.zkey` (ceremony); testnet keeps `/zk/chest_final.zkey`.
 
-Gates (the script REFUSES otherwise):
+## Deploy
+```bash
+export PATH=$HOME/.cargo/bin:$PATH
+SOURCE=loot-mn-deployer scripts/mainnet/deploy-registry.sh            # dry-run: builds, simulates uploads, prints the budget
+SOURCE=loot-mn-deployer scripts/mainnet/deploy-registry.sh --execute   # sends (refuses unless every preflight passes)
+node scripts/mainnet/verify-registry.mjs                               # read-only check against deployments/registry-mainnet.json
+```
+Order: upload verifier, deploy verifier, upload registry, deploy registry, `init(admin, verifier)` immediately, read the instance
+back (admin and verifier must match or the script stops), then write `deployments/registry-mainnet.json` (never overwritten).
+`contracts/chest` has a separate `init` (no constructor), so there is a short front-run window; the post-init check catches it
+and the instance is abandoned. Preflight: SOURCE funded, passphrase = PUBLIC, wasm sha256 vs pin, ceremony VK present.
 
-1. RPC passphrase must be `Public Global Stellar Network ; September 2015`; derived native SAC must equal the constant above.
-2. A ceremony hash is mandatory: `VERIFIER_WASM_SHA256` (alias `CEREMONY_EXPORT_HASH`) or a `verifierWasmSha256`
-   field in a ceremony manifest under `circuits/`. It must equal sha256 of the verifier wasm about to be uploaded.
-   At the time of writing no ceremony output exists in the repo (the ceremony branch has tooling only).
-3. The verifier wasm must not embed the testnet VK fingerprint.
-4. `--execute` needs `SOURCE` as a funded identity, `ADMIN == SOURCE` address (init requires admin auth),
-   `SAMPLE_FINGERPRINT`, balance >= total + 2 XLM, estimated total <= 80 XLM, and no existing `deployments/registry-mainnet.json`.
+Fees (simulated 2026-10-26): verifier upload 19.26 XLM, registry upload 15.09 XLM, deploy x2 ~0.5 each and init ~0.05 (estimates,
+not simulable before the wasm exists). About 35.4 XLM of fees; keep the deployer above ~38 XLM. The sample chest prize is funded by
+the creator account (Pau), not the deployer; the relayer float (8 XLM now) is funded separately.
 
-`DRYRUN_ALLOW_TESTNET_VK=1` skips gates 2-3 for dry-run only (never with `--execute`); output is flagged NOT EXECUTABLE.
-
-## Funding (XLM; uploads simulated 2026-10-26 on mainnet, rest estimated)
-
-| # | Item | Budget | Simulated / est. |
-|---|------|-------:|-----------------:|
-| 1 | Verifier wasm upload | 18.8 | 18.79 (sim) |
-| 2 | Verifier instance | 0.5 | 0.5 (est) |
-| 3 | Registry wasm upload | 14.0 | **15.09 (sim, over budget)** |
-| 4 | Registry instance | 0.5 | 0.5 (est) |
-| 5 | init | - | 0.05 (est) |
-| 6 | create_chest | - | 0.1 (est) |
-| 7 | claim (fee for one claim) | - | 0.1 (est; needs a real chest to simulate) |
-| 8 | Sample chest prize (locked, refundable via `close_chest` after deadline) | 30 | 30 |
-| 9 | Relayer float (`RELAYER_FLOAT_XLM`) | - | 5 |
-| | **Total** | cap 80 | **70.13** (35.13 burned, 35 recoverable/working funds) |
-
-Deploy/init/create_chest/claim cannot be simulated before the wasm and instance exist on-chain, so the script
-prints estimates for them. Rent dominates the upload costs (large wasm entries with a long TTL).
-
-## Front-run risk on init (important)
-
-Deploy and init are two transactions. Between them anyone who sees the new contract id can call
-`init(their_admin, malicious_verifier)` and permanently own the registry (a verifier that returns true drains every chest).
-The script calls `init` immediately after deploy, then `verify-registry.mjs` reads the instance storage and requires
-`Verifier == our verifier`. On mismatch it STOPS before any chest is funded. Residual risk is limited to wasted fees
-because nothing is funded until verification passes. Proper fix (contract change, out of scope here): make `init`
-a `__constructor` so deploy+init is atomic.
-
-## Failure / rollback
-
-- Upload hash mismatch: script stops; nothing else was sent. Uploads are idempotent (re-running only costs fees).
-- Deploy ok, init failed or verify failed: abandon that registry id (do not create chests). Redeploy; the wasm is
-  already uploaded so a retry costs ~0.5 XLM. Note the abandoned id in the incident log.
-- Verifier deployed, registry step failed: the verifier instance is reusable; set nothing, re-run is NOT supported
-  (the script deploys a fresh verifier); simply reuse manually via `stellar contract deploy` for the registry and `init`.
-- Sample chest failed after verification: `deployments/registry-mainnet.json` is already written with `sampleChest: null`;
-  create the chest manually with `create_chest` (command printed by the dry-run) and add it to the JSON.
-- Recover prize: `close_chest(chest_id)` by the creator after the deadline (or once exhausted).
-- The script never overwrites `deployments/registry-mainnet.json`; move it away to redeploy.
-- Caveat: the `init`-storage decoding in `verify-registry.mjs` (key `["Verifier"]`) and the second-init `#10` check could only
-  be exercised against a fake deployment before the first real run; confirm they print OK right after the real deploy.
+## Sample chest (created from /create, not by the script)
+30 claims x 1 XLM = 30 XLM locked. `/create` requires an expiry in the future (deadline 0 is refused) and mainnet caps it at
+30 days. The creator gets the unclaimed prize back with `close_chest`, but only AFTER the deadline or once all places are claimed
+(a chest with no deadline would never be refundable).
 
 ## App configuration (one domain, both networks)
-
-findloot.xyz serves testnet and mainnet. Visitors switch with the Testnet/Mainnet button (cookie `loot_net`; testnet by default; `?net=mainnet` in a shared link sets it and redirects to the clean URL). Mainnet is enabled once these server env vars exist (otherwise the switch reads "Mainnet (coming soon)"):
+findloot.xyz serves testnet and mainnet. Visitors switch with the Testnet/Mainnet button (cookie `loot_net`; testnet by default;
+`?net=mainnet|testnet` in a shared link sets it and redirects to the clean URL, share links always carry it).
+**Never set `NEXT_PUBLIC_STELLAR_NETWORK=mainnet` in production**: it only changes the default network for visitors without a cookie.
+Mainnet is enabled once these server env vars exist (otherwise the switch reads "Mainnet (coming soon)"):
 
 ```
 MAINNET_REGISTRY_ID=<deployments/registry-mainnet.json .registry>
-MAINNET_VERIFIER_ID=<post-ceremony verifier>
+MAINNET_VERIFIER_ID=<deployments/registry-mainnet.json .verifier>
 MAINNET_RPC_URL=<mainnet Soroban RPC>      # sent to browsers: use a domain-restricted key
 RELAYER_SECRET_MAINNET=S...                # never falls back to RELAYER_SECRET (testnet)
-MAINNET_SAMPLE_CHEST_ID=1                  # optional
-MAINNET_MAX_PRIZE_PER_PLACE_XLM=1          # optional beta caps (defaults 1 / 30)
+MAINNET_SAMPLE_CHEST_ID=1                  # enabled chest (listed in /explore, claimable through the relayer)
+MAINNET_LISTED_IDS=                        # optional extra enabled ids (csv)
+MAINNET_MAX_PRIZE_PER_PLACE_XLM=1          # beta caps (defaults 1 / 30)
 MAINNET_MAX_TOTAL_PRIZE_XLM=30
 ```
-Mainnet relayer limits: max 60 sponsored passkey registrations (Blob markers under `relay/mainnet/registrations/`, token `LOOT_READ_WRITE_TOKEN`), sponsoring stops below 3 XLM relayer balance (UI notice), final tx fee <= 2 XLM, no fee-bump, strict allowlist (registry create_chest/claim/close_chest, SAC transfer from the signer, passkey wallet deploy 97ce0478…).
-Blob: testnet keys are unchanged (`chests/<id>.json`, `pending/<fp>.json`); mainnet uses `mainnet/chests/…` and `mainnet/pending/…`.
+
+## Mainnet relayer limits
+- Allowlist (`lib/relay-policy.ts`): registry `create_chest` (token = native XLM SAC, prize <= per-claim cap, prize x claims <= total
+  cap, deadline in the future and <= 30 days), `claim` / `close_chest` only for ENABLED chest ids whose on-chain token is the XLM
+  SAC, SAC `transfer` from the authorizing wallet, passkey wallet deploy (wasm 97ce0478…). One op, no source-account auth, no fee-bump.
+- `/api/claim` applies the same chest checks, uses ~100 stroops inclusion (10000 only on TRY_AGAIN) and refuses to sign if
+  simulated resource fee + inclusion exceed the cap.
+- Fee cap of the FINAL tx: 0.3 XLM (`RELAY_MAX_FEE_STROOPS_MAINNET`); wallet deploy 1 XLM (`RELAY_MAX_DEPLOY_FEE_STROOPS_MAINNET`)
+  until its real mainnet cost is measured (the first registration logs `[passkey/send] minResourceFee`; lower the cap then).
+- Max 60 sponsored passkey registrations (Blob markers `relay/mainnet/registrations/`, token `LOOT_READ_WRITE_TOKEN`); sponsoring stops
+  below 3 XLM of effective relayer balance (Horizon, cached 10 s, in-flight fees subtracted); `/api/relayer/status` is `no-store`
+  and reports `sponsoring:false` on errors. Rate limits: mainnet 10/min per IP, 120/min global; testnet 60/min per IP.
+- Blob: testnet keys unchanged (`chests/<id>.json`, `pending/<fp>.json`); mainnet uses `mainnet/chests/…`, `mainnet/pending/…`.

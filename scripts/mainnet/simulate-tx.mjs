@@ -12,7 +12,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
 function loadSdk() {
   const bases = [process.env.SDK_DIR && resolve(process.env.SDK_DIR, "package.json"), resolve(root, "app/package.json"),
-    resolve(root, "package.json"), "/Users/paukoh/Chest ZK/app/package.json"].filter(Boolean);
+    resolve(root, "package.json")].filter(Boolean);
   for (const b of bases) { try { if (existsSync(b)) return createRequire(b)("@stellar/stellar-sdk"); } catch {} }
   throw new Error("@stellar/stellar-sdk not found; set SDK_DIR=<dir containing node_modules>");
 }
