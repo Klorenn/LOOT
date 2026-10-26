@@ -24,6 +24,9 @@ import { QuizForm } from "@/components/quiz-form";
 import type { Quiz } from "@/lib/quiz";
 import { useNet } from "@/components/network-provider";
 import { MAINNET_PASSKEY_NOTE } from "@/lib/passkey-policy";
+import { FreighterGlyph } from "@/components/freighter-glyph";
+import { FreighterUnavailableError, isPhone } from "@/lib/wallets-kit";
+import { Wallet as WalletIcon } from "lucide-react";
 
 type Meta = {
   question: string;
@@ -181,7 +184,7 @@ export function ChestSolve({
     return "open" as const;
   }, [meta, catalog]);
 
-  async function doConnect(method: "passkey" | "wallet" | "demo") {
+  async function doConnect(method: "passkey" | "wallet" | "freighter" | "demo") {
     setBusy(true);
     setConnectErr(null);
     try {
@@ -189,7 +192,9 @@ export function ChestSolve({
     } catch (e) {
       if ((e as { name?: string })?.name === "WalletPickerClosed") return;
       setConnectErr(
-        e instanceof PasskeyUnavailableError
+        e instanceof FreighterUnavailableError && isPhone()
+          ? "Freighter isn't available in this browser. On your phone, open this site inside the Freighter app's browser."
+          : e instanceof PasskeyUnavailableError
           ? "WebAuthn unavailable — connect a Stellar wallet or use a demo wallet."
           : e instanceof Error
             ? e.message
@@ -467,25 +472,37 @@ export function ChestSolve({
                   <p className="text-[15px] leading-[1.5] text-[var(--muted)]">
                     The prize goes to the address you connect.
                   </p>
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="mt-4 flex flex-col gap-3">
                     {!IS_MAINNET && (
                       <button
                         type="button"
                         disabled={busy}
                         onClick={() => void doConnect("passkey")}
-                        className="btn-landing btn-landing-p disabled:opacity-40"
+                        className="btn-landing btn-landing-p w-full disabled:opacity-40"
                       >
                         Continue with passkey
                       </button>
                     )}
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void doConnect("wallet")}
-                      className={`btn-landing ${IS_MAINNET ? "btn-landing-p sm:col-span-2" : "btn-landing-s"} disabled:opacity-40`}
-                    >
-                      Connect a wallet
-                    </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void doConnect("freighter")}
+                        className={`btn-landing ${IS_MAINNET ? "btn-landing-p" : "btn-landing-s"} gap-2 disabled:opacity-40`}
+                      >
+                        <FreighterGlyph />
+                        Freighter
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void doConnect("wallet")}
+                        className="btn-landing btn-landing-s gap-2 disabled:opacity-40"
+                      >
+                        <WalletIcon aria-hidden className="size-[18px]" />
+                        Other wallet
+                      </button>
+                    </div>
                   </div>
                   {!IS_MAINNET && (
                   <button

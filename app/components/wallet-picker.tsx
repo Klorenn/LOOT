@@ -78,7 +78,10 @@ export function WalletPicker({
       (b.id === last ? 1 : 0) - (a.id === last ? 1 : 0) || a.name.localeCompare(b.name);
     // WalletConnect genérico no se lista: en teléfonos se ofrece como "LOBSTR (mobile app)"; el módulo
     // `lobstr` del kit es la extensión de escritorio y en un teléfono nunca se detecta.
-    const all = (wallets ?? []).filter((w) => w.id !== WC_WALLET_ID && !(isPhone() && w.id === "lobstr" && !w.isAvailable));
+    // Freighter no detectado no se esconde en "More wallets": va arriba como fila propia (ver freighterRow).
+    const all = (wallets ?? []).filter(
+      (w) => w.id !== WC_WALLET_ID && !(isPhone() && w.id === "lobstr" && !w.isAvailable) && !(w.id === "freighter" && !w.isAvailable),
+    );
     const detected = all.filter(isDetected).sort(byLast);
     const web = all.filter((w) => WEB_IDS.has(w.id)).sort(byLast);
     const apps = all.filter((w) => MOBILE_IDS.has(w.id) && !isDetected(w) && !WEB_IDS.has(w.id)).sort(byLast);
@@ -211,6 +214,33 @@ export function WalletPicker({
     );
   })();
 
+  // Freighter sin detectar (extensión no instalada o navegador sin ella): siempre visible, con una
+  // salida clara. En el teléfono, Freighter corre en su propio navegador interno.
+  const freighterMissing = (wallets ?? []).find((w) => w.id === "freighter" && !w.isAvailable);
+  const freighterRow = freighterMissing ? (
+    <>
+      <p className={label}>Freighter</p>
+      <ul className="border-y border-[var(--line)]">
+        <li>
+          <a href={freighterMissing.url} target="_blank" rel="noopener noreferrer" className={`${row} min-h-[56px]`}>
+            <Icon w={freighterMissing} />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-medium">Freighter</span>
+              <span className="block text-[13px] text-[var(--muted)]">
+                {isPhone()
+                  ? "Not detected in this browser. Open this site inside the Freighter app's browser."
+                  : "Not detected. Install the extension, then reload this page."}
+              </span>
+            </span>
+            <span className="text-[var(--dim)]" aria-hidden>
+              ↗
+            </span>
+          </a>
+        </li>
+      </ul>
+    </>
+  ) : null;
+
   const passkeyOption = {
     id: "passkey",
     name: "Passkey",
@@ -290,6 +320,8 @@ export function WalletPicker({
 
               </>
             )}
+
+            {freighterRow}
 
             {phoneLobstr}
 
