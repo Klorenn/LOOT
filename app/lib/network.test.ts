@@ -3,7 +3,7 @@ import { configFor, effectiveNet, readNetCookie, type MainnetPublic } from "./ne
 
 const REG = "CBKH5Z25DDQRGMJDXQWUADOND4DUM5CN4CVZOX7M3OFH2HL7KYFONRRV";
 const VER = "CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE";
-const ready: MainnetPublic = { registry: REG, verifier: VER, rpcUrl: "https://rpc.example", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 1 };
+const ready: MainnetPublic = { registry: REG, verifier: VER, rpcUrl: "https://rpc.example", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 1, listedIds: [7] };
 const empty: MainnetPublic = { ...ready, registry: "", verifier: "", rpcUrl: "" };
 
 describe("configFor", () => {
@@ -17,6 +17,8 @@ describe("configFor", () => {
     expect(c.CONTRACTS).toEqual({ chest: REG, verifier: VER, token: c.XLM_SAC });
     expect(c.CAPS).toEqual({ maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30 });
     expect(c.DEMO_CHEST_ID).toBe(0);
+    expect(c.ALLOWED_CHEST_IDS).toEqual([1, 7]);
+    expect(c.LISTED_CHEST_IDS).toEqual([1, 7]);
     expect(c.mainnetReady).toBe(true);
   });
   it("testnet: unchanged ids, friendbot, no caps, demo chest", () => {
@@ -26,6 +28,7 @@ describe("configFor", () => {
     expect(c.NETWORK.friendbotUrl).toBe("https://friendbot.stellar.org");
     expect(c.CAPS.maxTotalPrizeXlm).toBe(Infinity);
     expect(c.LISTED_CHEST_IDS).toEqual([6]);
+    expect(c.ALLOWED_CHEST_IDS).toBeNull();
     expect(c.CONFIG_INCOMPLETE).toBe(false);
   });
   it("incomplete mainnet env is flagged and ids stay empty (never a testnet id)", () => {

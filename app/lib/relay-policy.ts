@@ -1,10 +1,11 @@
-import { Address, FeeBumpTransaction, Transaction, TransactionBuilder, xdr } from "@stellar/stellar-sdk";
+import { Address, FeeBumpTransaction, Transaction, TransactionBuilder, scValToNative, xdr } from "@stellar/stellar-sdk";
 
 /**
  * Política del relayer (/api/passkey/send): el servidor paga la fee, así que SOLO retransmite
  * transacciones que invocan NUESTRO contrato registro. Sin imports locales: se testea con vitest.
  *
- *  - registry: create_chest (autorizado por su creador) | claim | close_chest
+ *  - registry: create_chest (autorizado por su creador; token = XLM SAC; en mainnet con topes de premio y
+ *    plazo) | claim | close_chest (solo cofres cuyo token on-chain es el XLM SAC y, en mainnet, de la lista)
  *  - SAC del XLM: transfer cuyo `from` es la wallet que autoriza la tx (credencial de address)
  *  - deploy de la wallet passkey (CreateContract) con el wasm canónico
  * Una sola operación, sin auth de source-account, sin fee-bump.
@@ -15,6 +16,12 @@ export type RelayPolicy = {
   walletWasmHashHex: string;
   /** Cuenta del relayer: ninguna tx puede usarla como fuente (op o tx). */
   relayerPublicKey?: string;
+  /** Token del cofre leído on-chain (null = el cofre no existe). */
+  chestToken: (id: number) => Promise<string | null>;
+  /** Ids de cofre permitidos (mainnet). null = cualquiera (testnet). */
+  allowedChestIds: readonly number[] | null;
+  /** Solo mainnet: topes de create_chest. Sin esto (testnet) no hay topes de premio ni de plazo. */
+  createLimits?: { maxPrizeStroops: bigint; maxTotalStroops: bigint; maxDeadlineSecs: number; nowSec: number };
 };
 
 export type RelayVerdict =
@@ -48,7 +55,7 @@ export function declaredResourceFee(tx: Transaction): bigint {
   return ext.switch() === 1 ? BigInt(ext.sorobanData().resourceFee().toString()) : BigInt(0);
 }
 
-export function checkRelayable(xdrB64: string, passphrase: string, p: RelayPolicy): RelayVerdict {
+export async function checkRelayable(xdrB64: string, passphrase: string, p: RelayPolicy): Promise<RelayVerdict> {
   let parsed: Transaction | FeeBumpTransaction;
   try {
     parsed = TransactionBuilder.fromXDR(xdrB64, passphrase);
@@ -87,9 +94,40 @@ export function checkRelayable(xdrB64: string, passphrase: string, p: RelayPolic
     if (method === "create_chest") {
       const creator = args[0] ? scAddress(args[0]) : null;
       if (!creator || !authorizers(auth).has(creator)) return no("create_chest must be authorized by its creator");
+      if (args.length !== 6) return no("create_chest: unexpected arguments");
+      let token: string, prize: bigint, claims: number, deadline: bigint;
+      try {
+        token = scAddress(args[2]) ?? "";
+        prize = BigInt(scValToNative(args[3]) as bigint);
+        claims = Number(scValToNative(args[4]));
+        deadline = BigInt(scValToNative(args[5]) as bigint);
+      } catch {
+        return no("create_chest: unreadable arguments");
+      }
+      if (token !== p.xlmSac) return no("create_chest: the prize token must be native XLM");
+      const L = p.createLimits;
+      if (L) {
+        if (prize > L.maxPrizeStroops) return no("create_chest: prize per claim above the beta cap");
+        if (prize * BigInt(claims) > L.maxTotalStroops) return no("create_chest: total prize above the beta cap");
+        if (deadline <= BigInt(L.nowSec)) return no("create_chest: the deadline must be in the future");
+        if (deadline > BigInt(L.nowSec + L.maxDeadlineSecs)) return no("create_chest: deadline too far away");
+      }
       return { ok: true, kind: "create_chest", resourceFee };
     }
-    if (method === "claim" || method === "close_chest") return { ok: true, kind: method, resourceFee };
+    if (method === "claim" || method === "close_chest") {
+      let id: number;
+      try {
+        id = Number(scValToNative(args[0]));
+      } catch {
+        return no(`${method}: unreadable chest id`);
+      }
+      if (!Number.isSafeInteger(id) || id < 1) return no(`${method}: bad chest id`);
+      if (p.allowedChestIds && !p.allowedChestIds.includes(id)) return no(`${method}: chest ${id} is not enabled`);
+      const tk = await p.chestToken(id);
+      if (tk === null) return no(`${method}: chest ${id} not found`);
+      if (tk !== p.xlmSac) return no(`${method}: chest ${id} does not pay native XLM`);
+      return { ok: true, kind: method, resourceFee };
+    }
     return no(`registry.${method} is not relayed`);
   }
 

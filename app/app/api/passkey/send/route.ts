@@ -9,10 +9,13 @@ import {
 import { Api, Server } from "@stellar/stellar-sdk/rpc";
 import { cfg } from "@/lib/cfg";
 import type { NetConfig } from "@/lib/network";
+import type { RelayVerdict } from "@/lib/relay-policy";
+
+type RelayKind = Extract<RelayVerdict, { ok: true }>["kind"];
 import { pickRpcUrl } from "@/lib/rpc";
 import { relayLimit } from "@/lib/rate-limit";
 import { relayMaxFee, relayerSecretFor, vetRelayTx } from "@/lib/relay-guard";
-import { decideSponsor, relayerBalance, reserveRegistration } from "@/lib/relay-limits";
+import { decideSponsor, relayerBalance, reserveFee, reserveRegistration } from "@/lib/relay-limits";
 
 type Body = { xdr: string };
 
@@ -43,6 +46,7 @@ function hasSourceAccountAuth(tx: Transaction): boolean {
  */
 function assembleDeployTx(
   c: NetConfig,
+  kind: RelayKind,
   raw: Transaction,
   sim: Api.SimulateTransactionSuccessResponse,
   kp: Keypair,
@@ -50,7 +54,7 @@ function assembleDeployTx(
   const minRf = BigInt(sim.minResourceFee);
   const needsBump = minRf + BigInt(INCLUSION) > BigInt(UINT32_MAX);
   // Mainnet: sin fee-bump, y la fee de la tx FINAL no puede pasar del tope.
-  if (minRf + BigInt(INCLUSION) > relayMaxFee(c)) throw new Error("fee above the relayer cap; transaction not relayed");
+  if (minRf + BigInt(INCLUSION) > relayMaxFee(c, kind)) throw new Error("fee above the relayer cap; transaction not relayed");
   if (c.IS_MAINNET && needsBump) throw new Error("fee-bump is not allowed on mainnet");
 
   // First build under uint32 so TransactionBuilder accepts the envelope.
@@ -102,6 +106,7 @@ function assembleDeployTx(
  */
 async function submitAsChannel(
   c: NetConfig,
+  kind: RelayKind,
   signedXdr: string,
   secret: string,
 ): Promise<{ hash: string; via: string; pending?: boolean }> {
@@ -147,11 +152,11 @@ async function submitAsChannel(
     }
 
     console.info("[passkey/send] minResourceFee", sim.minResourceFee);
-    if (BigInt(sim.minResourceFee) + BigInt(INCLUSION) > relayMaxFee(c)) {
+    if (BigInt(sim.minResourceFee) + BigInt(INCLUSION) > relayMaxFee(c, kind)) {
       throw new Error("fee above the relayer cap; transaction not relayed");
     }
 
-    const signed = assembleDeployTx(c, built, sim, kp);
+    const signed = assembleDeployTx(c, kind, built, sim, kp);
     const sent = await rpc.sendTransaction(signed);
     if (sent.status === "ERROR") {
       throw new Error(`send ERROR: ${JSON.stringify(sent)}`);
@@ -198,6 +203,7 @@ async function waitForHash(
  */
 export async function POST(req: NextRequest) {
   let slot: Awaited<ReturnType<typeof reserveRegistration>> = null;
+  let release: () => void = () => {};
   const c = await cfg(); // red de la petición (cookie): fija passphrase, contratos, secretos y límites
   try {
     const body = (await req.json()) as Body;
@@ -217,7 +223,7 @@ export async function POST(req: NextRequest) {
     const secret = relayerSecretFor(c);
     const relayerKey = secret ? Keypair.fromSecret(secret).publicKey() : undefined;
     // Solo se retransmite lo que invoca NUESTRO contrato (ver lib/relay-policy.ts).
-    const verdict = vetRelayTx(body.xdr, c, relayerKey);
+    const verdict = await vetRelayTx(body.xdr, c, relayerKey);
     if (!verdict.ok) {
       console.warn("passkey/send rejected:", verdict.reason);
       return NextResponse.json({ error: `not relayed: ${verdict.reason}` }, { status: 403 });
@@ -248,6 +254,9 @@ export async function POST(req: NextRequest) {
       await slot?.release();
       return NextResponse.json({ error: "Set RELAYER_BASE_URL_MAINNET for mainnet Channels" }, { status: 500 });
     }
+
+    // fees en vuelo: el saldo efectivo del relayer las descuenta mientras la tx no se confirma (mainnet)
+    if (c.IS_MAINNET) release = reserveFee(c, relayMaxFee(c, verdict.kind));
 
     if (apiKey) {
       const { PasskeyServer } = await import("passkey-kit/server");
@@ -287,12 +296,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const out = await submitAsChannel(c, body.xdr, secret);
+    const out = await submitAsChannel(c, verdict.kind, body.xdr, secret);
     return NextResponse.json({ ok: true, ...out });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("passkey/send", e);
     await slot?.release();
     return NextResponse.json({ error: message }, { status: 500 });
+  } finally {
+    release();
   }
 }

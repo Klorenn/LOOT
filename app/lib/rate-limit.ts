@@ -26,11 +26,15 @@ export function allow(key: string, limit: number, windowMs: number, now = Date.n
 
 const num = (v: string | undefined, d: number) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
 
-/** Por IP y global para un endpoint que paga fees. Devuelve el motivo si hay que rechazar. */
+/**
+ * Por IP y global para un endpoint que paga fees. Mainnet es estricto (10/min por IP, 120 global);
+ * testnet es amable con demos (60/min por IP: una sala de jueces detrás de una IP no se bloquea).
+ */
 export function relayLimit(req: NextRequest, scope: string, net: string): "ip" | "global" | null {
+  const mainnet = net === "mainnet";
+  const perIp = mainnet ? num(process.env.RELAY_RATE_PER_IP_PER_MIN_MAINNET, 10) : num(process.env.RELAY_RATE_PER_IP_PER_MIN, 60);
+  const global = mainnet ? num(process.env.RELAY_RATE_GLOBAL_PER_MIN_MAINNET, 120) : num(process.env.RELAY_RATE_GLOBAL_PER_MIN, 600);
   scope = `${net}:${scope}`; // contadores separados por red
-  const perIp = num(process.env.RELAY_RATE_PER_IP_PER_MIN, 10);
-  const global = num(process.env.RELAY_RATE_GLOBAL_PER_MIN, 120);
   if (!allow(`${scope}:ip:${clientIp(req)}`, perIp, 60_000)) return "ip";
   if (!allow(`${scope}:global`, global, 60_000)) return "global";
   return null;

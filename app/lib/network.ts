@@ -20,6 +20,8 @@ export type MainnetPublic = {
   maxTotalPrizeXlm: number;
   /** Cofre al que apuntan los enlaces "abrir un cofre" en mainnet. */
   sampleChestId: number;
+  /** Ids extra permitidos en mainnet (MAINNET_LISTED_IDS, csv). */
+  listedIds: number[];
 };
 
 const isContractId = (s: string) => /^C[A-Z2-7]{55}$/.test(s);
@@ -43,6 +45,10 @@ export function mainnetPublicFromEnv(): MainnetPublic {
     maxPrizePerPlaceXlm: num(e.MAINNET_MAX_PRIZE_PER_PLACE_XLM ?? e.NEXT_PUBLIC_MAX_PRIZE_PER_PLACE_XLM, 1),
     maxTotalPrizeXlm: num(e.MAINNET_MAX_TOTAL_PRIZE_XLM ?? e.NEXT_PUBLIC_MAX_TOTAL_PRIZE_XLM, 30),
     sampleChestId: num(e.MAINNET_SAMPLE_CHEST_ID, 1),
+    listedIds: (clean(e.MAINNET_LISTED_IDS) || "")
+      .split(",")
+      .map((x) => Number(x.trim()))
+      .filter((n) => Number.isSafeInteger(n) && n > 0),
   };
 }
 
@@ -68,6 +74,8 @@ export type NetConfig = {
   DEMO_CHEST_ID: number;
   /** Cofre al que apuntan los enlaces "abrir un cofre". */
   SAMPLE_CHEST_ID: number;
+  /** Ids de cofre que mainnet muestra y deja reclamar/cerrar vía relayer. null = sin lista (testnet). */
+  ALLOWED_CHEST_IDS: readonly number[] | null;
   LISTED_CHEST_IDS: readonly number[];
   HIDDEN_CHEST_IDS: readonly number[];
   /** Lo que falta en la config de la red activa (siempre vacío en testnet). */
@@ -118,7 +126,8 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
       CAPS: { maxPrizePerPlaceXlm: mainnet.maxPrizePerPlaceXlm, maxTotalPrizeXlm: mainnet.maxTotalPrizeXlm },
       DEMO_CHEST_ID: 0,
       SAMPLE_CHEST_ID: mainnet.sampleChestId,
-      LISTED_CHEST_IDS: [],
+      ALLOWED_CHEST_IDS: [...new Set([mainnet.sampleChestId, ...mainnet.listedIds])],
+      LISTED_CHEST_IDS: [...new Set([mainnet.sampleChestId, ...mainnet.listedIds])],
       HIDDEN_CHEST_IDS: [],
       CONFIG_ISSUES: issues,
       CONFIG_INCOMPLETE: !mainnetReady,
@@ -152,6 +161,7 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
     CAPS: { maxPrizePerPlaceXlm: Infinity, maxTotalPrizeXlm: Infinity },
     DEMO_CHEST_ID: 6,
     SAMPLE_CHEST_ID: 6,
+    ALLOWED_CHEST_IDS: null,
     LISTED_CHEST_IDS: [6],
     HIDDEN_CHEST_IDS: [9, 10, 11],
     CONFIG_ISSUES: [],
@@ -182,7 +192,7 @@ export function injectMainnet(m: MainnetPublic) {
 export function mainnetPublic(): MainnetPublic {
   if (typeof window === "undefined") return mainnetPublicFromEnv();
   return (
-    injected ?? { registry: "", verifier: "", rpcUrl: "", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 1 }
+    injected ?? { registry: "", verifier: "", rpcUrl: "", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 1, listedIds: [] }
   );
 }
 

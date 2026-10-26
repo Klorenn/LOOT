@@ -110,13 +110,16 @@ export async function toRow(c: OnChainChest): Promise<ChestRowData> {
 
 /** Cofres listados en /explore: LISTED_CHEST_IDS + cofres públicos (listed:true) del almacén de metadatos. */
 export async function listExploreRows(): Promise<ChestRowData[]> {
-  const { LISTED_CHEST_IDS, HIDDEN_CHEST_IDS } = await cfg();
+  const { LISTED_CHEST_IDS, HIDDEN_CHEST_IDS, ALLOWED_CHEST_IDS } = await cfg();
   const all = await readAllChests();
   const publicIds = new Set(
     (await listPublicMetas().catch(() => [])).filter((m) => m.listed === true).map((m) => m.id),
   );
-  const listed = all.filter(
-    (c) => (LISTED_CHEST_IDS.includes(c.id) || publicIds.has(c.id)) && !HIDDEN_CHEST_IDS.includes(c.id),
+  // mainnet: solo los ids habilitados (MAINNET_SAMPLE_CHEST_ID / MAINNET_LISTED_IDS), nunca los públicos del almacén
+  const listed = all.filter((c) =>
+    ALLOWED_CHEST_IDS
+      ? ALLOWED_CHEST_IDS.includes(c.id)
+      : (LISTED_CHEST_IDS.includes(c.id) || publicIds.has(c.id)) && !HIDDEN_CHEST_IDS.includes(c.id),
   );
   return Promise.all(listed.map(toRow));
 }

@@ -78,10 +78,25 @@ export async function reserveRegistration(c: NetConfig): Promise<{ release: () =
 }
 
 const balanceCache = new Map<string, { at: number; value: bigint | null }>();
-/** Saldo XLM del relayer en stroops (caché 60 s). null si no se pudo leer. */
+const BALANCE_TTL_MS = 10_000;
+
+/** Fees reservadas por txs en vuelo (por red): el saldo efectivo las descuenta aunque el RPC aún no las refleje. */
+const inflight = new Map<string, bigint>();
+export function reserveFee(c: NetConfig, stroops: bigint): () => void {
+  inflight.set(c.net, (inflight.get(c.net) ?? BigInt(0)) + stroops);
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    inflight.set(c.net, (inflight.get(c.net) ?? BigInt(0)) - stroops);
+  };
+}
+/** Saldo EFECTIVO del relayer en stroops: leído de Horizon (caché 10 s) menos las fees en vuelo. null si no se pudo leer. */
 export async function relayerBalance(c: NetConfig, publicKey: string): Promise<bigint | null> {
+  const held = inflight.get(c.net) ?? BigInt(0);
+  const eff = (v: bigint | null) => (v === null ? null : v - held);
   const hit = balanceCache.get(c.net);
-  if (hit && Date.now() - hit.at < 60_000) return hit.value;
+  if (hit && Date.now() - hit.at < BALANCE_TTL_MS) return eff(hit.value);
   let value: bigint | null = null;
   try {
     const acc = await new Horizon.Server(c.NETWORK.horizonUrl).loadAccount(publicKey);
@@ -91,7 +106,7 @@ export async function relayerBalance(c: NetConfig, publicKey: string): Promise<b
     value = null;
   }
   balanceCache.set(c.net, { at: Date.now(), value });
-  return value;
+  return eff(value);
 }
 
 export type SponsorStatus = { sponsoring: boolean; reason?: string; notice?: string; registrationsLeft?: number };
