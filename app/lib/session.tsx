@@ -36,7 +36,7 @@ import {
 import { WalletPicker } from "@/components/wallet-picker";
 import { HandlePrompt } from "@/components/handle-prompt";
 import { getHandle, hasSkippedHandle } from "./handle";
-import { isMainnet } from "./client-cfg";
+import { passkeyEnabled } from "./client-cfg";
 import { MAINNET_PASSKEY_SIGNOUT } from "./passkey-policy";
 
 type EnrollOptsStage = EnrollOpts["onStage"];
@@ -220,7 +220,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // mainnet se cierra con un aviso.
   const [signedOutNotice, setSignedOutNotice] = useState(false);
   useEffect(() => {
-    if (!ready || !player || player.kind !== "passkey" || !isMainnet()) return;
+    if (!ready || !player || player.kind !== "passkey" || passkeyEnabled()) return;
     clearPlayer();
     setPlayer(null);
     setSignedOutNotice(true);

@@ -24,7 +24,7 @@ import { FreighterGlyph } from "@/components/freighter-glyph";
 
 type Mode = "login" | "register";
 type View = "idle" | "wait" | "deploy" | "done" | "fail" | "none";
-type FailKind = "passkey" | "relayer" | "unsupported" | "wallet";
+type FailKind = "passkey" | "relayer" | "unsupported" | "wallet" | "unavailable";
 
 const STEPS = [
   "Passkey created · this device",
@@ -43,7 +43,7 @@ const isCancel = (e: unknown) =>
   /NotAllowedError|AbortError|timed out or was not allowed|cancel/i.test(errMsg(e));
 
 export function AuthForm({ mode }: { mode: Mode }) {
-  const { SAMPLE_CHEST_ID, NETWORK_LC, IS_MAINNET } = useNet();
+  const { SAMPLE_CHEST_ID, NETWORK_LC, IS_MAINNET, PASSKEY_ENABLED } = useNet();
   const router = useRouter();
   const params = useSearchParams();
   const rawNext = params.get("next");
@@ -88,6 +88,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
       setView("fail");
     } else if (e instanceof NoPasskeyAccountError) {
       setView("none");
+    } else if (/signup is temporarily unavailable/i.test(errMsg(e))) {
+      setFailKind("unavailable");
+      setView("fail");
     } else if (/passkey submit|relay|HTTP 5|fetch failed|network/i.test(errMsg(e))) {
       setFailKind("relayer");
       setView("fail");
@@ -272,6 +275,13 @@ export function AuthForm({ mode }: { mode: Mode }) {
             body="This browser or device has no WebAuthn support. Connect a Stellar wallet instead."
           />
         )}
+        {view === "fail" && failKind === "unavailable" && (
+          <InlineAlert
+            tone="gold"
+            title="Passkey signup unavailable"
+            body="Passkey signup is temporarily unavailable on Mainnet — connect a Stellar wallet. Nothing was charged."
+          />
+        )}
         {view === "fail" && failKind === "relayer" && (
           <InlineAlert
             tone="gold"
@@ -395,8 +405,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
         {/* Formulario (idle / fail) */}
         {(view === "idle" || view === "fail") && (
           <>
-            {!isLogin && !IS_MAINNET && <SponsorNotice />}
-            {!isLogin && !IS_MAINNET && (
+            {!isLogin && PASSKEY_ENABLED && <SponsorNotice />}
+            {!isLogin && PASSKEY_ENABLED && (
               <div>
                 <label htmlFor="handle" className="block text-[14px] font-medium">
                   Choose a name
@@ -430,7 +440,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
               </div>
             )}
 
-            {IS_MAINNET ? (
+            {!PASSKEY_ENABLED ? (
               <p role="note" className="rounded-[10px] border border-[var(--line)] bg-[var(--s1)] p-4 text-[14px] leading-[1.55] text-[var(--muted)]" style={{ borderLeftWidth: 3, borderLeftColor: "var(--gold)" }}>
                 {MAINNET_PASSKEY_NOTE}
               </p>

@@ -26,6 +26,8 @@ export type MainnetPublic = {
   listedIds: number[];
   /** Creadores aprobados (MAINNET_CREATOR_ALLOWLIST): sus cofres se listan y el relayer los patrocina. */
   creatorAllowlist: string[];
+  /** MAINNET_PASSKEY_ENABLED=true: cuentas passkey en mainnet (apagado por defecto). */
+  passkeyEnabled: boolean;
 };
 
 const isContractId = (s: string) => /^C[A-Z2-7]{55}$/.test(s);
@@ -51,6 +53,7 @@ export function mainnetPublicFromEnv(): MainnetPublic {
     // sin MAINNET_SAMPLE_CHEST_ID no hay cofre de muestra (0): ya no se asume el #1, que cualquiera puede crear
     sampleChestId: num(e.MAINNET_SAMPLE_CHEST_ID, 0),
     creatorAllowlist: parseCreatorAllowlist(e.MAINNET_CREATOR_ALLOWLIST),
+    passkeyEnabled: clean(e.MAINNET_PASSKEY_ENABLED).toLowerCase() === "true",
     listedIds: (clean(e.MAINNET_LISTED_IDS) || "")
       .split(",")
       .map((x) => Number(x.trim()))
@@ -91,6 +94,8 @@ export type NetConfig = {
   CONFIG_INCOMPLETE: boolean;
   /** ¿Mainnet está configurada? (habilita el selector). */
   mainnetReady: boolean;
+  /** ¿Se admiten cuentas passkey en la red activa? Testnet siempre; mainnet solo con MAINNET_PASSKEY_ENABLED=true. */
+  PASSKEY_ENABLED: boolean;
 };
 
 const uniq = (xs: string[]) => [...new Set(xs.filter(Boolean))];
@@ -141,6 +146,7 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
       CONFIG_ISSUES: issues,
       CONFIG_INCOMPLETE: !mainnetReady,
       mainnetReady,
+      PASSKEY_ENABLED: mainnet.passkeyEnabled,
     };
   }
 
@@ -177,6 +183,7 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
     CONFIG_ISSUES: [],
     CONFIG_INCOMPLETE: false,
     mainnetReady,
+    PASSKEY_ENABLED: true,
   };
 }
 
@@ -209,7 +216,7 @@ export function injectMainnet(m: MainnetPublic) {
 export function mainnetPublic(): MainnetPublic {
   if (typeof window === "undefined") return mainnetPublicFromEnv();
   return (
-    injected ?? { registry: "", verifier: "", rpcUrl: "", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 0, listedIds: [], creatorAllowlist: [] }
+    injected ?? { registry: "", verifier: "", rpcUrl: "", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 0, listedIds: [], creatorAllowlist: [], passkeyEnabled: false }
   );
 }
 

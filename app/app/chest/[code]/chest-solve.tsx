@@ -92,7 +92,7 @@ export function ChestSolve({
   chestId: number;
   badge?: React.ReactNode;
 }) {
-  const { IS_MAINNET, SAMPLE_CHEST_ID } = useNet();
+  const { IS_MAINNET, SAMPLE_CHEST_ID, PASSKEY_ENABLED } = useNet();
   const router = useRouter();
   const catalog = getChest(chestId, IS_MAINNET);
 
@@ -473,7 +473,7 @@ export function ChestSolve({
                     The prize goes to the address you connect.
                   </p>
                   <div className="mt-4 flex flex-col gap-3">
-                    {!IS_MAINNET && (
+                    {PASSKEY_ENABLED && (
                       <button
                         type="button"
                         disabled={busy}
@@ -488,7 +488,7 @@ export function ChestSolve({
                         type="button"
                         disabled={busy}
                         onClick={() => void doConnect("freighter")}
-                        className={`btn-landing ${IS_MAINNET ? "btn-landing-p" : "btn-landing-s"} gap-2 disabled:opacity-40`}
+                        className={`btn-landing ${PASSKEY_ENABLED ? "btn-landing-s" : "btn-landing-p"} gap-2 disabled:opacity-40`}
                       >
                         <FreighterGlyph />
                         Freighter
@@ -515,7 +515,7 @@ export function ChestSolve({
                   </button>
                   )}
                   <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
-                    {IS_MAINNET ? MAINNET_PASSKEY_NOTE : `No gas needed: the relayer pays. You need 0 ${PRIZE.code}.`}
+                    {!PASSKEY_ENABLED ? MAINNET_PASSKEY_NOTE : `No gas needed: the relayer pays. You need 0 ${PRIZE.code}.`}
                   </p>
                 </>
               )}

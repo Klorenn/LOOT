@@ -1,7 +1,7 @@
 "use client";
 
 import { hash, Keypair } from "@stellar/stellar-sdk";
-import { NETWORK, isMainnet } from "./client-cfg";
+import { NETWORK, isMainnet, passkeyEnabled } from "./client-cfg";
 import { getPasskeyKit } from "./passkey-client";
 import { MAINNET_PASSKEY_NOTE } from "./passkey-policy";
 
@@ -114,9 +114,9 @@ export class PasskeyMainnetError extends Error {
   }
 }
 
-/** Mainnet: sin passkeys (ver lib/passkey-policy.ts). Todas las vías de passkey pasan por acá. */
+/** Sin passkeys donde no estén habilitadas (mainnet salvo MAINNET_PASSKEY_ENABLED=true; ver lib/passkey-policy.ts). */
 export function assertPasskeyAllowed(): void {
-  if (isMainnet()) throw new PasskeyMainnetError();
+  if (!passkeyEnabled()) throw new PasskeyMainnetError();
 }
 
 export async function submitPasskeyTx(xdr: string): Promise<string> {

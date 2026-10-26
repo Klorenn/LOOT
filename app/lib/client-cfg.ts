@@ -17,3 +17,4 @@ const lazy = <K extends keyof NetConfig>(key: K): NetConfig[K] =>
 export const NETWORK = lazy("NETWORK");
 export const CONTRACTS = lazy("CONTRACTS");
 export const isMainnet = () => clientCfg().IS_MAINNET;
+export const passkeyEnabled = () => clientCfg().PASSKEY_ENABLED;

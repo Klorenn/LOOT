@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { configFor, effectiveNet, readNetCookie, withNet, type MainnetPublic } from "./network";
+import { configFor, effectiveNet, mainnetPublicFromEnv, readNetCookie, withNet, type MainnetPublic } from "./network";
 
 const REG = "CBKH5Z25DDQRGMJDXQWUADOND4DUM5CN4CVZOX7M3OFH2HL7KYFONRRV";
 const VER = "CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE";
-const ready: MainnetPublic = { registry: REG, verifier: VER, rpcUrl: "https://rpc.example", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 1, listedIds: [7], creatorAllowlist: [REG.replace("CBKH","GBKH")] };
+const ready: MainnetPublic = { registry: REG, verifier: VER, rpcUrl: "https://rpc.example", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 1, listedIds: [7], creatorAllowlist: [REG.replace("CBKH","GBKH")], passkeyEnabled: false };
 const empty: MainnetPublic = { ...ready, registry: "", verifier: "", rpcUrl: "" };
 
 describe("configFor", () => {
@@ -72,5 +72,28 @@ describe("withNet", () => {
     expect(withNet("https://www.findloot.xyz/chest/abc#s=123", "mainnet")).toBe("https://www.findloot.xyz/chest/abc?net=mainnet#s=123");
     expect(withNet("https://x.io/a?b=1", "testnet")).toBe("https://x.io/a?b=1&net=testnet");
     expect(withNet("https://x.io/a?net=mainnet", "testnet")).toBe("https://x.io/a?net=testnet");
+  });
+});
+
+describe("mainnet passkey gate (MAINNET_PASSKEY_ENABLED)", () => {
+  it("is on for testnet, off for mainnet by default, on for mainnet only with the flag", () => {
+    expect(configFor("testnet", ready).PASSKEY_ENABLED).toBe(true);
+    expect(configFor("mainnet", ready).PASSKEY_ENABLED).toBe(false);
+    expect(configFor("mainnet", { ...ready, passkeyEnabled: true }).PASSKEY_ENABLED).toBe(true);
+    expect(configFor("testnet", { ...ready, passkeyEnabled: true }).PASSKEY_ENABLED).toBe(true);
+  });
+  it("reads the env flag strictly (only the string 'true' enables it)", () => {
+    const old = process.env.MAINNET_PASSKEY_ENABLED;
+    try {
+      delete process.env.MAINNET_PASSKEY_ENABLED;
+      expect(mainnetPublicFromEnv().passkeyEnabled).toBe(false);
+      process.env.MAINNET_PASSKEY_ENABLED = "1";
+      expect(mainnetPublicFromEnv().passkeyEnabled).toBe(false);
+      process.env.MAINNET_PASSKEY_ENABLED = "TRUE";
+      expect(mainnetPublicFromEnv().passkeyEnabled).toBe(true);
+    } finally {
+      if (old === undefined) delete process.env.MAINNET_PASSKEY_ENABLED;
+      else process.env.MAINNET_PASSKEY_ENABLED = old;
+    }
   });
 });

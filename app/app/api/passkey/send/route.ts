@@ -22,6 +22,16 @@ type Body = { xdr: string };
 const UINT32_MAX = 0xffffffff;
 const INCLUSION = 100;
 
+/** La simulación pasó del tope de fee del relayer (p. ej. el deploy de wallet en mainnet antes de extender el TTL del wasm). */
+class RelayCapError extends Error {
+  constructor(public minResourceFee: string) {
+    super("fee above the relayer cap; transaction not relayed");
+  }
+}
+
+export const SIGNUP_UNAVAILABLE =
+  "Passkey signup is temporarily unavailable on Mainnet — connect a Stellar wallet";
+
 /** Auth entry uses the envelope source account (needs fee-bump, not rebuild). */
 function hasSourceAccountAuth(tx: Transaction): boolean {
   for (const op of tx.operations) {
@@ -54,7 +64,7 @@ function assembleDeployTx(
   const minRf = BigInt(sim.minResourceFee);
   const needsBump = minRf + BigInt(INCLUSION) > BigInt(UINT32_MAX);
   // Mainnet: sin fee-bump, y la fee de la tx FINAL no puede pasar del tope.
-  if (minRf + BigInt(INCLUSION) > relayMaxFee(c, kind)) throw new Error("fee above the relayer cap; transaction not relayed");
+  if (minRf + BigInt(INCLUSION) > relayMaxFee(c, kind)) throw new RelayCapError(sim.minResourceFee);
   if (c.IS_MAINNET && needsBump) throw new Error("fee-bump is not allowed on mainnet");
 
   // First build under uint32 so TransactionBuilder accepts the envelope.
@@ -153,7 +163,8 @@ async function submitAsChannel(
 
     console.info("[passkey/send] minResourceFee", sim.minResourceFee);
     if (BigInt(sim.minResourceFee) + BigInt(INCLUSION) > relayMaxFee(c, kind)) {
-      throw new Error("fee above the relayer cap; transaction not relayed");
+      console.warn(`[passkey/send] ${kind} on ${c.NETWORK_LC}: minResourceFee ${sim.minResourceFee} above cap ${relayMaxFee(c, kind)}`);
+      throw new RelayCapError(sim.minResourceFee);
     }
 
     const signed = assembleDeployTx(c, kind, built, sim, kp);
@@ -204,10 +215,11 @@ async function waitForHash(
 export async function POST(req: NextRequest) {
   let slot: Awaited<ReturnType<typeof reserveRegistration>> = null;
   let release: () => void = () => {};
+  let relayKind: RelayKind | undefined;
   const c = await cfg(); // red de la petición (cookie): fija passphrase, contratos, secretos y límites
-  // Mainnet: nada firmado con passkey se retransmite (el deploy de un smart wallet simula a ~49.4 XLM
-  // de costo de recursos, muy por encima de lo que el relayer paga). Testnet no cambia.
-  if (c.IS_MAINNET) {
+  // Mainnet: apagado salvo MAINNET_PASSKEY_ENABLED=true (el deploy de un smart wallet simulaba a ~49.4 XLM
+  // de costo de recursos hasta extender el TTL del wasm). Testnet no cambia.
+  if (c.IS_MAINNET && !c.PASSKEY_ENABLED) {
     return NextResponse.json(
       { error: "Passkey accounts are testnet-only for now. Connect a Stellar wallet on Mainnet.", code: "passkey_testnet_only" },
       { status: 403 },
@@ -237,6 +249,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `not relayed: ${verdict.reason}` }, { status: 403 });
     }
 
+    relayKind = verdict.kind;
     // Mainnet: saldo mínimo del relayer y tope de registros de wallet (ver lib/relay-limits.ts).
     const deploy = verdict.kind === "wallet_deploy";
     if (c.IS_MAINNET) {
@@ -307,9 +320,16 @@ export async function POST(req: NextRequest) {
     const out = await submitAsChannel(c, verdict.kind, body.xdr, secret);
     return NextResponse.json({ ok: true, ...out });
   } catch (e) {
+    await slot?.release(); // el cupo de registro se devuelve si el deploy no llegó a enviarse
+    if (e instanceof RelayCapError) {
+      console.warn("passkey/send: over the fee cap, minResourceFee", e.minResourceFee);
+      // mensaje claro (no un error de fee crudo) para el alta con passkey en mainnet
+      if (relayKind === "wallet_deploy" && c.IS_MAINNET)
+        return NextResponse.json({ error: SIGNUP_UNAVAILABLE, code: "passkey_signup_unavailable" }, { status: 503 });
+      return NextResponse.json({ error: "Transaction not relayed: fee above the relayer cap", code: "fee_cap" }, { status: 503 });
+    }
     const message = e instanceof Error ? e.message : String(e);
     console.error("passkey/send", e);
-    await slot?.release();
     return NextResponse.json({ error: message }, { status: 500 });
   } finally {
     release();

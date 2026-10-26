@@ -36,7 +36,7 @@ export function WalletPicker({
   onClose: () => void;
   onSelect: (id: string) => Promise<void>;
 }) {
-  const { NETWORK_LABEL, NETWORK_LC, IS_MAINNET } = useNet();
+  const { NETWORK_LABEL, NETWORK_LC, IS_MAINNET, PASSKEY_ENABLED } = useNet();
   const [wallets, setWallets] = useState<WalletOption[] | null>(null);
   const [listErr, setListErr] = useState(false);
   const [view, setView] = useState<View>({ kind: "list" });
@@ -313,7 +313,7 @@ export function WalletPicker({
               Pick how you sign. Nothing is signed until you claim or send.
             </p>
 
-            {IS_MAINNET ? (
+            {!PASSKEY_ENABLED ? (
               <p className="mx-5 mb-3 rounded-[10px] border border-[var(--line)] bg-[var(--bg)] p-3 text-[13px] leading-[1.5] text-[var(--muted)]" role="note">
                 {MAINNET_PASSKEY_NOTE}
               </p>
