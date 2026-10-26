@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useId, useRef, useState } from "react";
 import { useNet } from "@/components/network-provider";
 import { switchNetwork, type Net } from "@/lib/network";
 
@@ -21,44 +22,74 @@ export function NetworkBadge({ className = "" }: { className?: string }) {
 }
 
 /**
- * ÚNICO control de red de la app: botón segmentado "Testnet | Mainnet" (dos <button> reales dentro de un grupo
- * con borde de 1px, radio 10, h-9). Activo = relleno (Mainnet dorado con texto oscuro, Testnet verde); inactivo =
- * transparente con texto atenuado. Mainnet queda deshabilitada ("soon") hasta que esté configurada.
+ * ÚNICO control de red de la app: un botón pequeño con el nombre de la red actual y ▾ ("Mainnet ▾" en dorado,
+ * "Testnet ▾" en verde) que abre un menú con SOLO el nombre de la otra red; elegirla cambia la red y recarga la ruta.
+ * Teclado: Enter/Espacio/↓ abren, ↑/↓ mueven, Esc cierra y devuelve el foco; clic fuera cierra. Sin sombras (s1, borde 1px, radio 10).
+ * `up` abre el menú hacia arriba (footer); `inline` lo pinta en el flujo (dentro de menús con overflow oculto).
  */
-export function NetworkSegmented({ className = "", info = true }: { className?: string; info?: boolean }) {
-  const { IS_MAINNET, mainnetReady } = useNet();
-  const seg = (net: Net, label: string) => {
-    const active = (net === "mainnet") === IS_MAINNET;
-    const soon = net === "mainnet" && !mainnetReady;
-    const on = net === "mainnet" ? "bg-[var(--gold)] text-[#14110a]" : "bg-[var(--ok)] text-[#04170d]";
-    return (
-      <button
-        key={net}
-        type="button"
-        aria-pressed={active}
-        disabled={soon}
-        title={soon ? "Mainnet is not live yet" : active ? `${label} is active` : `Switch to ${label}`}
-        onClick={() => !active && switchNetwork(net)}
-        className={`h-full px-3.5 font-mono text-[13px] font-semibold outline-none transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--proof)] ${
-          active ? on : "bg-transparent text-[var(--muted)] hover:text-[var(--text)]"
-        } disabled:cursor-not-allowed disabled:opacity-50`}
-      >
-        {soon ? `${label} · soon` : label}
-      </button>
-    );
+export function NetworkSelect({
+  className = "",
+  info = true,
+  up = false,
+  inline = false,
+}: {
+  className?: string;
+  info?: boolean;
+  up?: boolean;
+  inline?: boolean;
+}) {
+  const { IS_MAINNET, NETWORK_LABEL, mainnetReady } = useNet();
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLSpanElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const item = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  const other: Net = IS_MAINNET ? "testnet" : "mainnet";
+  const otherLabel = other === "mainnet" ? "Mainnet" : "Testnet";
+  const soon = other === "mainnet" && !mainnetReady;
+  const color = IS_MAINNET ? "var(--gold)" : "var(--ok)";
+
+  useEffect(() => {
+    if (!open) return;
+    item.current?.focus();
+    const onDown = (e: MouseEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const close = (refocus: boolean) => {
+    setOpen(false);
+    if (refocus) trigger.current?.focus();
   };
+
   return (
-    <span className={`inline-flex items-center gap-2 ${className}`}>
-      <span
-        role="group"
-        aria-label="Network"
-        data-network-toggle
-        data-network={IS_MAINNET ? "mainnet" : "testnet"}
-        className="inline-flex h-9 items-stretch overflow-hidden rounded-[10px] border border-[var(--line)]"
+    <span ref={root} className={`relative inline-flex items-center gap-2 ${className}`} data-network-select data-network={IS_MAINNET ? "mainnet" : "testnet"}>
+      <button
+        ref={trigger}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        aria-label={`Network: ${NETWORK_LABEL}. Change network`}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            setOpen(true);
+          }
+          if (e.key === "Escape") close(false);
+        }}
+        className="inline-flex h-9 items-center gap-2 rounded-[10px] border border-[var(--line)] bg-transparent px-3 font-mono text-[13px] font-semibold outline-none hover:bg-[var(--s1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--proof)]"
+        style={{ color }}
       >
-        {seg("testnet", "Testnet")}
-        {seg("mainnet", "Mainnet")}
-      </span>
+        {NETWORK_LABEL}
+        <span aria-hidden className="text-[10px] opacity-80">
+          ▾
+        </span>
+      </button>
       {info && (
         <Link
           href="/network"
@@ -69,19 +100,53 @@ export function NetworkSegmented({ className = "", info = true }: { className?: 
           ⓘ
         </Link>
       )}
+      {open && (
+        <div
+          id={menuId}
+          role="menu"
+          aria-label="Network"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              close(true);
+            }
+            if (e.key === "Tab") setOpen(false);
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault(); // un solo ítem: el foco se queda en él
+              item.current?.focus();
+            }
+          }}
+          className={`z-50 min-w-[120px] overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--s1)] ${
+            inline ? "mt-2 w-full" : `absolute left-0 ${up ? "bottom-[calc(100%+6px)]" : "top-[calc(100%+6px)]"}`
+          }`}
+        >
+          <button
+            ref={item}
+            type="button"
+            role="menuitem"
+            disabled={soon}
+            title={soon ? "Mainnet is not live yet" : undefined}
+            onClick={() => switchNetwork(other)}
+            className="block w-full px-3 py-2 text-left font-mono text-[13px] text-[var(--muted)] outline-none hover:bg-[var(--s2)] hover:text-[var(--text)] focus-visible:bg-[var(--s2)] focus-visible:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {otherLabel}
+          </button>
+        </div>
+      )}
     </span>
   );
 }
 
-/** Mismo control en el pie de página. */
-export const NetworkSwitch = NetworkSegmented;
+/** Mismo control en el pie de página (el menú abre hacia arriba). */
+export function NetworkSwitch() {
+  return <NetworkSelect up />;
+}
 
-/** Fila del menú de cuenta: el mismo control segmentado. */
+/** Fila del menú de cuenta: el mismo control, con el menú en el flujo (el desplegable de cuenta recorta lo que sobresale). */
 export function NetworkMenuItem() {
   return (
     <div role="none" className="border-b border-[var(--line)] px-4 py-3">
-      <p className="mb-2 font-mono text-[11px] tracking-[0.08em] text-[var(--dim)] uppercase">Network</p>
-      <NetworkSegmented info={false} />
+      <NetworkSelect info={false} inline />
     </div>
   );
 }

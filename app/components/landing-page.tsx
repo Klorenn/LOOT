@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { initLandingMotion } from "@/lib/landing-motion";
-import { NetworkSegmented } from "@/components/network-switch";
+import { NetworkSelect } from "@/components/network-switch";
 import { BrandMark, LogoChest } from "@/components/logo-chest";
 import { CellsBackground } from "@/components/cells-background";
 import { SiteFooter } from "@/components/site-footer";
@@ -101,7 +101,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
             </div>
             <div className="flex items-center gap-2">
               <span className="hidden md:inline-flex">
-                <NetworkSegmented />
+                <NetworkSelect />
               </span>
               {ready && address ? (
                 <Link
@@ -126,7 +126,7 @@ export function LandingPage({ kuyfiBadge }: { kuyfiBadge?: React.ReactNode }) {
         </nav>
         {/* móvil: selector de red bajo la barra */}
         <div className="absolute top-[calc(var(--network-strip-h)+5rem)] right-0 left-0 z-40 flex justify-center md:hidden">
-          <NetworkSegmented />
+          <NetworkSelect />
         </div>
 
         <main id="main">

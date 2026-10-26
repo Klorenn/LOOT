@@ -7,7 +7,7 @@ import { BrandMark } from "@/components/logo-chest";
 import { AccountMenu } from "@/components/account-menu";
 import { useSession } from "@/lib/session";
 import { useNet } from "@/components/network-provider";
-import { NetworkSegmented } from "@/components/network-switch";
+import { NetworkSelect } from "@/components/network-switch";
 
 const ALL_LINKS = [
   { href: "/explore", label: "Explore" },
@@ -77,7 +77,7 @@ export function AppNav() {
             </button>
           </span>
           <span className="hidden md:inline-flex">
-            <NetworkSegmented />
+            <NetworkSelect />
           </span>
           {!ready ? (
             <span
@@ -110,7 +110,7 @@ export function AppNav() {
       </div>
       {/* móvil: el selector de red va arriba, siempre a la vista */}
       <div className="flex justify-center border-t border-[var(--line)] py-2 md:hidden">
-        <NetworkSegmented />
+        <NetworkSelect />
       </div>
       {menu && (
         <ul
