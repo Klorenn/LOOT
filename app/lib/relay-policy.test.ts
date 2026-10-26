@@ -52,6 +52,18 @@ const addrCred = (addr: string) =>
     ),
     rootInvocation: root(),
   });
+const addrCredV2 = (addr: string) =>
+  new xdr.SorobanAuthorizationEntry({
+    credentials: xdr.SorobanCredentials.sorobanCredentialsAddressV2(
+      new xdr.SorobanAddressCredentials({
+        address: new Address(addr).toScAddress(),
+        nonce: xdr.Int64.fromString("1"),
+        signatureExpirationLedger: 100,
+        signature: xdr.ScVal.scvVoid(),
+      }),
+    ),
+    rootInvocation: root(),
+  });
 const srcCred = () =>
   new xdr.SorobanAuthorizationEntry({
     credentials: xdr.SorobanCredentials.sorobanCredentialsSourceAccount(),
@@ -84,6 +96,12 @@ describe("relay policy", () => {
     expect((await ok({ creator: OTHER })).ok).toBe(false);
     expect((await ok({ token: OTHER })).ok).toBe(false); // testnet too: no relayer burn on junk tokens
     expect((await check(build(call(REGISTRY, "create_chest", [addr(WALLET)], [addrCred(WALLET)])))).ok).toBe(false);
+  });
+  it("create_chest: accepts address-bound (V2) credentials as passkey-kit 0.19 signs them", async () => {
+    const v2 = (creator: string, signer = creator) =>
+      check(build(call(REGISTRY, "create_chest", createArgs({ creator }), [addrCredV2(signer)])));
+    expect((await v2(WALLET)).ok).toBe(true);
+    expect((await v2(WALLET, PAU)).ok).toBe(false); // V2 signed by someone else still rejected
   });
   it("mainnet create_chest: prize, total and deadline caps", async () => {
     const m = (o = {}) => check(build(call(REGISTRY, "create_chest", createArgs(o), [addrCred(WALLET)])), mainnet);

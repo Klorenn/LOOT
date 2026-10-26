@@ -44,9 +44,16 @@ function authorizers(auth: xdr.SorobanAuthorizationEntry[]): Set<string> {
   const out = new Set<string>();
   for (const e of auth) {
     const c = e.credentials();
-    if (c.switch().name === "sorobanCredentialsAddress") {
-      out.add(Address.fromScAddress(c.address().address()).toString());
-    }
+    // passkey-kit 0.19 firma con credenciales address-bound (CAP-0071): V2 y with-delegates, además de la V1.
+    const ac =
+      c.switch().name === "sorobanCredentialsAddress"
+        ? c.address()
+        : c.switch().name === "sorobanCredentialsAddressV2"
+          ? c.addressV2()
+          : c.switch().name === "sorobanCredentialsAddressWithDelegates"
+            ? c.addressWithDelegates().addressCredentials()
+            : null;
+    if (ac) out.add(Address.fromScAddress(ac.address()).toString());
   }
   return out;
 }
