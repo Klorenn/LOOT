@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { InlineAlert } from "@/components/inline-alert";
 import { IconSmartAccountKit as PasskeyGlyph } from "@/components/stack-logos";
-import { listWallets, WrongNetworkError, type WalletOption } from "@/lib/wallets-kit";
+import { isPhone, listWallets, WC_PROJECT_ID, WC_WALLET_ID, wcEnabled, WrongNetworkError, type WalletOption } from "@/lib/wallets-kit";
+import { MAINNET_PASSKEY_NOTE } from "@/lib/passkey-policy";
 import { useNet } from "@/components/network-provider";
 
 /** Wallets web: no hay nada que instalar (xBull también corre como PWA). */
@@ -35,7 +36,7 @@ export function WalletPicker({
   onClose: () => void;
   onSelect: (id: string) => Promise<void>;
 }) {
-  const { NETWORK_LABEL, NETWORK_LC } = useNet();
+  const { NETWORK_LABEL, NETWORK_LC, IS_MAINNET } = useNet();
   const [wallets, setWallets] = useState<WalletOption[] | null>(null);
   const [listErr, setListErr] = useState(false);
   const [view, setView] = useState<View>({ kind: "list" });
@@ -75,7 +76,9 @@ export function WalletPicker({
   const groups = useMemo(() => {
     const byLast = (a: WalletOption, b: WalletOption) =>
       (b.id === last ? 1 : 0) - (a.id === last ? 1 : 0) || a.name.localeCompare(b.name);
-    const all = wallets ?? [];
+    // WalletConnect genérico no se lista: en teléfonos se ofrece como "LOBSTR (mobile app)"; el módulo
+    // `lobstr` del kit es la extensión de escritorio y en un teléfono nunca se detecta.
+    const all = (wallets ?? []).filter((w) => w.id !== WC_WALLET_ID && !(isPhone() && w.id === "lobstr" && !w.isAvailable));
     const detected = all.filter(isDetected).sort(byLast);
     const web = all.filter((w) => WEB_IDS.has(w.id)).sort(byLast);
     const apps = all.filter((w) => MOBILE_IDS.has(w.id) && !isDetected(w) && !WEB_IDS.has(w.id)).sort(byLast);
@@ -89,7 +92,9 @@ export function WalletPicker({
   // isPlatformWrapper: la wallet que nos abrió se autoselecciona
   useEffect(() => {
     if (!open || !wallets || view.kind !== "list") return;
-    const w = wallets.find((x) => x.isPlatformWrapper && x.isAvailable);
+    // la wallet que nos abrió (isPlatformWrapper del kit, o el navegador interno de LOBSTR) se autoselecciona
+    const inLobstr = /lobstr/i.test(navigator.userAgent);
+    const w = wallets.find((x) => x.isPlatformWrapper && x.isAvailable) ?? (inLobstr ? wallets.find((x) => x.id === "lobstr" && x.isAvailable) : undefined);
     if (w) void choose(w);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, wallets]);
@@ -177,6 +182,35 @@ export function WalletPicker({
     </li>
   );
 
+  // LOBSTR en un teléfono: por WalletConnect si hay projectId; si no, instrucciones (no una página de
+  // instalación para una wallet que la persona ya tiene).
+  const phoneLobstr = (() => {
+    if (!isPhone() || !IS_MAINNET) return null;
+    if (wcEnabled()) {
+      const wc = (wallets ?? []).find((w) => w.id === WC_WALLET_ID);
+      if (!wc) return null;
+      const opt: WalletOption = { ...wc, id: WC_WALLET_ID, name: "LOBSTR (mobile app)", icon: "https://stellar.creit.tech/wallet-icons/lobstr.png" };
+      return (
+        <>
+          <p className={label}>Mobile app</p>
+          <ul className="border-y border-[var(--line)]">
+            <Row w={opt} status="WalletConnect" />
+          </ul>
+        </>
+      );
+    }
+    if (WC_PROJECT_ID) return null;
+    return (
+      <>
+        <p className={label}>LOBSTR (mobile app)</p>
+        <div className="mx-5 mb-3 rounded-[10px] border border-[var(--line)] bg-[var(--bg)] p-3 text-[13px] leading-[1.5] text-[var(--muted)]" role="note">
+          Using LOBSTR on your phone? Open this site inside the LOBSTR app&apos;s browser, then connect from there. We can&apos;t
+          detect the app from a regular mobile browser.
+        </div>
+      </>
+    );
+  })();
+
   const passkeyOption = {
     id: "passkey",
     name: "Passkey",
@@ -231,6 +265,12 @@ export function WalletPicker({
               Pick how you sign. Nothing is signed until you claim or send.
             </p>
 
+            {IS_MAINNET ? (
+              <p className="mx-5 mb-3 rounded-[10px] border border-[var(--line)] bg-[var(--bg)] p-3 text-[13px] leading-[1.5] text-[var(--muted)]" role="note">
+                {MAINNET_PASSKEY_NOTE}
+              </p>
+            ) : (
+              <>
             <p className={label}>Recommended</p>
             <ul className="border-y border-[var(--line)]">
               <li>
@@ -247,6 +287,11 @@ export function WalletPicker({
                 </button>
               </li>
             </ul>
+
+              </>
+            )}
+
+            {phoneLobstr}
 
             {listErr && (
               <p className="px-5 py-6 text-[14px] text-[var(--muted)]">

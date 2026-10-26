@@ -19,6 +19,7 @@ import {
   type EnrollOpts,
 } from "@/lib/wallet";
 import { useNet } from "@/components/network-provider";
+import { MAINNET_PASSKEY_NOTE } from "@/lib/passkey-policy";
 
 type Mode = "login" | "register";
 type View = "idle" | "wait" | "deploy" | "done" | "fail" | "none";
@@ -393,8 +394,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
         {/* Formulario (idle / fail) */}
         {(view === "idle" || view === "fail") && (
           <>
-            {!isLogin && <SponsorNotice />}
-            {!isLogin && (
+            {!isLogin && !IS_MAINNET && <SponsorNotice />}
+            {!isLogin && !IS_MAINNET && (
               <div>
                 <label htmlFor="handle" className="block text-[14px] font-medium">
                   Choose a name
@@ -428,6 +429,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
               </div>
             )}
 
+            {IS_MAINNET ? (
+              <p role="note" className="rounded-[10px] border border-[var(--line)] bg-[var(--s1)] p-4 text-[14px] leading-[1.55] text-[var(--muted)]" style={{ borderLeftWidth: 3, borderLeftColor: "var(--gold)" }}>
+                {MAINNET_PASSKEY_NOTE}
+              </p>
+            ) : (
+              <>
             <button
               type="button"
               disabled={busy || (!isLogin && !handleValid)}
@@ -447,6 +454,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
               or
               <span className="h-px flex-1 bg-[var(--line)]" />
             </div>
+
+              </>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <button

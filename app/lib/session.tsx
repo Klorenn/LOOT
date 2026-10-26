@@ -33,6 +33,8 @@ import {
 import { WalletPicker } from "@/components/wallet-picker";
 import { HandlePrompt } from "@/components/handle-prompt";
 import { getHandle, hasSkippedHandle } from "./handle";
+import { isMainnet } from "./client-cfg";
+import { MAINNET_PASSKEY_SIGNOUT } from "./passkey-policy";
 
 type EnrollOptsStage = EnrollOpts["onStage"];
 
@@ -199,6 +201,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setPlayer(null);
   }, []);
 
+  // Mainnet no admite cuentas passkey (ver lib/passkey-policy.ts): una sesión passkey guardada en
+  // mainnet se cierra con un aviso.
+  const [signedOutNotice, setSignedOutNotice] = useState(false);
+  useEffect(() => {
+    if (!ready || !player || player.kind !== "passkey" || !isMainnet()) return;
+    clearPlayer();
+    setPlayer(null);
+    setSignedOutNotice(true);
+  }, [ready, player]);
+
   const value = useMemo<SessionValue>(
     () => ({
       ready,
@@ -216,6 +228,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       {children}
       <WalletPicker open={pickerOpen} onClose={closePicker} onSelect={pickWallet} />
       <HandlePrompt address={promptFor} onClose={() => setPromptFor(null)} />
+      {signedOutNotice && (
+        <div
+          role="status"
+          className="fixed inset-x-4 bottom-4 z-[320] mx-auto flex max-w-[480px] items-start gap-3 rounded-[12px] border border-[var(--line)] bg-[var(--s1)] p-4 text-[14px] leading-[1.5] text-[var(--muted)] shadow-lg"
+          style={{ borderLeftWidth: 3, borderLeftColor: "var(--gold)" }}
+        >
+          <p className="flex-1">{MAINNET_PASSKEY_SIGNOUT}</p>
+          <button type="button" onClick={() => setSignedOutNotice(false)} className="font-mono text-[12px] text-[var(--text)] underline underline-offset-2">
+            Dismiss
+          </button>
+        </div>
+      )}
     </Ctx.Provider>
   );
 }

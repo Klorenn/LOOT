@@ -7,6 +7,23 @@
  */
 import { NETWORK, isMainnet } from "./client-cfg";
 
+/**
+ * LOBSTR en el móvil: el módulo `lobstr` del kit es la EXTENSIÓN de navegador (usa
+ * @lobstrco/signer-extension-api), así que en un teléfono siempre aparece como "no instalado" aunque la
+ * app esté. La app móvil se conecta por WalletConnect (módulo `wallet-connect` del kit, que necesita un
+ * projectId de Reown/WalletConnect). Sin NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID esa opción no existe.
+ */
+export const WC_PROJECT_ID = (process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "").trim();
+export const WC_WALLET_ID = "wallet_connect";
+/** Id de LOBSTR en el directorio de WalletConnect/Reown (el mismo que el kit usa como destacado). */
+const LOBSTR_WC_WALLET = "76a3d548a08cf402f5c7d021f24fd2881d767084b387a5325df88bc3d4b6f21b";
+
+export const isPhone = () =>
+  typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+/** WalletConnect solo se ofrece en teléfonos y en mainnet (la app de LOBSTR no opera en testnet). */
+export const wcEnabled = () => !!WC_PROJECT_ID && isMainnet() && isPhone();
+
 type Kit = typeof import("@creit.tech/stellar-wallets-kit/sdk").StellarWalletsKit;
 
 let loading: Promise<Kit> | null = null;
@@ -42,6 +59,26 @@ function loadKit(): Promise<Kit> {
         import("@creit.tech/stellar-wallets-kit/modules/onekey"),
         import("@creit.tech/stellar-wallets-kit/modules/bitget"),
       ]);
+      const wcModules: unknown[] = [];
+      if (wcEnabled()) {
+        const { WalletConnectModule, WalletConnectTargetChain } = await import(
+          "@creit.tech/stellar-wallets-kit/modules/wallet-connect"
+        );
+        wcModules.push(
+          new WalletConnectModule({
+            projectId: WC_PROJECT_ID,
+            metadata: {
+              name: "Loot",
+              description: "Puzzle chests with prizes only the rightful solver can claim.",
+              url: window.location.origin,
+              icons: [`${window.location.origin}/icon.svg`],
+            },
+            allowedChains: [WalletConnectTargetChain.PUBLIC],
+            // el modal de Reown solo ofrece LOBSTR: deep link directo desde el teléfono
+            appKitOptions: { includeWalletIds: [LOBSTR_WC_WALLET], featuredWalletIds: [LOBSTR_WC_WALLET] } as never,
+          }),
+        );
+      }
       StellarWalletsKit.init({
         modules: [
           new freighter.FreighterModule(),
@@ -54,6 +91,7 @@ function loadKit(): Promise<Kit> {
           new scopuly.ScopulyModule(),
           new onekey.OneKeyModule(),
           new bitget.BitgetModule(),
+          ...(wcModules as never[]),
         ],
         network: isMainnet() ? Networks.PUBLIC : Networks.TESTNET,
         // Tema Loot para el modal del kit (contraste AA: foreground/strong 15:1, secondary 7:1,
@@ -188,6 +226,9 @@ export async function connectFreighter(): Promise<{ address: string; walletId: s
  * silencio (extensión bloqueada, sin permiso, etc.).
  */
 export async function restoreGWallet(walletId: string): Promise<string | null> {
+  // WalletConnect no tiene "consulta en silencio": getAddress abriría el modal de conexión. La sesión
+  // de WalletConnect se restaura sola al firmar.
+  if (walletId === WC_WALLET_ID) return null;
   try {
     const kit = await loadKit();
     kit.setWallet(walletId);

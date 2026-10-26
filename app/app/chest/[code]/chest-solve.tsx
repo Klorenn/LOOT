@@ -23,6 +23,7 @@ import { PasskeyUnavailableError } from "@/lib/wallet";
 import { QuizForm } from "@/components/quiz-form";
 import type { Quiz } from "@/lib/quiz";
 import { useNet } from "@/components/network-provider";
+import { MAINNET_PASSKEY_NOTE } from "@/lib/passkey-policy";
 
 type Meta = {
   question: string;
@@ -467,23 +468,26 @@ export function ChestSolve({
                     The prize goes to the address you connect.
                   </p>
                   <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void doConnect("passkey")}
-                      className="btn-landing btn-landing-p disabled:opacity-40"
-                    >
-                      Continue with passkey
-                    </button>
+                    {!IS_MAINNET && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void doConnect("passkey")}
+                        className="btn-landing btn-landing-p disabled:opacity-40"
+                      >
+                        Continue with passkey
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => void doConnect("wallet")}
-                      className="btn-landing btn-landing-s disabled:opacity-40"
+                      className={`btn-landing ${IS_MAINNET ? "btn-landing-p sm:col-span-2" : "btn-landing-s"} disabled:opacity-40`}
                     >
                       Connect a wallet
                     </button>
                   </div>
+                  {!IS_MAINNET && (
                   <button
                     type="button"
                     disabled={busy}
@@ -492,8 +496,9 @@ export function ChestSolve({
                   >
                     or use a throwaway demo wallet
                   </button>
+                  )}
                   <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
-                    No gas needed: the relayer pays. You need 0 {PRIZE.code}.
+                    {IS_MAINNET ? MAINNET_PASSKEY_NOTE : `No gas needed: the relayer pays. You need 0 ${PRIZE.code}.`}
                   </p>
                 </>
               )}

@@ -3,6 +3,7 @@
 import { hash, Keypair } from "@stellar/stellar-sdk";
 import { NETWORK, isMainnet } from "./client-cfg";
 import { getPasskeyKit } from "./passkey-client";
+import { MAINNET_PASSKEY_NOTE } from "./passkey-policy";
 
 const STORAGE_KEY = "chestzk.player";
 /** Claves de storage por red: testnet conserva las de siempre; mainnet usa un prefijo propio, así una
@@ -106,7 +107,20 @@ function secretFromBytes(label: string): string {
   return BigInt("0x" + arr.toString("hex")).toString();
 }
 
+export class PasskeyMainnetError extends Error {
+  constructor() {
+    super(MAINNET_PASSKEY_NOTE);
+    this.name = "PasskeyMainnetError";
+  }
+}
+
+/** Mainnet: sin passkeys (ver lib/passkey-policy.ts). Todas las vías de passkey pasan por acá. */
+export function assertPasskeyAllowed(): void {
+  if (isMainnet()) throw new PasskeyMainnetError();
+}
+
 export async function submitPasskeyTx(xdr: string): Promise<string> {
+  assertPasskeyAllowed();
   const res = await fetch("/api/passkey/send", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -141,6 +155,7 @@ export class NoPasskeyAccountError extends Error {
 }
 
 export async function enrollWithPasskey(opts: EnrollOpts = {}): Promise<Player> {
+  assertPasskeyAllowed();
   if (typeof window === "undefined" || !window.PublicKeyCredential) {
     throw new PasskeyUnavailableError();
   }
@@ -269,6 +284,7 @@ async function enrollSmartWallet(opts: EnrollOpts = {}): Promise<Player> {
  * pide biometría; sin él, el navegador deja elegir entre sus passkeys.
  */
 export async function reconnectPasskey(): Promise<Player> {
+  assertPasskeyAllowed();
   if (typeof window === "undefined" || !window.PublicKeyCredential) {
     throw new PasskeyUnavailableError();
   }

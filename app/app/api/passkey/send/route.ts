@@ -205,6 +205,14 @@ export async function POST(req: NextRequest) {
   let slot: Awaited<ReturnType<typeof reserveRegistration>> = null;
   let release: () => void = () => {};
   const c = await cfg(); // red de la petición (cookie): fija passphrase, contratos, secretos y límites
+  // Mainnet: nada firmado con passkey se retransmite (el deploy de un smart wallet simula a ~49.4 XLM
+  // de costo de recursos, muy por encima de lo que el relayer paga). Testnet no cambia.
+  if (c.IS_MAINNET) {
+    return NextResponse.json(
+      { error: "Passkey accounts are testnet-only for now. Connect a Stellar wallet on Mainnet.", code: "passkey_testnet_only" },
+      { status: 403 },
+    );
+  }
   try {
     const body = (await req.json()) as Body;
     if (!body?.xdr) {
