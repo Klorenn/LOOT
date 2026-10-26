@@ -13,7 +13,7 @@ import { answerToField, normalizeAnswer, randomSalt } from "@/lib/answer";
 import { poseidon2, fieldToHex } from "@/lib/zk";
 import { chestPath } from "@/lib/chest-code";
 import { useSession } from "@/lib/session";
-import { stroopsToXlm } from "@/lib/config";
+import { stroopsToXlm, xlmToStroops } from "@/lib/config";
 import { balanceInfo, parseXlmAmount, SendError } from "@/lib/send";
 import { confirmMeta, createChestOnChain, estimateCreateFee, reserveMeta } from "@/lib/create-chest";
 import { capError, capHint, clampClaims, perClaimError } from "@/lib/caps";
