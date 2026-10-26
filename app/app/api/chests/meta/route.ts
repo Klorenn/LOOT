@@ -8,6 +8,8 @@ import {
   type PendingMeta,
 } from "@/lib/chest-store";
 import { readChest } from "@/lib/chain";
+import { cfg } from "@/lib/cfg";
+import { canConfirm, canReserve, parseCreatorAllowlist, type MetaGate } from "@/lib/meta-gate";
 import { QUIZ_LIMITS, parseQuiz, quizServerGuessable, type Quiz } from "@/lib/quiz";
 
 /**
@@ -88,10 +90,19 @@ export async function POST(req: NextRequest) {
   const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!b || typeof b !== "object") return NextResponse.json({ error: "bad request" }, { status: 400 });
 
+  const c = await cfg();
+  const gate: MetaGate = {
+    mainnet: c.IS_MAINNET,
+    creatorAllowlist: parseCreatorAllowlist(process.env.MAINNET_CREATOR_ALLOWLIST),
+    allowedChestIds: c.ALLOWED_CHEST_IDS,
+  };
+
   try {
     if (b.action === "reserve") {
       const p = parseReserve(b);
       if (typeof p === "string") return NextResponse.json({ error: p }, { status: 400 });
+      if (!canReserve(gate, p.creator))
+        return NextResponse.json({ error: "chest creation on mainnet is limited to approved creators during the beta" }, { status: 403 });
       const r = await reserveChestMeta(p);
       if (r === "exists") {
         // reintento legítimo del mismo creador: idempotente; otro creador: conflicto
@@ -120,6 +131,8 @@ export async function POST(req: NextRequest) {
       }
       if (chest.fingerprintHex !== fp || chest.creator !== pending.creator)
         return NextResponse.json({ error: "chest does not match the reservation" }, { status: 403 });
+      if (!canConfirm(gate, pending.creator, id))
+        return NextResponse.json({ error: "this chest is not enabled on mainnet" }, { status: 403 });
 
       const { reservedAt: _r, ...rest } = pending;
       void _r;

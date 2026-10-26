@@ -30,6 +30,23 @@ Fees (simulated 2026-10-26): verifier upload 19.26 XLM, registry upload 15.09 XL
 not simulable before the wasm exists). About 35.4 XLM of fees; keep the deployer above ~38 XLM. The sample chest prize is funded by
 the creator account (Pau), not the deployer; the relayer float (8 XLM now) is funded separately.
 
+## Deployed (2026-10-26, by the team lead from a pinned worktree)
+Record: `deployments/registry-mainnet.json`. `verify-registry.mjs` all OK (init by our admin, a second init rejected, ceremony VK).
+
+| Item | Id / tx |
+|---|---|
+| Verifier (ceremony, wasm 8df17eda…) | `CALYISOENO2N4575DWF2K2PHB5UAEHCWI5ZJCZXYNHC4OXYHJWVBGZKY` |
+| Registry | `CCMMITTW22KQHEYLZUFXDSWF3JJC36A2KIYQU6T2C6YGDAFXMEIQ64QP` |
+| Token (native XLM SAC) | `CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA` |
+| Verifier upload tx | `2e8ffc74c2101bf696e15fe29a22afb82fd7b377ed5f4d108834a71f6e065434` |
+| Verifier deploy tx | `b9d8730cf0427a65834f1036490c89a114fb6c79ce68eaa7925513de581114a6` |
+| Registry upload tx | `60ec5c4515e8aaca528f6998d79252531b4f180fcf89d6555e4ae35b2e1d08fc` |
+| Registry deploy tx | `efa584ab7fa43fa5aea20fb1f45ecd71515a56a9faa3bbbcafad0536cf55beba` |
+| init tx | `24a48a856de1a53d6df808ce022f3403a9faccd28af32bc918d6eadea6d7cab8` |
+
+Real cost: 29.93 XLM (below the 35.4 simulated). **Mainnet needs `STELLAR_INCLUSION_FEE` >= 200** (the CLI default of 100 timed out).
+No chest was created by the script.
+
 ## Sample chest (created from /create, not by the script)
 30 claims x 1 XLM = 30 XLM locked. `/create` requires an expiry in the future (deadline 0 is refused) and mainnet caps it at
 30 days. The creator gets the unclaimed prize back with `close_chest`, but only AFTER the deadline or once all places are claimed
@@ -48,6 +65,7 @@ MAINNET_RPC_URL=<mainnet Soroban RPC>      # sent to browsers: use a domain-rest
 RELAYER_SECRET_MAINNET=S...                # never falls back to RELAYER_SECRET (testnet)
 MAINNET_SAMPLE_CHEST_ID=1                  # enabled chest (listed in /explore, claimable through the relayer)
 MAINNET_LISTED_IDS=                        # optional extra enabled ids (csv)
+MAINNET_CREATOR_ALLOWLIST=G...,G...        # who may store chest metadata on mainnet (reserve) — add the creator wallet(s)
 MAINNET_MAX_PRIZE_PER_PLACE_XLM=1          # beta caps (defaults 1 / 30)
 MAINNET_MAX_TOTAL_PRIZE_XLM=30
 ```
@@ -64,3 +82,8 @@ MAINNET_MAX_TOTAL_PRIZE_XLM=30
   below 3 XLM of effective relayer balance (Horizon, cached 10 s, in-flight fees subtracted); `/api/relayer/status` is `no-store`
   and reports `sponsoring:false` on errors. Rate limits: mainnet 10/min per IP, 120/min global; testnet 60/min per IP.
 - Blob: testnet keys unchanged (`chests/<id>.json`, `pending/<fp>.json`); mainnet uses `mainnet/chests/…`, `mainnet/pending/…`.
+
+## Mainnet metadata (`/api/chests/meta`)
+On mainnet `reserve` is accepted only when the declared creator is in `MAINNET_CREATOR_ALLOWLIST`; `confirm` additionally needs the
+on-chain creator to equal the declared one (always) and either the chest id to be enabled or the creator to be allowlisted.
+With an empty allowlist nobody can create a chest from /create on mainnet: set it before Pau creates the sample chest.

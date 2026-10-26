@@ -1,0 +1,19 @@
+{
+  "network": "mainnet",
+  "passphrase": "Public Global Stellar Network ; September 2015",
+  "rpcUrl": "https://mainnet.sorobanrpc.com",
+  "registry": "CCMMITTW22KQHEYLZUFXDSWF3JJC36A2KIYQU6T2C6YGDAFXMEIQ64QP",
+  "verifier": "CALYISOENO2N4575DWF2K2PHB5UAEHCWI5ZJCZXYNHC4OXYHJWVBGZKY",
+  "token": "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+  "admin": "GBLCVZXOJR36M5YC2EX2JU5XDPKA5PVUOJFRMPXPOIRXIQS3NDSB3SP6",
+  "registryWasmHash": "ddf6ce56a88681e821eeb1d7ae410687b89996a93ff7f1c266fe74a0b631b967",
+  "verifierWasmHash": "8df17eda8f2f901a9636804e0e173586723420d38af6407974218b53f98905b5",
+  "deployedAt": "2026-10-26T01:20:05Z",
+  "txs": {
+    "verifierUpload": "",
+    "verifierDeploy": "",
+    "registryUpload": "",
+    "registryDeploy": "",
+    "init": ""
+  }
+}
