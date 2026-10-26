@@ -239,7 +239,7 @@ export function ClaimedClient({ code, label }: { code: string; label: string }) 
               check · recipient sealed in π
             </p>
             <p className="mt-1 text-[var(--ok)]">
-              VERIFIED nullifier stored · {prizeLabel || "prize"} → {prover}
+              VERIFIED nullifier stored · {amountDisplay.replace(/^\+/, "")} → {prover}
             </p>
           </div>
         </div>
