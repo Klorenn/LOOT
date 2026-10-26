@@ -1,0 +1,218 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "kyf-20261026T013803Z-e2a777bc",
+  "generatedAt": "2026-10-26T01:38:03.003Z",
+  "tool": {
+    "name": "kuyfi",
+    "version": "0.1.0"
+  },
+  "target": {
+    "contractId": "CBUPONATL6LLUAAMUHXTHX5CDN3VJRL3GAPZYMXG53CGJGQ6VS3GC2CR",
+    "network": "testnet",
+    "rpcUrl": "https://soroban-testnet.stellar.org",
+    "bytecodeSize": 9317
+  },
+  "scan": {
+    "totalFunctions": 5,
+    "functions": [
+      {
+        "name": "init",
+        "parameters": [
+          {
+            "name": "admin",
+            "type": "Address"
+          },
+          {
+            "name": "verifier",
+            "type": "Address"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "claim",
+        "parameters": [
+          {
+            "name": "chest_id",
+            "type": "U64"
+          },
+          {
+            "name": "recipient",
+            "type": "Address"
+          },
+          {
+            "name": "nullifier",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "proof",
+            "type": "Proof"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "get_chest",
+        "parameters": [
+          {
+            "name": "chest_id",
+            "type": "U64"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "close_chest",
+        "parameters": [
+          {
+            "name": "chest_id",
+            "type": "U64"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "create_chest",
+        "parameters": [
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          },
+          {
+            "name": "prize",
+            "type": "I128"
+          },
+          {
+            "name": "max_claims",
+            "type": "U32"
+          },
+          {
+            "name": "deadline",
+            "type": "U64"
+          }
+        ],
+        "hasReturn": true
+      }
+    ],
+    "udts": [
+      {
+        "kind": "struct",
+        "name": "Chest",
+        "fields": [
+          {
+            "name": "claims",
+            "type": "U32"
+          },
+          {
+            "name": "closed",
+            "type": "Bool"
+          },
+          {
+            "name": "creator",
+            "type": "Address"
+          },
+          {
+            "name": "deadline",
+            "type": "U64"
+          },
+          {
+            "name": "fingerprint",
+            "type": "BytesN<32>"
+          },
+          {
+            "name": "max_claims",
+            "type": "U32"
+          },
+          {
+            "name": "prize",
+            "type": "I128"
+          },
+          {
+            "name": "token",
+            "type": "Address"
+          }
+        ]
+      },
+      {
+        "kind": "struct",
+        "name": "Proof",
+        "fields": [
+          {
+            "name": "a",
+            "type": "BytesN<64>"
+          },
+          {
+            "name": "b",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "c",
+            "type": "BytesN<64>"
+          }
+        ]
+      },
+      {
+        "kind": "union",
+        "name": "DataKey",
+        "cases": [
+          {
+            "name": "Verifier",
+            "valueTypes": []
+          },
+          {
+            "name": "NextId",
+            "valueTypes": []
+          },
+          {
+            "name": "Chest",
+            "valueTypes": [
+              "U64"
+            ]
+          },
+          {
+            "name": "Nullifier",
+            "valueTypes": [
+              "BytesN<32>"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "execution": {
+    "vectorsExecuted": 48,
+    "broadcastTransactions": 1,
+    "transactionsWithHash": 1,
+    "verificationTransactions": [
+      {
+        "functionName": "get_chest",
+        "vectorName": "chest_id::ONE",
+        "broadcasted": true,
+        "hash": "08c5f96ed5c108267cdf45cc3fa4f04a5d1556e2e2588079ae47c8a8c8722fa8",
+        "ledger": 5391017,
+        "explorerUrl": "https://stellar.expert/explorer/testnet/tx/08c5f96ed5c108267cdf45cc3fa4f04a5d1556e2e2588079ae47c8a8c8722fa8"
+      }
+    ]
+  },
+  "summary": {
+    "totalFindings": 0,
+    "bySeverity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "info": 0,
+      "preconditionFail": 0
+    },
+    "findingsBySignal": {}
+  },
+  "findings": []
+}

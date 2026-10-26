@@ -1,0 +1,62 @@
+{
+  "contractId": "CCMMITTW22KQHEYLZUFXDSWF3JJC36A2KIYQU6T2C6YGDAFXMEIQ64QP",
+  "rpcUrl": "https://mainnet.sorobanrpc.com",
+  "bytecodeSize": 9317,
+  "mode": "osint",
+  "generatedAt": "2026-10-26T01:35:39.023Z",
+  "functions": [
+    {
+      "name": "init",
+      "parameters": [
+        "admin:Address",
+        "verifier:Address"
+      ]
+    },
+    {
+      "name": "claim",
+      "parameters": [
+        "chest_id:U64",
+        "recipient:Address",
+        "nullifier:BytesN<32>",
+        "proof:Proof"
+      ]
+    },
+    {
+      "name": "get_chest",
+      "parameters": [
+        "chest_id:U64"
+      ]
+    },
+    {
+      "name": "close_chest",
+      "parameters": [
+        "chest_id:U64"
+      ]
+    },
+    {
+      "name": "create_chest",
+      "parameters": [
+        "creator:Address",
+        "fingerprint:BytesN<32>",
+        "token:Address",
+        "prize:I128",
+        "max_claims:U32",
+        "deadline:U64"
+      ]
+    }
+  ],
+  "udts": [
+    {
+      "kind": "struct",
+      "name": "Chest"
+    },
+    {
+      "kind": "struct",
+      "name": "Proof"
+    },
+    {
+      "kind": "union",
+      "name": "DataKey"
+    }
+  ]
+}

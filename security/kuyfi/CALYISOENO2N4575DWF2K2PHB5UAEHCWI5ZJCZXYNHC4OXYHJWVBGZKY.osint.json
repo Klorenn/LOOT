@@ -1,0 +1,30 @@
+{
+  "contractId": "CALYISOENO2N4575DWF2K2PHB5UAEHCWI5ZJCZXYNHC4OXYHJWVBGZKY",
+  "rpcUrl": "https://mainnet.sorobanrpc.com",
+  "bytecodeSize": 18638,
+  "mode": "osint",
+  "generatedAt": "2026-10-26T01:35:41.565Z",
+  "functions": [
+    {
+      "name": "verify_proof",
+      "parameters": [
+        "proof:Proof",
+        "public_inputs:Vec<BytesN<32>>"
+      ]
+    },
+    {
+      "name": "vk_fingerprint",
+      "parameters": []
+    }
+  ],
+  "udts": [
+    {
+      "kind": "struct",
+      "name": "Proof"
+    },
+    {
+      "kind": "struct",
+      "name": "VerificationKey"
+    }
+  ]
+}

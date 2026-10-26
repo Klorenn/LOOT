@@ -1,0 +1,1 @@
+mainnet twin of CALYISOENO2N4575DWF2K2PHB5UAEHCWI5ZJCZXYNHC4OXYHJWVBGZKY, identical wasm 8df17eda8f2f901a9636804e0e173586723420d38af6407974218b53f98905b5 (verified via getLedgerEntries on both networks)

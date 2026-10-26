@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "kyf-20261026T013516Z-dd0271ca",
+  "generatedAt": "2026-10-26T01:35:16.268Z",
+  "tool": {
+    "name": "kuyfi",
+    "version": "0.1.0"
+  },
+  "target": {
+    "contractId": "CB3MSD3R7ZYP5JCKGDGBXRUXR4JWPFUQWAJ5YQK6OPCEGULQOCL3NUUG",
+    "network": "testnet",
+    "rpcUrl": "https://soroban-testnet.stellar.org",
+    "bytecodeSize": 18638
+  },
+  "scan": {
+    "totalFunctions": 2,
+    "functions": [
+      {
+        "name": "verify_proof",
+        "parameters": [
+          {
+            "name": "proof",
+            "type": "Proof"
+          },
+          {
+            "name": "public_inputs",
+            "type": "Vec<BytesN<32>>"
+          }
+        ],
+        "hasReturn": true
+      },
+      {
+        "name": "vk_fingerprint",
+        "parameters": [],
+        "hasReturn": true
+      }
+    ],
+    "udts": [
+      {
+        "kind": "struct",
+        "name": "Proof",
+        "fields": [
+          {
+            "name": "a",
+            "type": "BytesN<64>"
+          },
+          {
+            "name": "b",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "c",
+            "type": "BytesN<64>"
+          }
+        ]
+      },
+      {
+        "kind": "struct",
+        "name": "VerificationKey",
+        "fields": [
+          {
+            "name": "alpha",
+            "type": "BytesN<64>"
+          },
+          {
+            "name": "beta",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "delta",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "gamma",
+            "type": "BytesN<128>"
+          },
+          {
+            "name": "ic",
+            "type": "Vec<BytesN<64>>"
+          }
+        ]
+      }
+    ]
+  },
+  "execution": {
+    "vectorsExecuted": 9,
+    "broadcastTransactions": 0,
+    "transactionsWithHash": 0,
+    "verificationTransactions": []
+  },
+  "summary": {
+    "totalFindings": 0,
+    "bySeverity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "info": 0,
+      "preconditionFail": 0
+    },
+    "findingsBySignal": {}
+  },
+  "findings": []
+}
