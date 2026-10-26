@@ -61,6 +61,17 @@ export function SiteFooter() {
     <footer
       data-footer
       className="relative mt-auto overflow-hidden border-t border-[var(--line)] pt-24"
+      style={
+        {
+          "--wm": "38vw",
+          // layout crítico en línea: sobrevive a una hoja de estilos vieja/bloqueada (ver globals.css)
+          position: "relative",
+          isolation: "isolate",
+          overflow: "hidden",
+          flexShrink: 0,
+          paddingBottom: "calc(var(--wm) * 0.6)",
+        } as React.CSSProperties
+      }
     >
       <CellsBackground variant="footer" />
       <div className="relative z-10 mx-auto max-w-[1200px] px-6">
@@ -129,19 +140,28 @@ export function SiteFooter() {
         </div>
 
       </div>
+      {/* Marca de agua decorativa: absoluta al fondo del pie (el pie reserva su alto con padding-bottom). */}
       <div
-          data-wordmark
-          aria-hidden
-          className="relative z-10 select-none overflow-hidden text-center font-semibold text-[var(--wordmark)]"
-          style={{
-            fontSize: "38vw",
-            lineHeight: 0.74,
-            letterSpacing: "-2.2vw",
-            height: "0.6em",
-          }}
-        >
-          LOOT
-        </div>
+        data-wordmark
+        aria-hidden
+        className="text-center font-semibold text-[var(--wordmark)]"
+        style={{
+          position: "absolute",
+          right: 0,
+          bottom: 0,
+          left: 0,
+          zIndex: 0,
+          overflow: "hidden",
+          pointerEvents: "none",
+          userSelect: "none",
+          fontSize: "var(--wm)",
+          lineHeight: 0.74,
+          letterSpacing: "-2.2vw",
+          height: "calc(var(--wm) * 0.6)",
+        }}
+      >
+        LOOT
+      </div>
     </footer>
   );
 }

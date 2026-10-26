@@ -32,7 +32,7 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
         </a>
       )}
       {!isLanding && <AppNav />}
-      <div id={isLanding ? undefined : "main"} className="flex min-h-0 flex-1 flex-col">
+      <div id={isLanding ? undefined : "main"} className="app-main" style={{ display: "flex", flexDirection: "column", flex: "1 0 auto", minWidth: 0 }}>
         {children}
       </div>
       {!isLanding && <SiteFooter />}

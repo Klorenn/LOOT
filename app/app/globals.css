@@ -277,3 +277,43 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Estructura de página robusta (Brave, Safari, Firefox): el pie va SIEMPRE al final del flujo normal.
+ * - sin altura definida en html/body (nada de height:100% que haga que el contenido desborde);
+ * - alto mínimo = ventana (100vh con fallback a 100dvh donde exista), el contenido empuja al pie;
+ * - ningún elemento decorativo participa del flujo (ver [data-footer] / [data-wordmark]).
+ */
+html {
+  min-height: 100%;
+}
+.app-shell {
+  min-height: 100vh;
+}
+@supports (min-height: 100dvh) {
+  .app-shell {
+    min-height: 100dvh;
+  }
+}
+.app-main {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+[data-footer] {
+  flex-shrink: 0;
+  position: relative;
+  isolation: isolate;
+}
+/* Marca de agua del pie: puramente decorativa, anclada al fondo del pie y detrás del contenido. */
+[data-wordmark] {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0; /* encima del canvas de celdas y debajo del contenido (z-10) del pie */
+  pointer-events: none;
+  user-select: none;
+  overflow: hidden;
+}

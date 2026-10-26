@@ -40,10 +40,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
       style={{ "--network-strip-h": net === "mainnet" ? "32px" : "0px" } as React.CSSProperties}
     >
-      <body className="flex min-h-full flex-col bg-[var(--bg)] text-[var(--text)]">
+      <body
+        className="app-shell flex flex-col bg-[var(--bg)] text-[var(--text)]"
+        style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
+      >
         <NetworkProvider net={net} mainnet={mainnet}>
           <AppChrome>{children}</AppChrome>
         </NetworkProvider>
