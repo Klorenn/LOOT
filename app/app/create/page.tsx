@@ -24,6 +24,8 @@ import { QuizBuilder } from "@/components/quiz-builder";
 import { draftToQuiz, emptyDraftQuestion, type DraftQuestion } from "@/lib/quiz-draft";
 import { QUIZ_LIMITS, quizIsGuessable } from "@/lib/quiz";
 import { useNet } from "@/components/network-provider";
+import { SetCreate } from "@/components/set-create";
+import { expiryError } from "@/lib/expiry";
 
 type Mode = "riddle" | "quiz";
 
@@ -38,25 +40,44 @@ const STEPS = [
 const QUIZ_WEAK_MSG =
   "Too easy to guess: someone could try every combination offline. Use a longer typed answer, or add more questions and options.";
 
-const MIN_EXPIRY_S = 5 * 60;
-const MAX_EXPIRY_S = 90 * 24 * 3600;
-/** Mainnet: el relayer solo patrocina plazos de hasta 30 días. */
-const MAX_EXPIRY_MAINNET_S = 30 * 24 * 3600;
-
-/** Vencimiento obligatorio y futuro: con deadline 0 el cofre nunca se podría cerrar (premio bloqueado). */
-function expiryError(expires: string, mainnet: boolean): string | null {
-  const t = new Date(expires).getTime();
-  const now = Date.now() / 1000;
-  const sec = Math.floor(t / 1000);
-  if (!expires || !Number.isFinite(t))
-    return "Pick an expiry date — unclaimed prize can only be recovered after it.";
-  if (sec < now + MIN_EXPIRY_S) return "Expiry must be at least 5 minutes from now.";
-  if (mainnet && sec > now + MAX_EXPIRY_MAINNET_S) return "On mainnet the expiry can be at most 30 days from now.";
-  if (sec > now + MAX_EXPIRY_S) return "Expiry can be at most 90 days from now.";
-  return null;
+/** /create: one chest (riddle or quiz) or a set of chests (one question and one prize each). */
+export default function CreateChestPage() {
+  const [kind, setKind] = useState<"single" | "set">("single");
+  return (
+    <>
+      <div className="mx-auto max-w-[1200px] px-6 pt-6">
+        <div
+          role="radiogroup"
+          aria-label="What to create"
+          className="inline-flex overflow-hidden rounded-[10px] border border-[var(--line)]"
+        >
+          {(
+            [
+              ["single", "One chest"],
+              ["set", "Set of chests"],
+            ] as const
+          ).map(([k, label], i) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={kind === k}
+              onClick={() => setKind(k)}
+              className={`px-4 py-2 font-mono text-[12px] ${
+                kind === k ? "bg-[var(--s2)] text-[var(--text)]" : "text-[var(--muted)]"
+              } ${i ? "border-l border-[var(--line)]" : ""}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {kind === "single" ? <SingleChestCreate /> : <SetCreate />}
+    </>
+  );
 }
 
-export default function CreateChestPage() {
+function SingleChestCreate() {
   const { NETWORK, NETWORK_LC, CONFIG_INCOMPLETE, CAPS, IS_MAINNET } = useNet();
   const [step, setStep] = useState(0);
   const [tpl, setTpl] = useState<ChestTemplate>(TEMPLATES[2]);

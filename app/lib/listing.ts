@@ -2,6 +2,7 @@ import { chestPath } from "./chest-code";
 import { readChest, readClaimedEvents, type ClaimedEvent, type OnChainChest } from "./chain";
 import { getChest as demoMeta } from "./chests-demo";
 import { getChestMeta, listPublicMetas } from "./chest-store";
+import type { SetRef } from "./chest-set";
 import { cfg } from "./cfg";
 import { isChestAllowed } from "./chest-allow";
 import { DEMO_CHEST, stroopsToXlm, tokenDecimals, tokenLabel } from "./config";
@@ -71,6 +72,8 @@ export type ChestRowData = {
   token: string;
   creator: string;
   deadline: number;
+  /** member of a chest set: /explore shows the whole set as one card (lib/chest-set.ts) */
+  set?: SetRef;
 };
 
 export function statusOf(c: OnChainChest, nowSec = Math.floor(Date.now() / 1000)): ChestStatus {
@@ -85,10 +88,12 @@ export async function toRow(c: OnChainChest): Promise<ChestRowData> {
   let name = demo?.name;
   let question = !IS_MAINNET && c.id === DEMO_CHEST.id ? DEMO_CHEST.question : demo?.question;
   let difficulty = demo?.difficulty ?? null;
+  let set: SetRef | undefined;
   if (!question) {
     const meta = await getChestMeta(c.id).catch(() => null);
     question = meta?.question;
     difficulty = meta?.difficulty ?? difficulty;
+    set = meta?.set;
   }
   const amount = stroopsToXlm(c.prize, tokenDecimals(c.token));
   return {
@@ -106,6 +111,7 @@ export async function toRow(c: OnChainChest): Promise<ChestRowData> {
     token: c.token,
     creator: c.creator,
     deadline: c.deadline,
+    ...(set ? { set } : {}),
   };
 }
 

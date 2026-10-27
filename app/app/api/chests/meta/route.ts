@@ -3,14 +3,20 @@ import { StrKey } from "@stellar/stellar-sdk";
 import {
   StorageNotConfiguredError,
   getPending,
+  getSetHeader,
+  getSetMember,
+  getSetMembers,
   reserveChestMeta,
   saveChestMeta,
+  saveSetHeader,
+  saveSetMember,
   type PendingMeta,
 } from "@/lib/chest-store";
 import { readChest } from "@/lib/chain";
 import { cfg } from "@/lib/cfg";
 import { canConfirm, canReserve, parseCreatorAllowlist, type MetaGate } from "@/lib/meta-gate";
 import { QUIZ_LIMITS, parseQuiz, quizServerGuessable, type Quiz } from "@/lib/quiz";
+import { SET_LIMITS, setCapError, type SetRef } from "@/lib/chest-set";
 
 /**
  * Metadatos off-chain de un cofre, en dos pasos (reserve-then-confirm):
@@ -40,6 +46,23 @@ function limited(ip: string): boolean {
 const str = (v: unknown, max: number) =>
   typeof v === "string" && v.trim().length > 0 && v.length <= max;
 
+/**
+ * Set membership declared at reserve time. For question 1 (index 0) the set id is unknown until the chest
+ * exists (it IS that chest's id), so it is stored as 0 and replaced at confirm.
+ */
+function parseSetRef(v: unknown): SetRef | string {
+  const o = v as Record<string, unknown> | null;
+  if (!o || typeof o !== "object") return "bad set";
+  const { index, size, id } = o;
+  if (!Number.isSafeInteger(size) || (size as number) < SET_LIMITS.min || (size as number) > SET_LIMITS.max) return "bad set size";
+  if (!Number.isSafeInteger(index) || (index as number) < 0 || (index as number) >= (size as number)) return "bad set index";
+  if (!str(o.title, SET_LIMITS.title)) return "bad set title";
+  const title = (o.title as string).trim();
+  if (index === 0) return { id: 0, index: 0, size: size as number, title };
+  if (!Number.isSafeInteger(id) || (id as number) < 1) return "bad set id";
+  return { id: id as number, index: index as number, size: size as number, title };
+}
+
 function parseReserve(b: Record<string, unknown>): PendingMeta | string {
   const fp = typeof b.fingerprintHex === "string" ? b.fingerprintHex.toLowerCase() : "";
   if (!HEX64.test(fp)) return "bad fingerprint";
@@ -62,6 +85,12 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
       return "quiz too easy to guess: add a typed question or more questions and options";
     quiz = q;
   }
+  let set: SetRef | undefined;
+  if (b.set !== undefined && b.set !== null) {
+    const r = parseSetRef(b.set);
+    if (typeof r === "string") return r;
+    set = r;
+  }
   const listed = b.listed !== false;
   let salt: string | undefined;
   if (listed) {
@@ -74,6 +103,7 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
     hint: typeof b.hint === "string" && b.hint.trim() ? b.hint.trim() : undefined,
     difficulty: difficulty as 1 | 2 | 3 | 4 | undefined,
     ...(quiz ? { quiz } : {}),
+    ...(set ? { set } : {}),
     salt,
     listed,
     fingerprintHex: fp,
@@ -82,6 +112,65 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
     creator: b.creator,
     reservedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Confirms a chest as question `index` of a set. Everything is checked against the chain and write-once
+ * records, so nobody can attach a chest to someone else's set:
+ *  - the chest must have exactly one slot (a set member = one prize);
+ *  - question 1 creates the set header (set id = its chest id); later questions need that header, written
+ *    by the same creator, with the same planned size;
+ *  - on mainnet the SUM of all members' on-chain prizes (including this one) must stay under the total cap
+ *    (the relayer only sees one create_chest at a time, so the across-the-set total is enforced here);
+ *  - the (set, question) slot can hold one chest only.
+ */
+async function confirmSetMember(
+  pending: PendingMeta,
+  chest: Awaited<ReturnType<typeof readChest>>,
+  id: number,
+  caps: { maxPrizePerPlaceXlm: number; maxTotalPrizeXlm: number },
+): Promise<{ ref: SetRef } | { error: string; status: number }> {
+  const ref = pending.set!;
+  if (chest.maxClaims !== 1) return { error: "a set question must be a chest with exactly 1 claim", status: 403 };
+
+  const setId = ref.index === 0 ? id : ref.id;
+  if (ref.index === 0) {
+    const w = await saveSetHeader({
+      id,
+      title: ref.title,
+      creator: pending.creator,
+      size: ref.size,
+      listed: pending.listed !== false,
+      createdAt: new Date().toISOString(),
+    });
+    if (w === "exists") {
+      const h = await getSetHeader(id);
+      if (!h || h.creator !== pending.creator) return { error: "set already exists", status: 409 };
+    }
+  } else {
+    const h = await getSetHeader(setId);
+    if (!h) return { error: "set not found: question 1 must be saved first", status: 409 };
+    if (h.creator !== pending.creator || h.size !== ref.size)
+      return { error: "this chest does not belong to that set", status: 403 };
+  }
+
+  // Cap across the set: other members' prizes come from the chain, not from anything the client says.
+  const others = [...(await getSetMembers(setId, ref.size))].filter(([i]) => i !== ref.index).map(([, cid]) => cid);
+  const prizes = [chest.prize];
+  for (const cid of others) {
+    try {
+      prizes.push((await readChest(cid)).prize);
+    } catch {
+      return { error: "couldn’t read the other chests of this set yet", status: 409 };
+    }
+  }
+  const capBad = setCapError(prizes, caps);
+  if (capBad) return { error: capBad, status: 403 };
+
+  const w = await saveSetMember(setId, ref.index, id);
+  if (w === "exists" && (await getSetMember(setId, ref.index)) !== id)
+    return { error: "this question already has a chest", status: 409 };
+  return { ref: { id: setId, index: ref.index, size: ref.size, title: ref.title } };
 }
 
 export async function POST(req: NextRequest) {
@@ -134,10 +223,18 @@ export async function POST(req: NextRequest) {
       if (!canConfirm(gate, pending.creator, id))
         return NextResponse.json({ error: "this chest is not enabled on mainnet" }, { status: 403 });
 
+      let setRef: SetRef | undefined;
+      if (pending.set) {
+        const r = await confirmSetMember(pending, chest, id, c.CAPS);
+        if ("error" in r) return NextResponse.json({ error: r.error }, { status: r.status });
+        setRef = r.ref;
+      }
+
       const { reservedAt: _r, ...rest } = pending;
       void _r;
       const saved = await saveChestMeta({
         ...rest,
+        ...(setRef ? { set: setRef } : {}),
         id,
         txHash,
         createdAt: new Date().toISOString(),

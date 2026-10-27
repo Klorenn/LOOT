@@ -12,7 +12,8 @@ import { StatusLabel } from "@/components/status-label";
 import { DifficultyBars } from "@/components/difficulty-bars";
 import { ExampleTag } from "@/components/example-tag";
 import { InlineAlert } from "@/components/inline-alert";
-import { chestPath } from "@/lib/chest-code";
+import { chestPath, encodeChestId } from "@/lib/chest-code";
+import { SET_ALREADY_CLAIMED_CODE, type SetRef } from "@/lib/chest-set";
 import { DEMO_CHEST, PRIZE, zkAssets } from "@/lib/config";
 import { TrustedSetupNote } from "@/components/network-banner";
 import { NetworkBadge } from "@/components/network-switch";
@@ -44,6 +45,8 @@ type Meta = {
   closed?: boolean;
   /** Cofre cuestionario: preguntas públicas; el secreto se arma con lib/quiz.ts. */
   quiz?: Quiz;
+  /** Member of a chest set: one chest per question. */
+  set?: SetRef;
 };
 
 type StepState = "idle" | "run" | "done";
@@ -52,6 +55,7 @@ type StepState = "idle" | "run" | "done";
 type Fail =
   | { kind: "wrong"; quiz?: boolean }
   | { kind: "used" }
+  | { kind: "setused" }
   | { kind: "soldout" }
   | { kind: "closed" }
   | { kind: "invalid" }
@@ -148,6 +152,7 @@ export function ChestSolve({
           maxClaims: m.maxClaims,
           closed: m.closed,
           quiz: m.quiz,
+          set: m.set,
         }),
       )
       .catch(() => {
@@ -276,6 +281,10 @@ export function ChestSolve({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (data.code === SET_ALREADY_CLAIMED_CODE) {
+          setFail({ kind: "setused" });
+          return;
+        }
         setFail(classify(String(data.error || `HTTP ${res.status}`)));
         return;
       }
@@ -412,6 +421,27 @@ export function ChestSolve({
                         </span>
                       ),
                     },
+                    ...(meta.set
+                      ? [
+                          {
+                            label: "Set",
+                            value: (
+                              <span>
+                                <Link
+                                  href={`/set/${encodeChestId(meta.set.id)}`}
+                                  className="underline underline-offset-2"
+                                >
+                                  {meta.set.title}
+                                </Link>{" "}
+                                · question {meta.set.index + 1} of {meta.set.size}
+                                <span className="mt-1 block text-[12px] text-[var(--dim)]">
+                                  One chest per account in this set (app rule, not an on-chain guarantee).
+                                </span>
+                              </span>
+                            ),
+                          },
+                        ]
+                      : []),
                     ...(meta.maxClaims
                       ? [
                           {
@@ -703,6 +733,20 @@ function FailBlock({
           label="Proof already used"
           title="This proof was already spent."
           body="This account’s nullifier is already stored on this chest. Each proof works once and only pays the address it was made for."
+          chest="none"
+          actions={[
+            { href: "/explore", label: "Explore chests", primary: true },
+            { href: "/claimed-chests", label: "My claimed chests" },
+          ]}
+        />
+      );
+    case "setused":
+      return (
+        <StateBlock
+          tone="proof"
+          label="One per account"
+          title="This account already claimed from this set."
+          body="This app lets each account take one chest per set. It is an app rule, not an on-chain guarantee. Nothing was sent for this claim."
           chest="none"
           actions={[
             { href: "/explore", label: "Explore chests", primary: true },

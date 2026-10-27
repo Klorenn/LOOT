@@ -12,6 +12,8 @@ import { withRpcUrl } from "@/lib/rpc";
 import { relayLimit } from "@/lib/rate-limit";
 import { inclusionFee } from "@/lib/inclusion-fee";
 import { Server } from "@stellar/stellar-sdk/rpc";
+import { getChestMeta, reserveSetClaim, type SetClaimReservation } from "@/lib/chest-store";
+import { SET_ALREADY_CLAIMED_CODE, SET_ALREADY_CLAIMED_MSG } from "@/lib/chest-set";
 
 type Body = {
   chestId: number;
@@ -49,6 +51,8 @@ export async function POST(req: NextRequest) {
   if (relayLimit(req, "claim", net)) {
     return NextResponse.json({ error: "too many requests" }, { status: 429, headers: { "retry-after": "60" } });
   }
+  let setClaim: SetClaimReservation | null = null;
+  let submitted = false;
   try {
     // secreto de LA red de la petición: nunca se cae al de la otra
     const secret = relayerSecretFor(c);
@@ -92,6 +96,17 @@ export async function POST(req: NextRequest) {
     }
     if (!isChestAllowed({ restricted: c.IS_MAINNET, ids: c.ALLOWED_CHEST_IDS, creators: c.CREATOR_ALLOWLIST }, chestId, chest.creator)) {
       return NextResponse.json({ error: "this chest is not enabled" }, { status: 403 });
+    }
+
+    // Chest sets: ONE Loot per account per set, enforced here only (OFF-CHAIN). This binds callers of this
+    // relayer; it does NOT stop someone who uses a second account (sybil) or calls the contract directly.
+    // On-chain enforcement is a separate contract change. Reserved atomically BEFORE anything is sent.
+    // The metadata read fails open: if the store is unreachable the chest is treated as a normal chest.
+    const setRef = (await getChestMeta(chestId).catch(() => null))?.set;
+    if (setRef) {
+      setClaim = await reserveSetClaim(setRef.id, body.recipient, chestId);
+      if (!setClaim.ok)
+        return NextResponse.json({ error: SET_ALREADY_CLAIMED_MSG, code: SET_ALREADY_CLAIMED_CODE }, { status: 409 });
     }
 
     const maxFee = relayMaxFee(c, "claim");
@@ -143,6 +158,7 @@ export async function POST(req: NextRequest) {
             throw new FeeCapError(`claim fee ${resource === null ? "unknown" : resource + BigInt(inclusion)} above the cap ${maxFee}`);
           }
 
+          submitted = true; // from here on the outcome can be unknown (timeout, lost response)
           return tx.signAndSend();
         },
         { write: true },
@@ -162,6 +178,7 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       if (e instanceof FeeCapError) {
         console.warn("claim:", e.message);
+        if (setClaim?.ok) await setClaim.release(); // nothing was sent: free the account's set slot
         return NextResponse.json({ error: "claim fee above the relayer cap" }, { status: 503 });
       }
       throw e;
@@ -192,6 +209,10 @@ export async function POST(req: NextRequest) {
     // El cliente clasifica por código de contrato (#5 usado, #6 prueba inválida…): se devuelve
     // solo ese código, nunca el log de simulación.
     const code = message.match(/Error\(Contract,\s*#(\d+)\)/)?.[1];
+    // Set claim marker: free it only when the claim definitely did not happen (nothing was submitted, so a garbage request can't lock someone else's account out, or the
+    // contract rejected it). On an ambiguous failure (timeout, lost response) it is kept: the account can
+    // retry the SAME chest but not take another one, so a claim that actually landed can't be doubled.
+    if (setClaim?.ok && (!submitted || code)) await setClaim.release().catch(() => {});
     return NextResponse.json(
       { error: code ? `Error(Contract, #${code})` : "claim failed" },
       { status: 500 },

@@ -38,6 +38,8 @@ export type ChestMetaInput = {
   difficulty?: number;
   /** Cofre cuestionario: solo la parte pública (lib/quiz.ts). */
   quiz?: Quiz;
+  /** Chest sets: this chest is question `index` of `size`. `id` = chest id of question 1 (omit for index 0). */
+  set?: { index: number; size: number; title: string; id?: number };
   prize: number;
   /** false = privado: la sal no se guarda en el servidor */
   listed: boolean;

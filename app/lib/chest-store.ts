@@ -3,6 +3,7 @@ import path from "path";
 import { del, get, list, put } from "@vercel/blob";
 import { cfg } from "./cfg";
 import type { Quiz } from "./quiz";
+import { decideSetClaim, type SetClaimMarker, type SetHeader, type SetRef } from "./chest-set";
 
 /**
  * Metadatos off-chain de los cofres (pregunta, pista, dificultad y, solo si el cofre es público, la sal).
@@ -25,6 +26,8 @@ export type ChestMeta = {
   difficulty?: 1 | 2 | 3 | 4;
   /** Cofre cuestionario: solo preguntas y opciones públicas, nunca las respuestas (ver lib/quiz.ts). */
   quiz?: Quiz;
+  /** Member of a chest set (lib/chest-set.ts): one chest per question, max_claims = 1. */
+  set?: SetRef;
   /** Solo en cofres públicos: hace falta para armar la prueba. Los privados viajan en #s= del link. */
   salt?: string;
   /** false = cofre privado: no aparece en /explore y su sal no se guarda. Ausente = legado (público). */
@@ -59,6 +62,8 @@ async function ns() {
     net: IS_MAINNET ? "mainnet" : "testnet",
     chests: IS_MAINNET ? "mainnet/chests/" : "chests/",
     pending: IS_MAINNET ? "mainnet/pending/" : "pending/",
+    sets: IS_MAINNET ? "mainnet/sets/" : "sets/",
+    setsFile: path.join(process.cwd(), "data", IS_MAINNET ? "mainnet-sets.json" : "sets.json"),
     file: path.join(process.cwd(), "data", IS_MAINNET ? "mainnet-chests.json" : "chests.json"),
     pendingFile: path.join(process.cwd(), "data", IS_MAINNET ? "mainnet-pending.json" : "pending.json"),
   };
@@ -198,3 +203,88 @@ export async function listPublicMetas(): Promise<ChestMeta[]> {
 
 /** @deprecated usar listPublicMetas */
 export const listChests = listPublicMetas;
+
+// ---------- Chest sets (lib/chest-set.ts) ----------
+// Everything is write-once, keyed by the set id (= chest id of question 1):
+//   <id>/set.json            header (created when question 1 is confirmed)
+//   <id>/m/<index>.json      { chestId } for each question that was created
+//   <id>/c/<recipient>.json  { chestId } marker for "one Loot per account per set".
+// That marker is OFF-CHAIN: it only binds callers of OUR /api/claim relayer. It does not stop a
+// second account (sybil) nor a direct contract call. On-chain enforcement is a separate contract change.
+
+async function setKvWriteOnce(key: string, value: unknown): Promise<"ok" | "exists"> {
+  const n = await ns();
+  if (backend() === "blob") return blobWriteOnce(`${n.sets}${key}`, value);
+  const all = await fileReadAll<unknown>(n.setsFile);
+  if (key in all) return "exists";
+  all[key] = value;
+  await fileWriteAll(n.setsFile, all);
+  return "ok";
+}
+
+async function setKvRead<T>(key: string): Promise<T | null> {
+  const n = await ns();
+  if (hasBlob()) return blobRead<T>(`${n.sets}${key}`);
+  return ((await fileReadAll<T>(n.setsFile))[key] as T | undefined) ?? null;
+}
+
+async function setKvDelete(key: string): Promise<void> {
+  const n = await ns();
+  if (backend() === "blob") {
+    await del(`${n.sets}${key}`, auth()).catch(() => {});
+    return;
+  }
+  const all = await fileReadAll<unknown>(n.setsFile);
+  delete all[key];
+  await fileWriteAll(n.setsFile, all);
+}
+
+export const saveSetHeader = (h: SetHeader) => setKvWriteOnce(`${h.id}/set.json`, h);
+export const getSetHeader = (id: number) => setKvRead<SetHeader>(`${id}/set.json`);
+
+/** Records which chest is question `index` of the set. "exists" = already recorded (read it to compare). */
+export const saveSetMember = (setId: number, index: number, chestId: number) =>
+  setKvWriteOnce(`${setId}/m/${index}.json`, { chestId });
+
+/** Frees a question slot (only used to roll back a member that failed the set total cap). */
+export const deleteSetMember = (setId: number, index: number) => setKvDelete(`${setId}/m/${index}.json`);
+
+export async function getSetMember(setId: number, index: number): Promise<number | null> {
+  const m = await setKvRead<{ chestId: number }>(`${setId}/m/${index}.json`);
+  return m && Number.isSafeInteger(m.chestId) ? m.chestId : null;
+}
+
+/** Chest ids by question index; questions that were never created are absent. */
+export async function getSetMembers(setId: number, size: number): Promise<Map<number, number>> {
+  const ids = await Promise.all(Array.from({ length: size }, (_, i) => getSetMember(setId, i)));
+  const out = new Map<number, number>();
+  ids.forEach((id, i) => {
+    if (id !== null) out.set(i, id);
+  });
+  return out;
+}
+
+export type SetClaimReservation =
+  | { ok: true; /** undo the reservation if the claim then fails (no-op for a same-chest retry) */ release: () => Promise<void> }
+  | { ok: false };
+
+/**
+ * Atomically reserves the account's single claim in this set (write-once marker) BEFORE the relayer
+ * sends anything. Same chest again = retry, allowed. Another chest of the set = refused.
+ */
+export async function reserveSetClaim(setId: number, recipient: string, chestId: number): Promise<SetClaimReservation> {
+  const key = `${setId}/c/${recipient}.json`;
+  const r = await setKvWriteOnce(key, { chestId } satisfies SetClaimMarker);
+  if (r === "ok") return { ok: true, release: () => setKvDelete(key) };
+  const existing = await setKvRead<SetClaimMarker>(key);
+  // The marker exists but couldn't be read (storage hiccup): fail closed, never let a second claim through.
+  if (!existing) return { ok: false };
+  const d = decideSetClaim(existing, chestId);
+  return d === "refuse" ? { ok: false } : { ok: true, release: async () => {} };
+}
+
+/** Chest the account already claimed in this set (for UI hints), or null. */
+export async function getSetClaim(setId: number, recipient: string): Promise<number | null> {
+  const m = await setKvRead<SetClaimMarker>(`${setId}/c/${recipient}.json`);
+  return m && Number.isSafeInteger(m.chestId) ? m.chestId : null;
+}
