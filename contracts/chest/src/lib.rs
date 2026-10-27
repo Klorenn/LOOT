@@ -8,8 +8,8 @@
 //! definimos el wire type `Proof` y llamamos con `Env::invoke_contract`.
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, token, vec,
-    xdr::ToXdr, Address, Bytes, BytesN, Env, IntoVal, Symbol, Vec,
+    Address, Bytes, BytesN, Env, IntoVal, Symbol, Vec, contract, contracterror, contractimpl,
+    contracttype, symbol_short, token, vec, xdr::ToXdr,
 };
 
 #[contracterror]
@@ -27,7 +27,12 @@ pub enum Error {
     BadAmounts = 9,
     AlreadyInit = 10,
     NotInit = 11,
+    NotSetOwner = 12,
+    SetNotFound = 13,
 }
+
+/// Registry version (immutable contract; a new version is a new deployment).
+pub const VERSION: u32 = 2;
 
 /// Wire-compatible con el `Proof` del verificador generado
 /// (a: G1 64B, b: G2 128B, c: G1 64B, ethereum-uncompressed).
@@ -39,7 +44,7 @@ pub struct Proof {
     pub c: BytesN<64>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[contracttype]
 pub struct Chest {
     pub creator: Address,
@@ -50,8 +55,12 @@ pub struct Chest {
     pub claims: u32,
     pub deadline: u64,
     pub closed: bool,
+    /// Id pushed to the circuit as the `chestId` public input. For a normal
+    /// chest it equals the chest id; for chests in a set it is the set id.
+    pub group_id: u64,
 }
 
+/// This contract is immutable (no upgrade path): changes mean a new deployment.
 #[derive(Clone)]
 #[contracttype]
 pub enum DataKey {
@@ -59,6 +68,8 @@ pub enum DataKey {
     NextId,
     Chest(u64),
     Nullifier(BytesN<32>),
+    /// set id -> creator. Set ids come from the same counter as chest ids.
+    SetOwner(u64),
 }
 
 #[contract]
@@ -74,6 +85,30 @@ impl ChestZk {
         env.storage().instance().set(&DataKey::Verifier, &verifier);
         env.storage().instance().set(&DataKey::NextId, &1u64);
         Ok(())
+    }
+
+    pub fn version(_env: Env) -> u32 {
+        VERSION
+    }
+
+    fn next_id(env: &Env) -> u64 {
+        let id: u64 = env.storage().instance().get(&DataKey::NextId).unwrap();
+        env.storage().instance().set(&DataKey::NextId, &(id + 1));
+        id
+    }
+
+    /// Allocate a set id (from the same counter as chest ids, so it can never
+    /// equal any chest id or any other set id). Only `creator` can add chests.
+    pub fn create_set(env: Env, creator: Address) -> Result<u64, Error> {
+        Self::require_init(&env)?;
+        creator.require_auth();
+        let set_id = Self::next_id(&env);
+        env.storage()
+            .persistent()
+            .set(&DataKey::SetOwner(set_id), &creator);
+        env.events()
+            .publish((symbol_short!("set"), set_id), creator);
+        Ok(set_id)
     }
 
     fn require_init(env: &Env) -> Result<(), Error> {
@@ -93,8 +128,65 @@ impl ChestZk {
         max_claims: u32,
         deadline: u64,
     ) -> Result<u64, Error> {
+        Self::create_inner(
+            env,
+            creator,
+            None,
+            fingerprint,
+            token,
+            prize,
+            max_claims,
+            deadline,
+        )
+    }
+
+    /// Create a chest inside a set made with `create_set`. All chests of a set
+    /// share the nullifier domain: one claim per account per set.
+    pub fn create_chest_in_set(
+        env: Env,
+        creator: Address,
+        set_id: u64,
+        fingerprint: BytesN<32>,
+        token: Address,
+        prize: i128,
+        max_claims: u32,
+        deadline: u64,
+    ) -> Result<u64, Error> {
+        Self::create_inner(
+            env,
+            creator,
+            Some(set_id),
+            fingerprint,
+            token,
+            prize,
+            max_claims,
+            deadline,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn create_inner(
+        env: Env,
+        creator: Address,
+        set_id: Option<u64>,
+        fingerprint: BytesN<32>,
+        token: Address,
+        prize: i128,
+        max_claims: u32,
+        deadline: u64,
+    ) -> Result<u64, Error> {
         Self::require_init(&env)?;
         creator.require_auth();
+        if let Some(sid) = set_id {
+            let owner: Address = env
+                .storage()
+                .persistent()
+                .get(&DataKey::SetOwner(sid))
+                .ok_or(Error::SetNotFound)?;
+            if owner != creator {
+                return Err(Error::NotSetOwner);
+            }
+        }
         if prize <= 0 || max_claims == 0 {
             return Err(Error::BadAmounts);
         }
@@ -108,8 +200,7 @@ impl ChestZk {
             &total,
         );
 
-        let id: u64 = env.storage().instance().get(&DataKey::NextId).unwrap();
-        env.storage().instance().set(&DataKey::NextId, &(id + 1));
+        let id = Self::next_id(&env);
 
         let chest = Chest {
             creator,
@@ -120,10 +211,13 @@ impl ChestZk {
             claims: 0,
             deadline,
             closed: false,
+            group_id: set_id.unwrap_or(id),
         };
         env.storage().persistent().set(&DataKey::Chest(id), &chest);
-        env.events()
-            .publish((symbol_short!("created"), id), (chest.prize, chest.max_claims));
+        env.events().publish(
+            (symbol_short!("created"), id),
+            (chest.prize, chest.max_claims),
+        );
         Ok(id)
     }
 
@@ -160,23 +254,17 @@ impl ChestZk {
         }
 
         // Orden del circuito: [fingerprint, nullifier, chestId, recipient]
+        // chestId = group_id (== chest id for normal chests, set id for sets).
         let mut publics: Vec<BytesN<32>> = Vec::new(&env);
         publics.push_back(chest.fingerprint.clone());
         publics.push_back(nullifier.clone());
-        publics.push_back(Self::field_from_u64(&env, chest_id));
+        publics.push_back(Self::field_from_u64(&env, chest.group_id));
         publics.push_back(Self::field_from_address(&env, &recipient));
 
         let verifier_addr: Address = env.storage().instance().get(&DataKey::Verifier).unwrap();
-        let args = vec![
-            &env,
-            proof.into_val(&env),
-            publics.into_val(&env),
-        ];
-        let ok: bool = env.invoke_contract(
-            &verifier_addr,
-            &Symbol::new(&env, "verify_proof"),
-            args,
-        );
+        let args = vec![&env, proof.into_val(&env), publics.into_val(&env)];
+        let ok: bool =
+            env.invoke_contract(&verifier_addr, &Symbol::new(&env, "verify_proof"), args);
         if !ok {
             env.events()
                 .publish((symbol_short!("rejected"), chest_id), nullifier.clone());
@@ -194,8 +282,10 @@ impl ChestZk {
             &recipient,
             &chest.prize,
         );
-        env.events()
-            .publish((symbol_short!("claimed"), chest_id), (recipient, chest.prize));
+        env.events().publish(
+            (symbol_short!("claimed"), chest_id),
+            (recipient, chest.prize),
+        );
         Ok(())
     }
 

@@ -275,6 +275,14 @@
                   },
                   {
                     "key": {
+                      "symbol": "group_id"
+                    },
+                    "val": {
+                      "u64": "1"
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "max_claims"
                     },
                     "val": {
