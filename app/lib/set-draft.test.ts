@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isUnfinished, parseDraft, remainingCount, serializeDraft, type SetDraft } from "./set-draft";
+import { isUnfinished, parseDraft, remainingCount, resumeError, serializeDraft, type SetDraft } from "./set-draft";
 
 const draft = (over: Partial<SetDraft> = {}): SetDraft => ({
   v: 1,
   net: "testnet",
+  creator: "GCREATOR",
   title: "Trivia",
   listed: false,
   deadline: 1_900_000_000,
@@ -47,5 +48,28 @@ describe("set draft (partial-failure recovery record)", () => {
     expect(isUnfinished(done)).toBe(false);
     const unsaved = draft({ progress: { setId: 9, members: [0, 1, 2].map((i) => ({ index: i, chestId: 9 + i, saved: i !== 1 })) } });
     expect(isUnfinished(unsaved)).toBe(true);
+  });
+});
+
+describe("resumeError", () => {
+  const now = Date.UTC(2030, 0, 1);
+  const future = (s: number) => Math.floor(now / 1000) + s;
+  it("blocks a different or missing account", () => {
+    expect(resumeError(draft({ deadline: future(86400) }), "GOTHER", false, now)).toMatch(/different account/);
+    expect(resumeError(draft({ deadline: future(86400) }), undefined, false, now)).toMatch(/Connect/);
+  });
+  it("allows the creator while the deadline is still valid", () => {
+    expect(resumeError(draft({ deadline: future(86400) }), "GCREATOR", false, now)).toBeNull();
+  });
+  it("rejects a deadline that has become too close or past while chests are missing", () => {
+    expect(resumeError(draft({ deadline: future(60) }), "GCREATOR", false, now)).toMatch(/Expiry/);
+    expect(resumeError(draft({ deadline: future(-10) }), "GCREATOR", false, now)).toMatch(/Expiry/);
+  });
+  it("skips the deadline check when every chest already exists (details-only retry)", () => {
+    const d = draft({
+      deadline: future(-10),
+      progress: { setId: 9, members: [0, 1, 2].map((i) => ({ index: i, chestId: 9 + i, hash: "h", saved: i === 0 })) },
+    });
+    expect(resumeError(d, "GCREATOR", false, now)).toBeNull();
   });
 });

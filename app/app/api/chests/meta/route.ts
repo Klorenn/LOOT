@@ -6,6 +6,7 @@ import {
   getSetHeader,
   getSetMember,
   getSetMembers,
+  deleteSetMember,
   reserveChestMeta,
   saveChestMeta,
   saveSetHeader,
@@ -124,6 +125,26 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
  *    (the relayer only sees one create_chest at a time, so the across-the-set total is enforced here);
  *  - the (set, question) slot can hold one chest only.
  */
+/** Cap across the set: other members' prizes come from the chain, not from anything the client says. */
+async function setTotalError(
+  setId: number,
+  ref: SetRef,
+  chest: Awaited<ReturnType<typeof readChest>>,
+  caps: { maxPrizePerPlaceXlm: number; maxTotalPrizeXlm: number },
+): Promise<{ error: string; status: number } | null> {
+  const others = [...(await getSetMembers(setId, ref.size))].filter(([i]) => i !== ref.index).map(([, cid]) => cid);
+  const prizes = [chest.prize];
+  for (const cid of others) {
+    try {
+      prizes.push((await readChest(cid)).prize);
+    } catch {
+      return { error: "couldn’t read the other chests of this set yet", status: 409 };
+    }
+  }
+  const capBad = setCapError(prizes, caps);
+  return capBad ? { error: capBad, status: 403 } : null;
+}
+
 async function confirmSetMember(
   pending: PendingMeta,
   chest: Awaited<ReturnType<typeof readChest>>,
@@ -134,6 +155,10 @@ async function confirmSetMember(
   if (chest.maxClaims !== 1) return { error: "a set question must be a chest with exactly 1 claim", status: 403 };
 
   const setId = ref.index === 0 ? id : ref.id;
+  // Total cap first, so a rejected question 1 doesn't burn the set id.
+  const capBad = await setTotalError(setId, ref, chest, caps);
+  if (capBad) return capBad;
+
   if (ref.index === 0) {
     const w = await saveSetHeader({
       id,
@@ -154,22 +179,17 @@ async function confirmSetMember(
       return { error: "this chest does not belong to that set", status: 403 };
   }
 
-  // Cap across the set: other members' prizes come from the chain, not from anything the client says.
-  const others = [...(await getSetMembers(setId, ref.size))].filter(([i]) => i !== ref.index).map(([, cid]) => cid);
-  const prizes = [chest.prize];
-  for (const cid of others) {
-    try {
-      prizes.push((await readChest(cid)).prize);
-    } catch {
-      return { error: "couldn’t read the other chests of this set yet", status: 409 };
-    }
-  }
-  const capBad = setCapError(prizes, caps);
-  if (capBad) return { error: capBad, status: 403 };
-
   const w = await saveSetMember(setId, ref.index, id);
   if (w === "exists" && (await getSetMember(setId, ref.index)) !== id)
     return { error: "this question already has a chest", status: 409 };
+  if (w === "ok") {
+    // Concurrent confirms can each pass the check above before either is stored; re-check with this one in.
+    const again = await setTotalError(setId, ref, chest, caps);
+    if (again) {
+      await deleteSetMember(setId, ref.index);
+      return again;
+    }
+  }
   return { ref: { id: setId, index: ref.index, size: ref.size, title: ref.title } };
 }
 

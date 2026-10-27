@@ -18,7 +18,7 @@ import { stroopsToXlm } from "@/lib/config";
 import { withNet } from "@/lib/network";
 import { balanceInfo, parseXlmAmount } from "@/lib/send";
 import { useSession } from "@/lib/session";
-import { draftKey, isUnfinished, parseDraft, remainingCount, serializeDraft, type SetDraft } from "@/lib/set-draft";
+import { draftKey, isUnfinished, parseDraft, remainingCount, resumeError, serializeDraft, type SetDraft } from "@/lib/set-draft";
 
 type Row = { question: string; hint: string; answer: string; prize: string };
 const emptyRow = (): Row => ({ question: "", hint: "", answer: "", prize: "1" });
@@ -116,6 +116,11 @@ export function SetCreate() {
 
   async function execute(d: SetDraft) {
     if (!player) return;
+    const blocked = resumeError(d, player.publicKey, IS_MAINNET);
+    if (blocked) {
+      setError(blocked);
+      return;
+    }
     setBusy(true);
     setError(null);
     const deps: SetCreateDeps = {
@@ -204,6 +209,7 @@ export function SetCreate() {
       const d: SetDraft = {
         v: 1,
         net,
+        creator: player.publicKey,
         title: title.trim(),
         listed,
         deadline: Math.floor(new Date(expires).getTime() / 1000),

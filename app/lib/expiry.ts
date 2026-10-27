@@ -4,9 +4,9 @@ const MAX_EXPIRY_S = 90 * 24 * 3600;
 const MAX_EXPIRY_MAINNET_S = 30 * 24 * 3600;
 
 /** Expiry is required and in the future: with deadline 0 a chest could never be closed (prize locked). */
-export function expiryError(expires: string, mainnet: boolean): string | null {
+export function expiryError(expires: string, mainnet: boolean, nowMs: number = Date.now()): string | null {
   const t = new Date(expires).getTime();
-  const now = Date.now() / 1000;
+  const now = nowMs / 1000;
   const sec = Math.floor(t / 1000);
   if (!expires || !Number.isFinite(t))
     return "Pick an expiry date — unclaimed prize can only be recovered after it.";
