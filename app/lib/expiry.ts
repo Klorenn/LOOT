@@ -1,5 +1,6 @@
 const MIN_EXPIRY_S = 5 * 60;
-const MAX_EXPIRY_S = 90 * 24 * 3600;
+/** 1 h under the contract's 90-day bound, so clock drift or a late member tx of a set never hits BadDeadline (#15). */
+const MAX_EXPIRY_S = 90 * 24 * 3600 - 3600;
 /** Mainnet: the relayer only sponsors deadlines up to 30 days. */
 const MAX_EXPIRY_MAINNET_S = 30 * 24 * 3600;
 
