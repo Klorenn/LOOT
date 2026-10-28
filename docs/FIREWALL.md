@@ -31,6 +31,7 @@ The wallet-deploy counters are taken only for requests the policy check classifi
 | Kind | Testnet | Mainnet |
 | --- | --- | --- |
 | claim, create_chest, close_chest, transfer | 10 XLM (`RELAY_MAX_FEE_STROOPS`) | 0.3 XLM (`RELAY_MAX_FEE_STROOPS_MAINNET`) |
+| claim on registry v2 (player-signed) | 0.5 XLM (`RELAY_MAX_CLAIM_V2_FEE_STROOPS`; measured resource fee 895,284 stroops) | n/a (v2 is testnet only) |
 | wallet_deploy | 1 XLM (`RELAY_MAX_DEPLOY_FEE_STROOPS`) | 1 XLM (`RELAY_MAX_DEPLOY_FEE_STROOPS_MAINNET`) |
 
 The testnet deploy cap is the measured cost plus margin: `app/scripts/measure-wallet-deploy.mjs` simulates the real shared-deployer deploy (secp256r1 signer + Genesis binding proof) and measured a resource fee of 3,434,759 stroops (0.343 XLM) on 2026-10-28; the cap is 1 XLM. An earlier observation of 4.29e9 stroops (about 429 XLM) came from a deploy that had to pay for the wallet wasm entry; if that happens again the deploy is refused with `fee_cap` instead of draining the relayer (extend the wasm TTL, or raise `RELAY_MAX_DEPLOY_FEE_STROOPS` on purpose). Mainnet never reads the testnet variables.

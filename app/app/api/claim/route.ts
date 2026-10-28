@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { Keypair } from "@stellar/stellar-sdk";
+import { NextRequest, NextResponse, after } from "next/server";
+import { Keypair, StrKey } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import {
   Client,
@@ -24,6 +24,8 @@ import { relayGate } from "@/lib/relay-gate";
 import { testnetFeatures } from "@/lib/testnet-features";
 import { inclusionFee } from "@/lib/inclusion-fee";
 import { checkRelayerBalance } from "@/lib/relayer-alert";
+import { RECIPIENT_NOT_SUPPORTED, contractWasmHash, sponsorableRecipient } from "@/lib/claim-recipient";
+import { isV2Ref } from "@/lib/registry";
 import { Server } from "@stellar/stellar-sdk/rpc";
 import { getChestMeta, reserveSetClaim, type SetClaimReservation } from "@/lib/chest-store";
 import { SET_ALREADY_CLAIMED_CODE, SET_ALREADY_CLAIMED_MSG } from "@/lib/chest-set";
@@ -116,12 +118,15 @@ export async function POST(req: NextRequest) {
     }
     const body = parsed;
     const preparing = body.phase === "prepare";
-    // Persistent global limit, after cheap validation so junk requests don't cost a store write (testnet only).
-    // The prepare call only simulates (no fee, no write): the in-memory limit above covers it.
-    if (!preparing) {
-      const gate = await relayGate(req, c, "claim");
-      if (!gate.ok) return gate.res;
+    // The two-step, wallet-signed flow exists only for registry v2 chests, which are testnet only. Refused here,
+    // before any store write or RPC, so a mainnet (or v1) request can never take a different path than before.
+    if ((preparing || body.signedAuthEntry !== undefined) && (c.IS_MAINNET || !isV2Ref(body.chestId))) {
+      return NextResponse.json({ error: "this chest does not take a wallet signature" }, { status: 400 });
     }
+    // Persistent global limit, after cheap validation so junk requests don't cost a store write (testnet only;
+    // a pass-through on mainnet). Both v2 steps go through it: prepare runs a simulation on the relayer's behalf.
+    const gate = await relayGate(req, c, "claim");
+    if (!gate.ok) return gate.res;
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
 
@@ -145,6 +150,14 @@ export async function POST(req: NextRequest) {
     const reg = registryFor({ chest: CONTRACTS.chest, chestV2: c.REGISTRY_V2.chest }, chestId);
     if (reg.version !== 2 && (preparing || body.signedAuthEntry)) {
       return NextResponse.json({ error: "this chest does not take a wallet signature" }, { status: 400 });
+    }
+    // Registry v2: require_auth runs the recipient's own auth code inside the tx the relayer pays for. Only G
+    // accounts and the canonical passkey wallet wasm are sponsored (lib/claim-recipient.ts).
+    if (reg.version === 2 && !StrKey.isValidEd25519PublicKey(body.recipient)) {
+      const wasm = StrKey.isValidContract(body.recipient)
+        ? await withRpcUrl((u) => contractWasmHash(new Server(u, { allowHttp: true }), body.recipient)).catch(() => null)
+        : null;
+      if (!sponsorableRecipient(body.recipient, wasm)) return NextResponse.json(RECIPIENT_NOT_SUPPORTED, { status: 403 });
     }
     // Registry v2: the recipient signs the claim (require_auth). Step 1 returns the entry to sign.
     if (reg.version === 2 && preparing) {
@@ -193,7 +206,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: SET_ALREADY_CLAIMED_MSG, code: SET_ALREADY_CLAIMED_CODE }, { status: 409 });
     }
 
-    const maxFee = relayMaxFee(c, "claim");
+    // v2 claims have their own, tighter cap (close to the measured cost: see lib/relay-fee-cap.ts)
+    const maxFee = relayMaxFee(c, reg.version === 2 ? "claim_v2" : "claim");
     class FeeCapError extends Error {}
 
     // Escritura: RPC primario; fallback solo ante error de red (ver lib/rpc.ts).
@@ -306,7 +320,7 @@ export async function POST(req: NextRequest) {
     }
     const { hash, ledger } = sent;
     // testnet: low-balance alert after each paid claim (structured log + optional webhook); never blocks the reply
-    if (!c.IS_MAINNET) void checkRelayerBalance(c, kp.publicKey()).catch(() => undefined);
+    if (!c.IS_MAINNET) after(() => checkRelayerBalance(c, kp.publicKey()).then(() => undefined, () => undefined));
 
     return NextResponse.json({
       ok: true,

@@ -58,6 +58,8 @@ This is NOT sybil resistance. A person with N fresh addresses (and N player secr
 1. `{..., phase: "prepare"}`: the relayer simulates `claim` (recording auth) and returns the recipient's unsigned auth entry (`authEntry`, base64 XDR) and `validUntilLedger` (about 5 minutes). Contract errors (#16 already claimed, #6 invalid proof, ...) come back here, before the player is asked to sign.
 2. Same body plus `signedAuthEntry`: the relayer checks that the entry is an address credential for exactly `claim(chest_id, recipient, nullifier, proof)` on this registry with no sub-invocations, simulates in enforcing mode (the signature is verified), applies its fee cap, signs ONLY the envelope as fee payer and submits.
 
+Relayer-side limits for v2 claims: both steps go through the persistent rate limit; the wallet-signed flow is refused on mainnet and for v1 chests before any RPC; the fee cap is 0.5 XLM (`RELAY_MAX_CLAIM_V2_FEE_STROOPS`; measured resource fee 895,284 stroops); and because `require_auth` runs a C-address recipient's own `__check_auth` inside the relayer-paid transaction, the relayer sponsors only G accounts and contracts whose wasm hash is the passkey-kit wallet (`WALLET_WASM_HASH`, read with `getLedgerEntries` on the instance). Other contract accounts get `recipient_not_supported` (they can still submit the claim themselves).
+
 Signing: a demo G key signs locally; an external G wallet signs with Stellar Wallets Kit `signAuthEntry` (SEP-43); a passkey C wallet signs with passkey-kit `signAuthEntry` (one WebAuthn prompt). The SDK helpers are in `packages/chestzk-chest/src/claim-auth.ts` (`prepareClaimAuth`, `signClaimAuthEntry`, `checkClaimAuthEntry`, `buildClaimTxWithAuth`, `sendAndWait`). v1 chests (and so mainnet) keep the old one-call flow.
 
 ## Why the set cannot be griefed or replayed
@@ -97,6 +99,7 @@ It writes `deployments/registry-v2-mainnet.json` (the v1 record `registry-mainne
 - Identity `loot-v2-throwaway` (testnet only): `GADNYHTC5RSY4WGE2NOMNPKNQ3EDVL7Q4NPKIUEHGUW55DXT6ND5I2PP`.
 - TESTNET ceremony verifier (wasm `8df17eda...`, vk `3889d2e9...`): `CCFHJHU2DSVEYXRH7JE457654JB7N2RKDG5A5HJCKT42PZS3ZMMIZPTV`.
 - Registry v2 (current, claim needs the recipient's signature): `CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG`, wasm sha256 `88b24f39...2a7f`, token = testnet native SAC `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`. Deploy tx `499e7d89...2849`. Record: `deployments/registry-v2-testnet.json`.
+- Old registry `NextId` read on-chain on 2026-10-28: 11 (ids 1 to 10 used), so burning 1 to 20 covers every old metadata key.
 - Ids 1 to 20 of the new registry were burned with `create_set` right after deploy. The app keys off-chain metadata (chests, sets, set claim markers) by ref = `1e9 + id`, and the previous registry used ids 1 to 10: without the burn, new chest 1 would inherit the old chest 1's question and salt. A later fix is to namespace v2 metadata by registry id.
 - Previous registry v2 (superseded, no claim auth): `CAEBFT22DIJNNJ6CLHY5L3SKLSACRHJLJW22VQAKTI3MCCP5KTO277NJ`. Its chests are not migrated; once the app points to the new registry they are no longer listed.
 - App env (testnet): `NEXT_PUBLIC_REGISTRY_V2_ID=CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG`, `NEXT_PUBLIC_VERIFIER_V2_ID=CCFHJHU2DSVEYXRH7JE457654JB7N2RKDG5A5HJCKT42PZS3ZMMIZPTV`.

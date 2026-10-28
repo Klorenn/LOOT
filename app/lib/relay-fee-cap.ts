@@ -1,6 +1,6 @@
 import type { NetConfig } from "./network";
 
-export type RelayFeeKind = "create_chest" | "claim" | "close_chest" | "transfer" | "wallet_deploy";
+export type RelayFeeKind = "create_chest" | "claim" | "claim_v2" | "close_chest" | "transfer" | "wallet_deploy";
 
 const envNum = (v: string | undefined) => (Number(v) > 0 ? Number(v) : 0);
 
@@ -22,5 +22,10 @@ export function relayMaxFee(c: Pick<NetConfig, "IS_MAINNET">, kind?: RelayFeeKin
     return BigInt(envNum(process.env.RELAY_MAX_FEE_STROOPS_MAINNET) || 3_000_000);
   }
   if (kind === "wallet_deploy") return BigInt(envNum(process.env.RELAY_MAX_DEPLOY_FEE_STROOPS) || 10_000_000);
+  // Registry v2 claim (player-signed, recipient.require_auth): measured on testnet 2026-10-28 (app/scripts/
+  // e2e-claim-auth.mjs, G recipient, with the 1e8 instruction leeway): resource fee 895,284 stroops. Cap 0.5 XLM
+  // = ~5.6x that, room for a passkey __check_auth (secp256r1) and fee drift, far below the 10 XLM generic cap that
+  // a hostile recipient contract could otherwise burn.
+  if (kind === "claim_v2") return BigInt(envNum(process.env.RELAY_MAX_CLAIM_V2_FEE_STROOPS) || 5_000_000);
   return BigInt(envNum(process.env.RELAY_MAX_FEE_STROOPS) || 100_000_000);
 }

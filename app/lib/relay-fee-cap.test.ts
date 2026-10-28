@@ -18,6 +18,10 @@ describe("relayMaxFee", () => {
     expect(relayMaxFee(T, "wallet_deploy")).toBe(BigInt(10_000_000));
     expect(relayMaxFee(T, "wallet_deploy")).toBeGreaterThan(BigInt(3_434_759));
   });
+  it("testnet v2 claims have a tight cap near the measured 895,284-stroop resource fee", () => {
+    expect(relayMaxFee(T, "claim_v2")).toBe(BigInt(5_000_000));
+    expect(relayMaxFee(T, "claim_v2")).toBeGreaterThan(BigInt(895_284));
+  });
   it("mainnet defaults are unchanged and ignore testnet variables", () => {
     process.env.RELAY_MAX_FEE_STROOPS = "999999999999";
     expect(relayMaxFee(M, "claim")).toBe(BigInt(3_000_000));
