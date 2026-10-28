@@ -54,9 +54,6 @@ export async function POST(req: NextRequest) {
   if (relayLimit(req, "claim", net)) {
     return NextResponse.json({ error: "too many requests" }, { status: 429, headers: { "retry-after": "60" } });
   }
-  // Persistent global limit (Blob-backed; mainnet fails closed if the store is unavailable).
-  const gate = await relayGate(req, c, "claim");
-  if (!gate.ok) return gate.res;
   let setClaim: SetClaimReservation | null = null;
   let submitted = false;
   try {
@@ -85,6 +82,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "bad request" }, { status: 400 });
     }
     const body = parsed;
+    // Persistent global limit, after cheap validation so junk requests don't cost a store write (testnet only).
+    const gate = await relayGate(req, c, "claim");
+    if (!gate.ok) return gate.res;
     const kp = Keypair.fromSecret(secret);
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
 
