@@ -53,3 +53,5 @@ export class Client extends ContractClient {
         create_chest: (this.txFromJSON)
     };
 }
+/** Registry v2 (sets, constructor, token/deadline checks, group_id). The v1 `Client` above is unchanged. */
+export { Client as ClientV2, Errors as ErrorsV2, networks as networksV2 } from "./v2.js";
