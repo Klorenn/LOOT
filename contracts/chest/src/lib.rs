@@ -25,14 +25,28 @@ pub enum Error {
     NotCreator = 7,
     StillActive = 8,
     BadAmounts = 9,
-    AlreadyInit = 10,
-    NotInit = 11,
+    // 10 and 11 were AlreadyInit / NotInit (removed: the constructor replaces init). Not reused.
     NotSetOwner = 12,
     SetNotFound = 13,
+    /// create_chest / create_chest_in_set received a token other than the one fixed in the constructor.
+    WrongToken = 14,
+    /// Deadline must satisfy now < deadline <= now + MAX_DEADLINE.
+    BadDeadline = 15,
+    /// This recipient already claimed in this group (chest or set). Does NOT stop fresh addresses.
+    AlreadyClaimed = 16,
 }
 
 /// Registry version (immutable contract; a new version is a new deployment).
 pub const VERSION: u32 = 2;
+
+/// Longest allowed chest lifetime: 90 days. `deadline` must satisfy
+/// `now < deadline <= now + MAX_DEADLINE` (0 = "never expires" is NOT allowed).
+pub const MAX_DEADLINE: u64 = 90 * 24 * 60 * 60;
+/// After the deadline the entries stay alive this long so the creator can still `close_chest`.
+const CLOSE_GRACE: u64 = 30 * 24 * 60 * 60;
+/// Seconds per ledger assumed when converting time to a TTL in ledgers. Real mainnet is ~5s;
+/// 4 deliberately over-extends (more ledgers) instead of under-extending.
+const LEDGER_SECS: u64 = 4;
 
 /// Wire-compatible con el `Proof` del verificador generado
 /// (a: G1 64B, b: G2 128B, c: G1 64B, ethereum-uncompressed).
@@ -65,9 +79,15 @@ pub struct Chest {
 #[contracttype]
 pub enum DataKey {
     Verifier,
+    /// The single token (XLM SAC) this registry accepts, fixed in the constructor.
+    Token,
     NextId,
     Chest(u64),
     Nullifier(BytesN<32>),
+    /// (group id, recipient) -> true. One claim per address per group. This is NOT sybil
+    /// resistance: a person with N fresh addresses (and N player secrets) still claims N times.
+    /// It only stops the SAME address from claiming twice in a group.
+    Claimed(u64, Address),
     /// set id -> creator. Set ids come from the same counter as chest ids.
     SetOwner(u64),
 }
@@ -77,14 +97,20 @@ pub struct ChestZk;
 
 #[contractimpl]
 impl ChestZk {
-    pub fn init(env: Env, admin: Address, verifier: Address) -> Result<(), Error> {
-        admin.require_auth();
-        if env.storage().instance().has(&DataKey::Verifier) {
-            return Err(Error::AlreadyInit);
-        }
+    /// Deploy-time initialisation (atomic with deployment: no init front-run window).
+    /// `verifier`: Groth16 verifier contract. `token`: the only token chests may hold (XLM SAC).
+    pub fn __constructor(env: Env, verifier: Address, token: Address) {
         env.storage().instance().set(&DataKey::Verifier, &verifier);
+        env.storage().instance().set(&DataKey::Token, &token);
         env.storage().instance().set(&DataKey::NextId, &1u64);
-        Ok(())
+    }
+
+    pub fn verifier(env: Env) -> Address {
+        env.storage().instance().get(&DataKey::Verifier).unwrap()
+    }
+
+    pub fn token(env: Env) -> Address {
+        env.storage().instance().get(&DataKey::Token).unwrap()
     }
 
     pub fn version(_env: Env) -> u32 {
@@ -100,23 +126,35 @@ impl ChestZk {
     /// Allocate a set id (from the same counter as chest ids, so it can never
     /// equal any chest id or any other set id). Only `creator` can add chests.
     pub fn create_set(env: Env, creator: Address) -> Result<u64, Error> {
-        Self::require_init(&env)?;
         creator.require_auth();
         let set_id = Self::next_id(&env);
-        env.storage()
-            .persistent()
-            .set(&DataKey::SetOwner(set_id), &creator);
+        let owner_key = DataKey::SetOwner(set_id);
+        env.storage().persistent().set(&owner_key, &creator);
+        Self::extend_max(&env, &owner_key);
+        Self::bump_instance(&env);
         env.events()
             .publish((symbol_short!("set"), set_id), creator);
         Ok(set_id)
     }
 
-    fn require_init(env: &Env) -> Result<(), Error> {
-        if env.storage().instance().has(&DataKey::Verifier) {
-            Ok(())
-        } else {
-            Err(Error::NotInit)
-        }
+    /// Extend an entry to the network max TTL (small entries: nullifiers, claimed flags, set owners).
+    fn extend_max(env: &Env, key: &DataKey) {
+        let max = env.storage().max_ttl();
+        env.storage().persistent().extend_ttl(key, max, max);
+    }
+
+    /// Ledgers needed to outlive `deadline` plus CLOSE_GRACE, clamped to the network max TTL.
+    fn ttl_past(env: &Env, deadline: u64) -> u32 {
+        let secs = deadline
+            .saturating_sub(env.ledger().timestamp())
+            .saturating_add(CLOSE_GRACE);
+        let ledgers = secs / LEDGER_SECS + 1;
+        ledgers.min(env.storage().max_ttl() as u64) as u32
+    }
+
+    fn bump_instance(env: &Env) {
+        let max = env.storage().max_ttl();
+        env.storage().instance().extend_ttl(max, max);
     }
 
     pub fn create_chest(
@@ -175,8 +213,14 @@ impl ChestZk {
         max_claims: u32,
         deadline: u64,
     ) -> Result<u64, Error> {
-        Self::require_init(&env)?;
         creator.require_auth();
+        if token != Self::token(env.clone()) {
+            return Err(Error::WrongToken);
+        }
+        let now = env.ledger().timestamp();
+        if deadline <= now || deadline > now.saturating_add(MAX_DEADLINE) {
+            return Err(Error::BadDeadline);
+        }
         if let Some(sid) = set_id {
             let owner: Address = env
                 .storage()
@@ -186,6 +230,7 @@ impl ChestZk {
             if owner != creator {
                 return Err(Error::NotSetOwner);
             }
+            Self::extend_max(&env, &DataKey::SetOwner(sid));
         }
         if prize <= 0 || max_claims == 0 {
             return Err(Error::BadAmounts);
@@ -213,7 +258,11 @@ impl ChestZk {
             closed: false,
             group_id: set_id.unwrap_or(id),
         };
-        env.storage().persistent().set(&DataKey::Chest(id), &chest);
+        let ckey = DataKey::Chest(id);
+        env.storage().persistent().set(&ckey, &chest);
+        let ttl = Self::ttl_past(&env, chest.deadline);
+        env.storage().persistent().extend_ttl(&ckey, ttl, ttl);
+        Self::bump_instance(&env);
         env.events().publish(
             (symbol_short!("created"), id),
             (chest.prize, chest.max_claims),
@@ -228,7 +277,6 @@ impl ChestZk {
         nullifier: BytesN<32>,
         proof: Proof,
     ) -> Result<(), Error> {
-        Self::require_init(&env)?;
         let key = DataKey::Chest(chest_id);
         let mut chest: Chest = env
             .storage()
@@ -239,7 +287,7 @@ impl ChestZk {
         if chest.closed {
             return Err(Error::ChestClosed);
         }
-        if chest.deadline != 0 && env.ledger().timestamp() > chest.deadline {
+        if env.ledger().timestamp() > chest.deadline {
             return Err(Error::ChestExpired);
         }
         if chest.claims >= chest.max_claims {
@@ -252,6 +300,13 @@ impl ChestZk {
         {
             return Err(Error::NullifierUsed);
         }
+        // One claim per ADDRESS per group, in addition to the per-secret nullifier.
+        // Same address cannot claim twice (same chest, or two chests of one set).
+        // This does NOT prevent a person from using fresh addresses (sybil).
+        let claimed_key = DataKey::Claimed(chest.group_id, recipient.clone());
+        if env.storage().persistent().has(&claimed_key) {
+            return Err(Error::AlreadyClaimed);
+        }
 
         // Orden del circuito: [fingerprint, nullifier, chestId, recipient]
         // chestId = group_id (== chest id for normal chests, set id for sets).
@@ -261,7 +316,7 @@ impl ChestZk {
         publics.push_back(Self::field_from_u64(&env, chest.group_id));
         publics.push_back(Self::field_from_address(&env, &recipient));
 
-        let verifier_addr: Address = env.storage().instance().get(&DataKey::Verifier).unwrap();
+        let verifier_addr = Self::verifier(env.clone());
         let args = vec![&env, proof.into_val(&env), publics.into_val(&env)];
         let ok: bool =
             env.invoke_contract(&verifier_addr, &Symbol::new(&env, "verify_proof"), args);
@@ -271,11 +326,16 @@ impl ChestZk {
             return Err(Error::InvalidProof);
         }
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::Nullifier(nullifier.clone()), &chest_id);
+        let nkey = DataKey::Nullifier(nullifier.clone());
+        env.storage().persistent().set(&nkey, &chest_id);
+        env.storage().persistent().set(&claimed_key, &true);
+        Self::extend_max(&env, &nkey);
+        Self::extend_max(&env, &claimed_key);
         chest.claims += 1;
         env.storage().persistent().set(&key, &chest);
+        let ttl = Self::ttl_past(&env, chest.deadline);
+        env.storage().persistent().extend_ttl(&key, ttl, ttl);
+        Self::bump_instance(&env);
 
         token::Client::new(&env, &chest.token).transfer(
             &env.current_contract_address(),
@@ -301,13 +361,16 @@ impl ChestZk {
         if chest.closed {
             return Err(Error::ChestClosed);
         }
-        let expired = chest.deadline != 0 && env.ledger().timestamp() > chest.deadline;
+        let expired = env.ledger().timestamp() > chest.deadline;
         let sold_out = chest.claims >= chest.max_claims;
         if !expired && !sold_out {
             return Err(Error::StillActive);
         }
 
         let remaining = chest.prize * ((chest.max_claims - chest.claims) as i128);
+        // Checks-effects-interactions: persist closed = true BEFORE the token transfer.
+        chest.closed = true;
+        env.storage().persistent().set(&key, &chest);
         if remaining > 0 {
             token::Client::new(&env, &chest.token).transfer(
                 &env.current_contract_address(),
@@ -315,8 +378,6 @@ impl ChestZk {
                 &remaining,
             );
         }
-        chest.closed = true;
-        env.storage().persistent().set(&key, &chest);
         env.events()
             .publish((symbol_short!("closed"), chest_id), remaining);
         Ok(remaining)
