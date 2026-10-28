@@ -166,6 +166,90 @@ fn real_proof_cannot_be_replayed() {
         .try_claim(&id, &r.recipient, &n, &proof(&r.env))
         .unwrap_err()
         .unwrap();
-    assert_eq!(err, Error::NullifierUsed);
+    // Claimed(group, recipient) is checked first: it is the authoritative guard.
+    assert_eq!(err, Error::AlreadyClaimed);
     assert_eq!(r.token.balance(&r.recipient), 100);
+}
+
+fn proof_of(env: &Env, a: [u8; 64], b: [u8; 128], c: [u8; 64]) -> Proof {
+    Proof {
+        a: BytesN::from_array(env, &a),
+        b: BytesN::from_array(env, &b),
+        c: BytesN::from_array(env, &c),
+    }
+}
+
+#[test]
+fn same_address_with_a_second_player_secret_cannot_claim_again() {
+    // Two VALID proofs for the same recipient and group, made with two different playerSecrets
+    // (so two different nullifiers). The nullifier alone would let both through; Claimed stops it.
+    let r = real();
+    let id = open(&r, None);
+    r.chest
+        .claim(&id, &r.recipient, &nullifier(&r), &proof(&r.env));
+    assert_ne!(fx::SECRET2_NULLIFIER, fx::NULLIFIER);
+    let p2 = proof_of(&r.env, fx::SECRET2_PROOF_A, fx::SECRET2_PROOF_B, fx::SECRET2_PROOF_C);
+    let err = r
+        .chest
+        .try_claim(
+            &id,
+            &r.recipient,
+            &BytesN::from_array(&r.env, &fx::SECRET2_NULLIFIER),
+            &p2,
+        )
+        .unwrap_err()
+        .unwrap();
+    assert_eq!(err, Error::AlreadyClaimed);
+    assert_eq!(r.token.balance(&r.recipient), 100);
+    assert_eq!(r.chest.get_chest(&id).claims, 1);
+}
+
+#[test]
+fn second_player_secret_proof_is_itself_valid() {
+    // Control for the test above: the SECRET2 proof verifies on its own (a fresh registry).
+    let r = real();
+    let id = open(&r, None);
+    let p2 = proof_of(&r.env, fx::SECRET2_PROOF_A, fx::SECRET2_PROOF_B, fx::SECRET2_PROOF_C);
+    r.chest.claim(
+        &id,
+        &r.recipient,
+        &BytesN::from_array(&r.env, &fx::SECRET2_NULLIFIER),
+        &p2,
+    );
+    assert_eq!(r.token.balance(&r.recipient), 100);
+}
+
+#[test]
+fn sybil_two_different_addresses_each_claim_once_by_design() {
+    // Documents the limit honestly: a DIFFERENT address with its own valid proof claims too.
+    // Not preventable on-chain without an identity layer.
+    let r = real();
+    let id = open(&r, None);
+    r.chest
+        .claim(&id, &r.recipient, &nullifier(&r), &proof(&r.env));
+    let other = Address::from_str(&r.env, fx::OTHER_RECIPIENT);
+    let p3 = proof_of(&r.env, fx::OTHER_PROOF_A, fx::OTHER_PROOF_B, fx::OTHER_PROOF_C);
+    r.chest.claim(
+        &id,
+        &other,
+        &BytesN::from_array(&r.env, &fx::OTHER_NULLIFIER),
+        &p3,
+    );
+    assert_eq!(r.token.balance(&r.recipient), 100);
+    assert_eq!(r.token.balance(&other), 100);
+    assert_eq!(r.chest.get_chest(&id).claims, 2);
+}
+
+#[test]
+fn real_proof_without_recipient_auth_is_rejected() {
+    // A valid proof is not enough: the recipient must sign the claim (require_auth).
+    let r = real();
+    let id = open(&r, None);
+    r.env.set_auths(&[]); // turn off mock_all_auths: no signatures at all
+    let res = r
+        .chest
+        .try_claim(&id, &r.recipient, &nullifier(&r), &proof(&r.env));
+    assert!(matches!(res, Err(Err(_))), "expected an auth failure, got {res:?}");
+    assert_eq!(r.token.balance(&r.recipient), 0);
+    assert_eq!(r.chest.get_chest(&id).claims, 0);
 }

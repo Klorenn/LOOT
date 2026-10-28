@@ -1,7 +1,8 @@
 #![no_std]
 //! ChestZK: cofres de premios cuyo reclamo exige una prueba Groth16 (BN254)
-//! de que conoces la respuesta, atada a la cuenta que cobra (anti-copia)
-//! y con nullifier (una vez por persona y cofre).
+//! de que conoces la respuesta, atada a la cuenta que cobra (anti-copia).
+//! El destinatario firma el claim (require_auth) y solo puede cobrar una vez por
+//! grupo (Claimed(group_id, recipient)). Eso NO frena a quien usa varias cuentas (sybil).
 //!
 //! El verificador vive en otro contrato. No usamos `contractimport!`:
 //! en testnet provocaba "Missing Entry Proof" al invocar. En su lugar
@@ -277,6 +278,10 @@ impl ChestZk {
         nullifier: BytesN<32>,
         proof: Proof,
     ) -> Result<(), Error> {
+        // The prize goes to `recipient`, and `recipient` must sign this call (wallet signature on
+        // the Soroban auth entry; a relayer may still pay the fee). Without this, anyone holding a
+        // valid proof could submit it, and nothing ties the claim to the address owner's consent.
+        recipient.require_auth();
         let key = DataKey::Chest(chest_id);
         let mut chest: Chest = env
             .storage()
@@ -293,19 +298,23 @@ impl ChestZk {
         if chest.claims >= chest.max_claims {
             return Err(Error::SoldOut);
         }
+        // AUTHORITATIVE double-claim guard: one claim per ADDRESS per group (a normal chest is its
+        // own group; all chests of a set share the set id). The nullifier is derived from a
+        // client-side playerSecret, so one address can mint many nullifiers: the nullifier alone
+        // does NOT stop the same address from claiming twice. This check does.
+        // It does NOT prevent a person from using fresh addresses (sybil): that needs identity.
+        let claimed_key = DataKey::Claimed(chest.group_id, recipient.clone());
+        if env.storage().persistent().has(&claimed_key) {
+            return Err(Error::AlreadyClaimed);
+        }
+        // Defensive only: the nullifier is still a public input of the proof (it is in the
+        // circuit) and is still recorded, so an exact proof replay is refused here too.
         if env
             .storage()
             .persistent()
             .has(&DataKey::Nullifier(nullifier.clone()))
         {
             return Err(Error::NullifierUsed);
-        }
-        // One claim per ADDRESS per group, in addition to the per-secret nullifier.
-        // Same address cannot claim twice (same chest, or two chests of one set).
-        // This does NOT prevent a person from using fresh addresses (sybil).
-        let claimed_key = DataKey::Claimed(chest.group_id, recipient.clone());
-        if env.storage().persistent().has(&claimed_key) {
-            return Err(Error::AlreadyClaimed);
         }
 
         // Orden del circuito: [fingerprint, nullifier, chestId, recipient]

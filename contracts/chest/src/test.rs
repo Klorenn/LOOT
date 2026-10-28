@@ -331,7 +331,7 @@ fn set_chests_share_group_and_nullifier() {
         .set_expected(&publics(&s.env, fp(&s.env), n.clone(), set, &p));
     s.chest.claim(&a, &p, &n, &dummy_proof(&s.env));
 
-    // same account, other chest of the set: same nullifier -> rejected
+    // same account, other chest of the set -> rejected by the authoritative Claimed(group, address) guard
     s.mock
         .set_expected(&publics(&s.env, fp2(&s.env), n.clone(), set, &p));
     let err = s
@@ -339,8 +339,19 @@ fn set_chests_share_group_and_nullifier() {
         .try_claim(&b, &p, &n, &dummy_proof(&s.env))
         .unwrap_err()
         .unwrap();
-    assert_eq!(err, Error::NullifierUsed);
+    assert_eq!(err, Error::AlreadyClaimed);
     assert_eq!(s.token.balance(&p), 100);
+
+    // the shared nullifier is still recorded (defensive): another address cannot reuse it in the set
+    let q = Address::generate(&s.env);
+    s.mock
+        .set_expected(&publics(&s.env, fp2(&s.env), n.clone(), set, &q));
+    let err = s
+        .chest
+        .try_claim(&b, &q, &n, &dummy_proof(&s.env))
+        .unwrap_err()
+        .unwrap();
+    assert_eq!(err, Error::NullifierUsed);
 }
 
 #[test]
@@ -718,4 +729,75 @@ fn only_the_fixed_token_is_accepted() {
         TokenClient::new(&s.env, &other.address()).balance(&s.creator),
         1_000
     );
+}
+
+#[test]
+fn claim_requires_the_recipient_signature() {
+    extern crate std;
+    use soroban_sdk::{IntoVal, testutils::{AuthorizedFunction, AuthorizedInvocation}};
+    let s = setup();
+    let id = s
+        .chest
+        .create_chest(&s.creator, &fp(&s.env), &s.token.address, &100, &2, &dl(&s.env));
+    let p = Address::generate(&s.env);
+    let n = nul(&s.env, 1);
+    let proof = dummy_proof(&s.env);
+    s.chest.claim(&id, &p, &n, &proof);
+    // Exactly one auth was required, from the recipient, for this exact claim call (no sub-invocations).
+    assert_eq!(
+        s.env.auths(),
+        std::vec![(
+            p.clone(),
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    s.chest.address.clone(),
+                    Symbol::new(&s.env, "claim"),
+                    (id, p.clone(), n.clone(), proof.clone()).into_val(&s.env),
+                )),
+                sub_invocations: std::vec![],
+            }
+        )]
+    );
+}
+
+#[test]
+fn claim_without_recipient_auth_fails_and_moves_nothing() {
+    let s = setup();
+    let id = s
+        .chest
+        .create_chest(&s.creator, &fp(&s.env), &s.token.address, &100, &2, &dl(&s.env));
+    let p = Address::generate(&s.env);
+    s.env.set_auths(&[]);
+    let res = s
+        .chest
+        .try_claim(&id, &p, &nul(&s.env, 1), &dummy_proof(&s.env));
+    assert!(matches!(res, Err(Err(_))), "expected an auth failure, got {res:?}");
+    assert_eq!(s.token.balance(&p), 0);
+    assert_eq!(s.chest.get_chest(&id).claims, 0);
+}
+
+#[test]
+fn someone_else_cannot_sign_for_the_recipient() {
+    use soroban_sdk::{IntoVal, testutils::{MockAuth, MockAuthInvoke}};
+    let s = setup();
+    let id = s
+        .chest
+        .create_chest(&s.creator, &fp(&s.env), &s.token.address, &100, &2, &dl(&s.env));
+    let victim = Address::generate(&s.env);
+    let relayer = Address::generate(&s.env);
+    let n = nul(&s.env, 1);
+    let proof = dummy_proof(&s.env);
+    // The relayer (or anyone) authorizes the call, but not the recipient: rejected.
+    s.env.mock_auths(&[MockAuth {
+        address: &relayer,
+        invoke: &MockAuthInvoke {
+            contract: &s.chest.address,
+            fn_name: "claim",
+            args: (id, victim.clone(), n.clone(), proof.clone()).into_val(&s.env),
+            sub_invokes: &[],
+        },
+    }]);
+    let res = s.chest.try_claim(&id, &victim, &n, &proof);
+    assert!(matches!(res, Err(Err(_))), "expected an auth failure, got {res:?}");
+    assert_eq!(s.token.balance(&victim), 0);
 }
