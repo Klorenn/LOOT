@@ -8,6 +8,7 @@ import { StateBlock } from "@/components/state-block";
 import { Mono } from "@/components/kv";
 import { readWonChests, type WonChestsResult } from "@/lib/chain";
 import { chestPath } from "@/lib/chest-code";
+import { displayId } from "@/lib/registry";
 import { stroopsToXlm, tokenDecimals, tokenLabel } from "@/lib/config";
 import { getChest } from "@/lib/chests-demo";
 import { expertTx, shortAddr } from "@/lib/format";
@@ -141,7 +142,7 @@ export default function ClaimedChestsPage() {
                           <LogoChest className="w-[44px]" deg={30} showInside />
                         </td>
                         <td className="py-4 font-mono text-[13px] text-[var(--dim)]">
-                          #{String(w.chestId).padStart(4, "0")}
+                          #{String(displayId(w.chestId)).padStart(4, "0")}
                         </td>
                         <td className="py-4">
                           <p className="text-[15px] font-medium">

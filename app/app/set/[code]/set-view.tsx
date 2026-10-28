@@ -10,6 +10,7 @@ import { Mono } from "@/components/kv";
 import { useNet } from "@/components/network-provider";
 import { useSession } from "@/lib/session";
 import { chestPath } from "@/lib/chest-code";
+import { displayId } from "@/lib/registry";
 import { chestSaltFragment, parseSetSalts } from "@/lib/chest-set";
 import type { SetMemberView } from "@/app/api/sets/[code]/route";
 
@@ -140,7 +141,7 @@ export function SetView({ code }: { code: string }) {
                       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[12px] text-[var(--dim)]">
                         <span className="text-[var(--gold)]">{m.prizeLabel ?? "—"}</span>
                         {m.difficulty && <DifficultyBars level={m.difficulty} />}
-                        <Mono className="text-[var(--dim)]">{`#${String(m.chestId).padStart(4, "0")}`}</Mono>
+                        <Mono className="text-[var(--dim)]">{`#${String(displayId(m.chestId)).padStart(4, "0")}`}</Mono>
                         {mine && <span className="text-[var(--ok)]">claimed by this account</span>}
                         {blockedForMe && m.status === "open" && <span>not available to this account</span>}
                         {needsSalt && m.status === "open" && <span className="text-[var(--gold)]">needs the full invite link</span>}

@@ -18,6 +18,7 @@ import { cfg } from "@/lib/cfg";
 import { canConfirm, canReserve, parseCreatorAllowlist, type MetaGate } from "@/lib/meta-gate";
 import { QUIZ_LIMITS, parseQuiz, quizServerGuessable, type Quiz } from "@/lib/quiz";
 import { SET_LIMITS, setCapError, type SetRef } from "@/lib/chest-set";
+import { isV2Ref, resolveSetId } from "@/lib/registry";
 
 /**
  * Metadatos off-chain de un cofre, en dos pasos (reserve-then-confirm):
@@ -59,7 +60,8 @@ function parseSetRef(v: unknown): SetRef | string {
   if (!Number.isSafeInteger(index) || (index as number) < 0 || (index as number) >= (size as number)) return "bad set index";
   if (!str(o.title, SET_LIMITS.title)) return "bad set title";
   const title = (o.title as string).trim();
-  if (index === 0) return { id: 0, index: 0, size: size as number, title };
+  // question 1: registry v1 has no set id yet (it IS the chest id, replaced at confirm); registry v2 sends the on-chain set id
+  if (index === 0) return { id: isV2Ref(Number(id)) ? (id as number) : 0, index: 0, size: size as number, title };
   if (!Number.isSafeInteger(id) || (id as number) < 1) return "bad set id";
   return { id: id as number, index: index as number, size: size as number, title };
 }
@@ -154,14 +156,16 @@ async function confirmSetMember(
   const ref = pending.set!;
   if (chest.maxClaims !== 1) return { error: "a set question must be a chest with exactly 1 claim", status: 403 };
 
-  const setId = ref.index === 0 ? id : ref.id;
+  const resolved = resolveSetId({ chestRef: id, groupId: chest.groupId, declaredSetId: ref.id, index: ref.index });
+  if ("error" in resolved) return { error: resolved.error, status: 403 };
+  const setId = resolved.setId;
   // Total cap first, so a rejected question 1 doesn't burn the set id.
   const capBad = await setTotalError(setId, ref, chest, caps);
   if (capBad) return capBad;
 
   if (ref.index === 0) {
     const w = await saveSetHeader({
-      id,
+      id: setId,
       title: ref.title,
       creator: pending.creator,
       size: ref.size,
@@ -169,7 +173,7 @@ async function confirmSetMember(
       createdAt: new Date().toISOString(),
     });
     if (w === "exists") {
-      const h = await getSetHeader(id);
+      const h = await getSetHeader(setId);
       if (!h || h.creator !== pending.creator) return { error: "set already exists", status: 409 };
     }
   } else {

@@ -2,7 +2,7 @@
 
 import { Keypair, rpc, scValToNative } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
-import { Client } from "@findloot/chest";
+import { Client, ClientV2 } from "@findloot/chest";
 import { latestLedgerHint } from "./chain";
 import type { Quiz } from "./quiz";
 import { capError } from "./caps";
@@ -11,6 +11,7 @@ import { clientCfg } from "./network";
 import { resourceFeeOf } from "./sim-fee";
 import { getPasskeyKit } from "./passkey-client";
 import { SendError } from "./send";
+import { contractErrorCode, contractErrorMessage, createMethod, deadlineError, refOf, splitRef, type RegistryVersion } from "./registry";
 import { submitPasskeyTx, type Player } from "./wallet";
 import { signWithWallet } from "./wallets-kit";
 
@@ -27,8 +28,13 @@ export type CreateInput = {
   /** stroops por cupo */
   prizeStroops: bigint;
   maxClaims: number;
-  /** segundos unix; 0 = sin vencimiento */
+  /** segundos unix; siempre en el futuro y como máximo 90 días (el registry v2 lo exige) */
   deadline: number;
+  /**
+   * Registry v2 only: ref (lib/registry.ts) of a set made with createSetOnChain. The chest is created with
+   * `create_chest_in_set`, so the contract enforces that only the set owner adds chests to it.
+   */
+  setRef?: number;
 };
 
 export type ChestMetaInput = {
@@ -82,15 +88,20 @@ export function confirmMeta(chestId: number, fingerprintHex: string, txHash?: st
   return postMeta({ action: "confirm", chestId, fingerprintHex, txHash });
 }
 
-function newClient(publicKey: string, signTransaction?: unknown): Client {
-  return new Client({
+/** Registry where NEW chests are created: v1 unless REGISTRY_VERSION=2 is configured (lib/network.ts). */
+const createVersion = (): RegistryVersion => clientCfg().CREATE_VERSION;
+
+/** Client for the registry of `version` (v1 `Client`, v2 `ClientV2`: same methods plus create_set / create_chest_in_set). */
+function newClient(publicKey: string, signTransaction?: unknown, version: RegistryVersion = 1): ClientV2 {
+  const Registry = version === 2 ? ClientV2 : Client;
+  return new Registry({
     networkPassphrase: NETWORK.passphrase,
-    contractId: CONTRACTS.chest,
+    contractId: version === 2 ? clientCfg().REGISTRY_V2.chest : CONTRACTS.chest,
     rpcUrl: NETWORK.rpcUrl,
     allowHttp: true,
     publicKey,
     ...(signTransaction ? { signTransaction } : {}),
-  } as never);
+  } as never) as unknown as ClientV2;
 }
 
 const createArgs = (player: Player, i: CreateInput) => ({
@@ -101,6 +112,24 @@ const createArgs = (player: Player, i: CreateInput) => ({
   max_claims: i.maxClaims,
   deadline: BigInt(i.deadline),
 });
+
+/** Which contract method creates this chest (lib/registry.ts, unit-tested). */
+export function createCall(version: RegistryVersion, setRef?: number): "create_chest" | "create_chest_in_set" {
+  try {
+    return createMethod(version, setRef);
+  } catch (e) {
+    throw new SendError(e instanceof Error ? e.message : String(e));
+  }
+}
+
+/** Builds the create call for the registry that will hold the chest. */
+function buildCreate(client: ClientV2, player: Player, input: CreateInput, version: RegistryVersion) {
+  const args = createArgs(player, input);
+  return (o: object) =>
+    createCall(version, input.setRef) === "create_chest_in_set"
+      ? client.create_chest_in_set({ ...args, set_id: BigInt(splitRef(input.setRef!).id) }, o as never)
+      : client.create_chest(args, o as never);
+}
 
 /** Espera la tx y devuelve su valor de retorno (create_chest: u64; close_chest: i128). */
 async function returnValueFromTx(hash: string): Promise<unknown> {
@@ -119,21 +148,39 @@ async function returnValueFromTx(hash: string): Promise<unknown> {
 }
 
 type Phase = (phase: "signing" | "pending") => void;
-type Build = (client: Client, opts: object) => Promise<{ sign(): Promise<unknown>; send(): Promise<unknown> }>;
+type Build = (client: ClientV2, opts: object) => Promise<{ sign(): Promise<unknown>; send(): Promise<unknown> }>;
 
 export async function createChestOnChain(
   player: Player,
   input: CreateInput,
   onPhase?: Phase,
 ): Promise<{ chestId: number; hash: string }> {
-  if (!Number.isSafeInteger(input.deadline) || input.deadline <= Math.floor(Date.now() / 1000))
-    throw new SendError("The chest needs an expiry in the future; otherwise the prize could never be recovered.");
-  if (clientCfg().IS_MAINNET && input.deadline > Math.floor(Date.now() / 1000) + 30 * 86400)
+  const now = Math.floor(Date.now() / 1000);
+  const dl = deadlineError(input.deadline, now);
+  if (dl) throw new SendError(dl);
+  if (clientCfg().IS_MAINNET && input.deadline > now + 30 * 86400)
     throw new SendError("On mainnet the expiry can be at most 30 days from now.");
   const capBad = capError(input.prizeStroops, input.maxClaims, clientCfg().CAPS);
   if (capBad) throw new SendError(capBad);
-  const hash = await invokeAsCreator(player, (c, o) => c.create_chest(createArgs(player, input), o) as never, onPhase);
-  return { chestId: Number(await returnValueFromTx(hash)), hash };
+  const version = createVersion();
+  const hash = await invokeAsCreator(
+    player,
+    (c, o) => buildCreate(c, player, input, version)(o) as never,
+    onPhase,
+    version,
+  );
+  // the contract returns the id inside its registry; the app keeps a ref (v1: same number)
+  return { chestId: refOf(version, Number(await returnValueFromTx(hash))), hash };
+}
+
+/**
+ * Registry v2: the creator allocates a set on-chain (`create_set`). Its id comes from the contract's own counter,
+ * so it can never equal a chest id or another set id, and only this creator can add chests to it.
+ */
+export async function createSetOnChain(player: Player, onPhase?: Phase): Promise<{ setRef: number; hash: string }> {
+  if (createVersion() !== 2) throw new SendError("On-chain sets need registry v2.");
+  const hash = await invokeAsCreator(player, (c, o) => c.create_set({ creator: player.publicKey }, o as never) as never, onPhase, 2);
+  return { setRef: refOf(2, Number(await returnValueFromTx(hash))), hash };
 }
 
 /** El creador cierra un cofre vencido: el contrato le devuelve (max_claims − claims) × prize. */
@@ -142,13 +189,30 @@ export async function closeChestOnChain(
   chestId: number,
   onPhase?: Phase,
 ): Promise<{ hash: string; refunded: bigint }> {
-  const hash = await invokeAsCreator(player, (c, o) => c.close_chest({ chest_id: BigInt(chestId) }, o) as never, onPhase);
+  const { version, id } = splitRef(chestId);
+  const hash = await invokeAsCreator(player, (c, o) => c.close_chest({ chest_id: BigInt(id) }, o as never) as never, onPhase, version);
   return { hash, refunded: BigInt((await returnValueFromTx(hash)) as bigint) };
 }
 
+/** Registry contract errors (WrongToken, BadDeadline, NotSetOwner, SetNotFound...) become clear English messages. */
+async function friendly<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (e) {
+    if (e instanceof SendError) throw e;
+    const message = contractErrorMessage(contractErrorCode(e));
+    if (message) throw new SendError(message);
+    throw e;
+  }
+}
+
 /** Firma con la cuenta de sesión y envía; devuelve el hash. G por RPC, C por passkey + relayer. */
-async function invokeAsCreator(player: Player, build: Build, onPhase?: Phase): Promise<string> {
-  if (player.kind === "passkey") return invokePasskey(player, build, onPhase);
+function invokeAsCreator(player: Player, build: Build, onPhase?: Phase, version: RegistryVersion = 1): Promise<string> {
+  return friendly(() => invokeRaw(player, build, onPhase, version));
+}
+
+async function invokeRaw(player: Player, build: Build, onPhase?: Phase, version: RegistryVersion = 1): Promise<string> {
+  if (player.kind === "passkey") return invokePasskey(player, build, onPhase, version);
 
   let signTransaction: unknown;
   if (player.kind === "classic" && player.secretKey) {
@@ -163,7 +227,7 @@ async function invokeAsCreator(player: Player, build: Build, onPhase?: Phase): P
     throw new SendError("This session can’t sign transactions.");
   }
 
-  const client = newClient(player.publicKey, signTransaction);
+  const client = newClient(player.publicKey, signTransaction, version);
   const at = await build(client, { fee: "10000000", timeoutInSeconds: 120 });
   onPhase?.("signing");
   await at.sign();
@@ -174,7 +238,7 @@ async function invokeAsCreator(player: Player, build: Build, onPhase?: Phase): P
   return hash;
 }
 
-async function invokePasskey(player: Player, build: Build, onPhase?: Phase): Promise<string> {
+async function invokePasskey(player: Player, build: Build, onPhase?: Phase, version: RegistryVersion = 1): Promise<string> {
   const kit = getPasskeyKit();
   if (!kit.keyId || !kit.wallet || kit.wallet.options.contractId !== player.publicKey) {
     try {
@@ -185,7 +249,7 @@ async function invokePasskey(player: Player, build: Build, onPhase?: Phase): Pro
   }
   if (!kit.keyId || !kit.wallet) throw new SendError("Couldn’t unlock your passkey wallet. Try logging in again.");
 
-  const client = newClient(SIM_ACCOUNT);
+  const client = newClient(SIM_ACCOUNT, undefined, version);
   const at = await build(client, { simulate: true });
   const expiration = (await latestLedgerHint()) + 120;
   onPhase?.("signing");
@@ -204,8 +268,9 @@ async function invokePasskey(player: Player, build: Build, onPhase?: Phase): Pro
  */
 export async function estimateCreateFee(player: Player, input: CreateInput): Promise<bigint | null> {
   try {
-    const client = newClient(player.kind === "passkey" ? SIM_ACCOUNT : player.publicKey);
-    const at = await client.create_chest(createArgs(player, input), { simulate: true } as never);
+    const version = createVersion();
+    const client = newClient(player.kind === "passkey" ? SIM_ACCOUNT : player.publicKey, undefined, version);
+    const at = await buildCreate(client, player, input, version)({ simulate: true });
     const rf = resourceFeeOf(at);
     return rf === null ? null : rf + BigInt(100);
   } catch {

@@ -15,8 +15,11 @@ export type ProveInput = {
   answer: string;
   salt: string;
   playerSecret: string;
+  /** Circuit chestId input: `group_id` on registry v2, the chest id on v1. Also keys the nullifier. */
   chestId: string;
   recipientField: string; // decimal field element
+  /** Registry del cofre: elige la zkey (v2 usa la de la ceremonia también en testnet). Por defecto 1. */
+  registryVersion?: 1 | 2;
   /** Etapas para la UI: "witness" al empezar, "prove" antes de snarkjs. */
   onStage?: (stage: "witness" | "prove") => void;
 };
@@ -76,8 +79,8 @@ export async function proveChest(input: ProveInput): Promise<ProveResult> {
   const nullifier = await poseidon2(playerSecret, chestId);
   const calcMs = performance.now() - t0;
 
-  // la zkey depende de la red activa (ceremonia en mainnet, original en testnet)
-  const assets = zkAssets(clientCfg().IS_MAINNET);
+  // la zkey depende de la red Y del registry (ceremonia en mainnet y en v2, original solo en v1 de testnet)
+  const assets = zkAssets(clientCfg().IS_MAINNET, input.registryVersion ?? 1);
   input.onStage?.("prove");
   const t1 = performance.now();
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(

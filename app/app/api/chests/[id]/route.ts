@@ -33,6 +33,9 @@ async function onChain(id: number) {
     deadline: chest.deadline,
     creator: chest.creator,
     fingerprintHex: chest.fingerprintHex,
+    // Circuit `chestId` input (v2: group_id, the set id for set chests; v1: the chest id).
+    groupId: chest.groupId,
+    registryVersion: chest.version,
   };
 }
 
@@ -62,7 +65,7 @@ export async function GET(
     });
   }
 
-  const isDemo = !IS_MAINNET && n === DEMO_CHEST.id;
+  const isDemo = !IS_MAINNET && n === DEMO_CHEST.id; // v1 id only: v2 refs are above the offset
   const meta = isDemo ? null : await getChestMeta(n);
   if (!isDemo && !meta) {
     return NextResponse.json({ error: "not found" }, { status: 404 });

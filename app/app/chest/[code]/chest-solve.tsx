@@ -15,6 +15,7 @@ import { InlineAlert } from "@/components/inline-alert";
 import { chestPath, encodeChestId } from "@/lib/chest-code";
 import { SET_ALREADY_CLAIMED_CODE, type SetRef } from "@/lib/chest-set";
 import { DEMO_CHEST, PRIZE, zkAssets } from "@/lib/config";
+import { ALREADY_CLAIMED_MSG, circuitChestId, contractErrorMessage, displayId, splitRef } from "@/lib/registry";
 import { TrustedSetupNote } from "@/components/network-banner";
 import { NetworkBadge } from "@/components/network-switch";
 import { getChest } from "@/lib/chests-demo";
@@ -47,6 +48,10 @@ type Meta = {
   quiz?: Quiz;
   /** Member of a chest set: one chest per question. */
   set?: SetRef;
+  /** Circuit chestId input read from the chain (registry v2: group_id, the set id for set chests). */
+  groupId?: number;
+  /** Registry the chest lives in (1 = original, 2 = new registry). */
+  registryVersion?: 1 | 2;
 };
 
 type StepState = "idle" | "run" | "done";
@@ -56,6 +61,7 @@ type Fail =
   | { kind: "wrong"; quiz?: boolean }
   | { kind: "used" }
   | { kind: "setused" }
+  | { kind: "contract"; message: string; already?: boolean }
   | { kind: "soldout" }
   | { kind: "closed" }
   | { kind: "invalid" }
@@ -63,9 +69,14 @@ type Fail =
   | { kind: "relayer"; detail: string }
   | { kind: "example" };
 
-/** Contrato (contracts/chest/src/lib.rs): 1 NotFound, 2 Closed, 3 Expired, 4 SoldOut, 5 NullifierUsed, 6 InvalidProof. */
+/** Contrato (contracts/chest/src/lib.rs): 1 NotFound, 2 Closed, 3 Expired, 4 SoldOut, 5 NullifierUsed, 6 InvalidProof; v2 adds 12-16. */
 function classify(raw: string): Fail {
   const n = raw.match(/Error\(Contract,\s*#(\d+)\)/)?.[1];
+  if (n === "16") return { kind: "contract", message: ALREADY_CLAIMED_MSG, already: true };
+  if (n === "12" || n === "13" || n === "14" || n === "15") {
+    const message = contractErrorMessage(Number(n));
+    if (message) return { kind: "contract", message };
+  }
   if (n === "5") return { kind: "used" };
   if (n === "4") return { kind: "soldout" };
   if (n === "1" || n === "2" || n === "3") return { kind: "closed" };
@@ -153,6 +164,8 @@ export function ChestSolve({
           closed: m.closed,
           quiz: m.quiz,
           set: m.set,
+          groupId: m.groupId,
+          registryVersion: m.registryVersion,
         }),
       )
       .catch(() => {
@@ -236,9 +249,17 @@ export function ChestSolve({
       }
 
       mark(0, "run");
-      const zk = zkAssets(IS_MAINNET);
+      const version = meta.registryVersion ?? splitRef(chestId).version;
+      const zk = zkAssets(IS_MAINNET, version);
       await Promise.all([fetch(zk.wasm), fetch(zk.zkey)]);
       mark(0, "done");
+
+      // Circuit chestId input: group_id read from the chain (v2: the set id for set chests). v1 has no group_id: it is the chest id.
+      const circuitId = circuitChestId(chestId, meta.groupId);
+      if (circuitId === null) {
+        setFail({ kind: "relayer", detail: "Couldn’t read this chest from the network. Try again in a moment." });
+        return;
+      }
 
       const { decimal: recipient } = recipientField(player.publicKey);
       let result;
@@ -247,7 +268,8 @@ export function ChestSolve({
           answer: secretAnswer,
           salt: salt ?? "0",
           playerSecret: player.playerSecret,
-          chestId: String(chestId),
+          chestId: circuitId,
+          registryVersion: version,
           recipientField: recipient,
           onStage: (stage) => {
             if (stage === "witness") mark(1, "run");
@@ -369,7 +391,7 @@ export function ChestSolve({
         }
         lead={
           <span className="font-mono text-[14px] tracking-[0.06em] text-[var(--dim)]">
-            {catalog?.name ? `${catalog.name} · ` : ""}Chest #{String(chestId).padStart(4, "0")}
+            {catalog?.name ? `${catalog.name} · ` : ""}Chest #{String(displayId(chestId)).padStart(4, "0")}
             {!catalog?.live && catalog && (
               <>
                 {" · "}
@@ -658,7 +680,7 @@ export function ChestSolve({
                   </button>
                   <p className="mt-3 font-mono text-[12px] text-[var(--dim)]">
                     {connected && answer.trim()
-                      ? `Proof binds: answer hash + ${player!.publicKey.slice(0, 4)}…${player!.publicKey.slice(-4)} + chest #${String(chestId).padStart(4, "0")}.`
+                      ? `Proof binds: answer hash + ${player!.publicKey.slice(0, 4)}…${player!.publicKey.slice(-4)} + chest #${String(displayId(meta?.groupId ?? chestId)).padStart(4, "0")}.`
                       : "Connect and enter an answer to continue."}
                   </p>
                 </>
@@ -747,6 +769,20 @@ function FailBlock({
           label="One per account"
           title="This account already claimed from this set."
           body="This app lets each account take one chest per set. It is an app rule, not an on-chain guarantee. Nothing was sent for this claim."
+          chest="none"
+          actions={[
+            { href: "/explore", label: "Explore chests", primary: true },
+            { href: "/claimed-chests", label: "My claimed chests" },
+          ]}
+        />
+      );
+    case "contract":
+      return (
+        <StateBlock
+          tone="proof"
+          label={fail.already ? "Already claimed" : "Not accepted"}
+          title={fail.message}
+          body="Nothing was sent for this claim."
           chest="none"
           actions={[
             { href: "/explore", label: "Explore chests", primary: true },

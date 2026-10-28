@@ -9,6 +9,7 @@ import { KV, Mono } from "@/components/kv";
 import { chestPath } from "@/lib/chest-code";
 import { loadPlayer } from "@/lib/wallet";
 import { withNet } from "@/lib/network";
+import { displayId } from "@/lib/registry";
 import { useNet } from "@/components/network-provider";
 
 type ClaimTx = {
@@ -26,7 +27,7 @@ function shortAddr(a: string) {
 export function ClaimedClient({ chestId: chestNum }: { chestId: number }) {
   const { NETWORK, IS_MAINNET } = useNet();
   const id = String(chestNum);
-  const chestId = id.padStart(4, "0");
+  const chestId = String(displayId(chestNum)).padStart(4, "0");
   const [deg, setDeg] = useState(0);
   const [tx, setTx] = useState<ClaimTx | null>(null);
   const [addr, setAddr] = useState("");

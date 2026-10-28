@@ -14,7 +14,8 @@ import { poseidon2, fieldToHex } from "@/lib/zk";
 import { chestPath, encodeChestId } from "@/lib/chest-code";
 import { SET_LIMITS, maxSetSize, setCapError, setSaltsFragment, validateSetShape } from "@/lib/chest-set";
 import { createdCount, runSetCreation, nextToCreate, type SetCreateDeps, type SetItem, type SetProgress } from "@/lib/chest-set-create";
-import { confirmMeta, createChestOnChain, reserveMeta } from "@/lib/create-chest";
+import { isV2Ref } from "@/lib/registry";
+import { confirmMeta, createChestOnChain, createSetOnChain, reserveMeta } from "@/lib/create-chest";
 import { expiryError, defaultExpiry } from "@/lib/expiry";
 import { stroopsToXlm } from "@/lib/config";
 import { withNet } from "@/lib/network";
@@ -34,7 +35,7 @@ const emptyRow = (): Row => ({ question: "", hint: "", answer: "", prize: "1" })
  * guarantee: someone with several accounts, or calling the contract directly, can take more than one.
  */
 export function SetCreate() {
-  const { NETWORK, NETWORK_LC, CONFIG_INCOMPLETE, CAPS, IS_MAINNET } = useNet();
+  const { NETWORK, NETWORK_LC, CONFIG_INCOMPLETE, CAPS, IS_MAINNET, CREATE_VERSION } = useNet();
   const { player } = useSession();
   const net = IS_MAINNET ? "mainnet" : "testnet";
 
@@ -147,12 +148,29 @@ export function SetCreate() {
           },
         );
       },
-      create: (item) =>
-        createChestOnChain(
+      // Registry v2: the set is allocated on-chain first and every question is created INSIDE it
+      // (create_chest_in_set). Registry v1: unchanged (set id = chest id of question 1, off-chain grouping).
+      ...(CREATE_VERSION === 2
+        ? {
+            createSet: async () => {
+              setPhase("Creating the set…");
+              const r = await createSetOnChain(player, (p) => setPhase(p === "signing" ? "Approve in your wallet…" : "Waiting for the network…"));
+              return { setId: r.setRef, hash: r.hash };
+            },
+          }
+        : {}),
+      create: (item, setId) => {
+        // a draft keeps working only on the registry its set was started in
+        if (setId !== undefined && CREATE_VERSION === 2 && !isV2Ref(setId))
+          throw new Error("This set was started on the previous registry and can’t be continued here.");
+        if (setId !== undefined && CREATE_VERSION === 1 && isV2Ref(setId))
+          throw new Error("This set was started on the new registry, which isn’t enabled right now.");
+        return createChestOnChain(
           player,
-          { fingerprintHex: item.fingerprintHex, prizeStroops: item.prizeStroops, maxClaims: 1, deadline: d.deadline },
+          { fingerprintHex: item.fingerprintHex, prizeStroops: item.prizeStroops, maxClaims: 1, deadline: d.deadline, ...(CREATE_VERSION === 2 && setId !== undefined ? { setRef: setId } : {}) },
           (p) => setPhase(p === "signing" ? "Approve in your wallet…" : "Waiting for the network…"),
-        ),
+        );
+      },
       confirm: (item, chestId, hash) => {
         setPhase("Publishing…");
         return confirmMeta(chestId, item.fingerprintHex, hash);

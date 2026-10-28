@@ -1,4 +1,5 @@
 import { isChestAllowed } from "./chest-allow";
+import { refOf } from "./registry";
 import { Address, FeeBumpTransaction, Transaction, TransactionBuilder, scValToNative, xdr } from "@stellar/stellar-sdk";
 
 /**
@@ -13,11 +14,13 @@ import { Address, FeeBumpTransaction, Transaction, TransactionBuilder, scValToNa
  */
 export type RelayPolicy = {
   registry: string;
+  /** Registry v2 (create_set / create_chest_in_set exist only here). Absent = v2 not configured: nothing for it is relayed. */
+  registryV2?: string;
   xlmSac: string;
   walletWasmHashHex: string;
   /** Cuenta del relayer: ninguna tx puede usarla como fuente (op o tx). */
   relayerPublicKey?: string;
-  /** Token y creador del cofre leídos on-chain (null = el cofre no existe). */
+  /** Token y creador del cofre leídos on-chain (null = el cofre no existe). `id` es un ref (lib/registry.ts). */
   chestInfo: (id: number) => Promise<{ token: string; creator: string } | null>;
   /** Mainnet: ids habilitados y creadores aprobados. `allow` ausente (testnet) = sin restricción. */
   allow?: { ids: readonly number[] | null; creators: readonly string[] };
@@ -98,28 +101,39 @@ export async function checkRelayable(xdrB64: string, passphrase: string, p: Rela
   const method = inv.functionName().toString();
   const args = inv.args();
 
-  if (contract === p.registry) {
-    if (method === "create_chest") {
+  const isV2 = !!p.registryV2 && contract === p.registryV2;
+  if (contract === p.registry || isV2) {
+    // registry v2 only: allocate a set. Same rule as create_chest: authorized by the creator, approved creator on mainnet.
+    if (method === "create_set" && isV2) {
       const creator = args[0] ? scAddress(args[0]) : null;
-      if (!creator || !authorizers(auth).has(creator)) return no("create_chest must be authorized by its creator");
-      if (args.length !== 6) return no("create_chest: unexpected arguments");
-      if (p.allow && !p.allow.creators.includes(creator)) return no("create_chest: creator is not approved on mainnet");
+      if (!creator || !authorizers(auth).has(creator)) return no("create_set must be authorized by its creator");
+      if (args.length !== 1) return no("create_set: unexpected arguments");
+      if (p.allow && !p.allow.creators.includes(creator)) return no("create_set: creator is not approved on mainnet");
+      return { ok: true, kind: "create_chest", resourceFee };
+    }
+    if (method === "create_chest" || (method === "create_chest_in_set" && isV2)) {
+      // create_chest(creator, fingerprint, token, prize, max_claims, deadline); create_chest_in_set adds `set_id` after creator
+      const o = method === "create_chest" ? 0 : 1;
+      const creator = args[0] ? scAddress(args[0]) : null;
+      if (!creator || !authorizers(auth).has(creator)) return no(`${method} must be authorized by its creator`);
+      if (args.length !== 6 + o) return no(`${method}: unexpected arguments`);
+      if (p.allow && !p.allow.creators.includes(creator)) return no(`${method}: creator is not approved on mainnet`);
       let token: string, prize: bigint, claims: number, deadline: bigint;
       try {
-        token = scAddress(args[2]) ?? "";
-        prize = BigInt(scValToNative(args[3]) as bigint);
-        claims = Number(scValToNative(args[4]));
-        deadline = BigInt(scValToNative(args[5]) as bigint);
+        token = scAddress(args[2 + o]) ?? "";
+        prize = BigInt(scValToNative(args[3 + o]) as bigint);
+        claims = Number(scValToNative(args[4 + o]));
+        deadline = BigInt(scValToNative(args[5 + o]) as bigint);
       } catch {
-        return no("create_chest: unreadable arguments");
+        return no(`${method}: unreadable arguments`);
       }
-      if (token !== p.xlmSac) return no("create_chest: the prize token must be native XLM");
+      if (token !== p.xlmSac) return no(`${method}: the prize token must be native XLM`);
       const L = p.createLimits;
       if (L) {
-        if (prize > L.maxPrizeStroops) return no("create_chest: prize per claim above the cap");
-        if (prize * BigInt(claims) > L.maxTotalStroops) return no("create_chest: total prize above the cap");
-        if (deadline <= BigInt(L.nowSec)) return no("create_chest: the deadline must be in the future");
-        if (deadline > BigInt(L.nowSec + L.maxDeadlineSecs)) return no("create_chest: deadline too far away");
+        if (prize > L.maxPrizeStroops) return no(`${method}: prize per claim above the cap`);
+        if (prize * BigInt(claims) > L.maxTotalStroops) return no(`${method}: total prize above the cap`);
+        if (deadline <= BigInt(L.nowSec)) return no(`${method}: the deadline must be in the future`);
+        if (deadline > BigInt(L.nowSec + L.maxDeadlineSecs)) return no(`${method}: deadline too far away`);
       }
       return { ok: true, kind: "create_chest", resourceFee };
     }
@@ -127,6 +141,8 @@ export async function checkRelayable(xdrB64: string, passphrase: string, p: Rela
       let id: number;
       try {
         id = Number(scValToNative(args[0]));
+        // the app identifies a chest by a ref (lib/registry.ts): v1 keeps its id, v2 ids are offset
+        if (isV2) id = refOf(2, id);
       } catch {
         return no(`${method}: unreadable chest id`);
       }

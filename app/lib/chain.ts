@@ -11,6 +11,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { cfg } from "./cfg";
 import { withRpc } from "./rpc";
+import { refOf, registryFor } from "./registry";
 
 /**
  * Lecturas de solo-lectura contra Soroban RPC. Sirven en server y en browser
@@ -52,7 +53,12 @@ export async function simulateRead(
 }
 
 export type OnChainChest = {
+  /** "ref" (lib/registry.ts): the plain id for v1, V2_REF_OFFSET + id for v2. */
   id: number;
+  /** Registry the chest lives in. */
+  version: 1 | 2;
+  /** Circuit `chestId` input: `group_id` on v2 (set id for set chests), the chest id on v1. */
+  groupId: number;
   creator: string;
   token: string;
   /** stroops por cupo */
@@ -64,14 +70,16 @@ export type OnChainChest = {
   fingerprintHex: string;
 };
 
-/** `get_chest` del contrato principal. Lanza si el cofre no existe. */
-export async function readChest(id: number): Promise<OnChainChest> {
-  const { CONTRACTS } = await cfg();
-  const c = await simulateRead(CONTRACTS.chest, "get_chest", [
-    nativeToScVal(id, { type: "u64" }),
-  ]);
+/** `get_chest` del registry que guarda `ref` (v1 por id simple, v2 por ref; ver lib/registry.ts). Lanza si no existe. */
+export async function readChest(ref: number): Promise<OnChainChest> {
+  const { CONTRACTS, REGISTRY_V2 } = await cfg();
+  const { version, contractId, id } = registryFor({ chest: CONTRACTS.chest, chestV2: REGISTRY_V2.chest }, ref);
+  const c = await simulateRead(contractId, "get_chest", [nativeToScVal(id, { type: "u64" })]);
   return {
-    id,
+    id: ref,
+    version,
+    // v1 has no group_id: the chest id is the circuit input
+    groupId: c.group_id === undefined || c.group_id === null ? id : Number(c.group_id),
     creator: String(c.creator),
     token: String(c.token),
     prize: BigInt(c.prize),
@@ -161,14 +169,20 @@ type EventFilter = {
 };
 
 async function scanEvents(name: "claimed" | "created"): Promise<EventsScan> {
-  const { CONTRACTS } = await cfg();
+  const { CONTRACTS, REGISTRY_V2 } = await cfg();
   return scanWithFilters([
     {
       type: "contract" as const,
-      contractIds: [CONTRACTS.chest],
+      contractIds: [CONTRACTS.chest, ...(REGISTRY_V2.chest ? [REGISTRY_V2.chest] : [])],
       topics: [[xdr.ScVal.scvSymbol(name).toXDR("base64"), "*"]],
     },
   ]);
+}
+
+/** Chest ref of a registry event: topic[1] is the on-chain id, the emitting contract says which registry. */
+export function eventChestRef(ev: { contractId?: unknown; topic: xdr.ScVal[] }, v2Registry: string): number {
+  const id = Number(scValToNative(ev.topic[1]));
+  return v2Registry && String(ev.contractId) === v2Registry ? refOf(2, id) : id;
 }
 
 /** Ventana máxima que el RPC escanea por request (el resto se pide en ventanas paralelas). */
@@ -276,6 +290,7 @@ async function scanWithFilters(filters: EventFilter[]): Promise<EventsScan> {
  * del evento, no en los topics, así que se filtra en el cliente.
  */
 export async function readWonChests(address: string): Promise<WonChestsResult> {
+  const { REGISTRY_V2 } = await cfg();
   const scan = await scanEvents("claimed");
   const items: WonChest[] = [];
   for (const ev of scan.events) {
@@ -283,7 +298,7 @@ export async function readWonChests(address: string): Promise<WonChestsResult> {
       const val = scValToNative(ev.value) as [unknown, unknown];
       if (String(val[0]) !== address) continue;
       items.push({
-        chestId: Number(scValToNative(ev.topic[1])),
+        chestId: eventChestRef(ev, REGISTRY_V2.chest),
         prize: BigInt(val[1] as bigint),
         token: "",
         txHash: ev.txHash,
@@ -335,12 +350,12 @@ export async function readProtocolStats(): Promise<ProtocolStats> {
   ]);
 
   // El evento no dice el token: se resuelve por cofre y solo se suma XLM.
-  const { CONTRACTS } = await cfg();
+  const { CONTRACTS, REGISTRY_V2 } = await cfg();
   const perChest = new Map<number, bigint>();
   for (const ev of claimed.events) {
     try {
       const val = scValToNative(ev.value) as [unknown, unknown];
-      const id = Number(scValToNative(ev.topic[1]));
+      const id = eventChestRef(ev, REGISTRY_V2.chest);
       perChest.set(
         id,
         (perChest.get(id) ?? BigInt(0)) + BigInt(val[1] as bigint),
@@ -386,13 +401,14 @@ export async function readClaimedEvents(): Promise<{
   oldestLedger: number;
   truncated: boolean;
 }> {
+  const { REGISTRY_V2 } = await cfg();
   const scan = await scanEvents("claimed");
   const items: ClaimedEvent[] = [];
   for (const ev of scan.events) {
     try {
       const val = scValToNative(ev.value) as [unknown, unknown];
       items.push({
-        chestId: Number(scValToNative(ev.topic[1])),
+        chestId: eventChestRef(ev, REGISTRY_V2.chest),
         prize: BigInt(val[1] as bigint),
         recipient: String(val[0]),
         txHash: ev.txHash,

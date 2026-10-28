@@ -1,3 +1,5 @@
+import { usesCeremonyZkey } from "./registry";
+
 /** Constantes que no dependen de la red activa (la red por petición vive en lib/network.ts). */
 export const PRIZE = {
   code: "XLM",
@@ -90,13 +92,15 @@ export const LEGACY_ATTACK_CHEST = {
 } as const;
 
 /**
- * Assets del prover por red. El circuito (wasm) es el mismo; la zkey NO: testnet usa la original (su
- * verificador y cofres tienen la VK vieja) y mainnet la de la ceremonia (circuits/ceremony/release-*).
+ * Assets del prover. El circuito (wasm) es el mismo; la zkey NO: la original solo sirve al registry v1 de testnet
+ * (su verificador y cofres tienen la VK vieja). Mainnet y todo registry v2 (incluido el de testnet, que usa el
+ * verificador de la ceremonia) usan la de la ceremonia (circuits/ceremony/release-*). Se elige por versión de
+ * registry Y red, no solo por red.
  */
-export function zkAssets(mainnet: boolean) {
+export function zkAssets(mainnet: boolean, registryVersion: 1 | 2 = 1) {
   return {
     wasm: "/zk/chest.wasm",
-    zkey: mainnet ? "/zk/mainnet/chest_final.zkey" : "/zk/chest_final.zkey",
+    zkey: usesCeremonyZkey(mainnet, registryVersion) ? "/zk/mainnet/chest_final.zkey" : "/zk/chest_final.zkey",
   } as const;
 }
 

@@ -34,14 +34,23 @@ export type MemberProgress = {
 };
 
 export type SetProgress = {
-  /** chest id of question 1; known once it is created */
+  /**
+   * Set id (a "ref", lib/registry.ts). Registry v1: the chest id of question 1, known once it is created.
+   * Registry v2: allocated on-chain by `create_set` BEFORE question 1, so it is known up front.
+   */
   setId?: number;
   members: MemberProgress[];
 };
 
 export type SetCreateDeps = {
   reserve(item: SetItem, setId: number | undefined): Promise<void>;
-  create(item: SetItem): Promise<{ chestId: number; hash: string }>;
+  /** `setId` is set when the set already exists on-chain (registry v2): the chest must be created inside it. */
+  create(item: SetItem, setId: number | undefined): Promise<{ chestId: number; hash: string }>;
+  /**
+   * Registry v2 only: allocates the set on-chain (`create_set`). When present, it runs once before the first
+   * chest (a retry reuses `progress.setId`, so a set is never allocated twice). Registry v1: omit.
+   */
+  createSet?(): Promise<{ setId: number; hash: string }>;
   confirm(item: SetItem, chestId: number, hash: string, setId: number): Promise<void>;
   /** called after each state change; index = question being worked on (0-based) */
   onProgress?(p: SetProgress, working: number | null): void;
@@ -91,6 +100,17 @@ export async function runSetCreation(items: readonly SetItem[], deps: SetCreateD
     return { status: createdCount(progress) > 0 ? "partial" : "failed", progress, failedAt: item.index, stage, message };
   };
 
+  if (deps.createSet && progress.setId === undefined && ordered.length > 0) {
+    emit(ordered[0].index);
+    try {
+      const made = await deps.createSet();
+      progress = { ...progress, setId: made.setId };
+      emit(ordered[0].index);
+    } catch (e) {
+      return fail(ordered[0], "create", msg(e));
+    }
+  }
+
   for (const item of ordered) {
     const done = memberOf(progress, item.index);
 
@@ -104,12 +124,13 @@ export async function runSetCreation(items: readonly SetItem[], deps: SetCreateD
       }
       let created: { chestId: number; hash: string };
       try {
-        created = await deps.create(item);
+        created = await deps.create(item, progress.setId);
       } catch (e) {
         return fail(item, "create", msg(e));
       }
       progress = upsert(progress, { index: item.index, chestId: created.chestId, hash: created.hash, saved: false });
-      if (item.index === 0) progress = { ...progress, setId: created.chestId };
+      // registry v1: question 1 IS the set (its chest id); registry v2 already has the set id from create_set
+      if (item.index === 0 && progress.setId === undefined) progress = { ...progress, setId: created.chestId };
       emit(item.index);
     }
 

@@ -42,7 +42,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default async function NetworkPage() {
   const c = await cfg();
-  const { NETWORK, CONTRACTS, IS_MAINNET, CAPS } = c;
+  const { NETWORK, CONTRACTS, IS_MAINNET, CAPS, REGISTRY_V2, CREATE_VERSION } = c;
   const f = await networkFacts(c);
   const ex = NETWORK.explorerUrl;
   const link = (id: string) => (
@@ -66,6 +66,16 @@ export default async function NetworkPage() {
       <div className="mx-auto max-w-[900px] px-6 pb-20">
         <Section title="Contracts">
           <Row k="Registry">{CONTRACTS.chest ? link(CONTRACTS.chest) : "not configured"}</Row>
+          {REGISTRY_V2.chest && (
+            <Row k="Registry v2">
+              {link(REGISTRY_V2.chest)}
+              <span className="mt-1 block text-[12px] text-[var(--dim)]">
+                {CREATE_VERSION === 2
+                  ? "New chests are created here. Chests in the registry above stay readable and claimable."
+                  : "Readable and claimable. New chests are still created in the registry above."}
+              </span>
+            </Row>
+          )}
           <Row k="Verifier">{CONTRACTS.verifier ? link(CONTRACTS.verifier) : "not configured"}</Row>
           <Row k="Prize token (native XLM SAC)">{link(CONTRACTS.token)}</Row>
           {IS_MAINNET && <Row k="Admin / deployer">{link(MAINNET_RECORD.admin)}</Row>}

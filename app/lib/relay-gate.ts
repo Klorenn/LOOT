@@ -16,14 +16,16 @@ export async function relayGate(
   deploy = false,
 ): Promise<{ ok: true; release: () => Promise<void> } | { ok: false; res: NextResponse }> {
   if (c.IS_MAINNET) {
-    const v = await verifierGuard({
-      mainnet: true,
-      registryId: c.CONTRACTS.chest,
-      expectedVerifier: c.CONTRACTS.verifier,
-      read: (id, method) => simulateRead(id, method, []),
-    });
-    if (blocksRelay(v)) {
-      console.error("relay blocked: registry verifier does not match MAINNET_VERIFIER_ID");
+    // v1 (no verifier getter: no-op) and, when configured, v2 (verifier() must equal the configured verifier)
+    const checks = [
+      { registryId: c.CONTRACTS.chest, expectedVerifier: c.CONTRACTS.verifier },
+      ...(c.REGISTRY_V2.chest ? [{ registryId: c.REGISTRY_V2.chest, expectedVerifier: c.REGISTRY_V2.verifier }] : []),
+    ];
+    const results = await Promise.all(
+      checks.map((k) => verifierGuard({ mainnet: true, ...k, read: (id, method) => simulateRead(id, method, []) })),
+    );
+    if (results.some(blocksRelay)) {
+      console.error("relay blocked: a registry verifier does not match the configured verifier id");
       return { ok: false, res: NextResponse.json({ error: "Sponsored transactions are paused.", code: "config_mismatch" }, { status: 503 }) };
     }
   }

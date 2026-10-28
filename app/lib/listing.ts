@@ -1,4 +1,5 @@
 import { chestPath } from "./chest-code";
+import { displayId, isV2Ref, refOf } from "./registry";
 import { readChest, readClaimedEvents, type ClaimedEvent, type OnChainChest } from "./chain";
 import { getChest as demoMeta } from "./chests-demo";
 import { getChestMeta, listPublicMetas } from "./chest-store";
@@ -21,27 +22,43 @@ const isMissing = (e: unknown) =>
     (e as { message?: string })?.message ?? String(e),
   );
 
-/** Todos los cofres del contrato principal (ids 1.. hasta el primero que no existe). */
-export async function readAllChests(fresh = false): Promise<OnChainChest[]> {
-  const { net } = await cfg();
-  const hit = chestsCache.get(net);
-  if (!fresh && hit && Date.now() - hit.at < TTL) return hit.value;
+/**
+ * Cofres de un registry: ids 1.. hasta el primero que no existe (v1) o hasta un bloque entero vacío (v2: los ids de
+ * sets comparten contador con los cofres y dejan huecos). `toRef` convierte el id local en ref (lib/registry.ts).
+ */
+async function scanRegistry(toRef: (id: number) => number, tolerateGaps: boolean): Promise<OnChainChest[]> {
   const out: OnChainChest[] = [];
   const CHUNK = 6;
   for (let start = 1; start <= MAX_SCAN; start += CHUNK) {
     const ids = Array.from({ length: CHUNK }, (_, i) => start + i);
     const res = await Promise.all(
       ids.map((id) =>
-        readChest(id).catch((e) => {
+        readChest(toRef(id)).catch((e) => {
           if (isMissing(e)) return null;
           throw e; // RPC caído: no se cachea un listado incompleto
         }),
       ),
     );
+    if (tolerateGaps) {
+      for (const r of res) if (r) out.push(r);
+      if (res.every((r) => r === null)) break;
+      continue;
+    }
     const firstMissing = res.findIndex((r) => r === null);
     for (const r of firstMissing === -1 ? res : res.slice(0, firstMissing)) if (r) out.push(r);
     if (firstMissing !== -1) break;
   }
+  return out;
+}
+
+/** Todos los cofres de los registries configurados (v1 siempre; v2 solo si hay id v2). */
+export async function readAllChests(fresh = false): Promise<OnChainChest[]> {
+  const { net, REGISTRY_V2 } = await cfg();
+  const hit = chestsCache.get(net);
+  if (!fresh && hit && Date.now() - hit.at < TTL) return hit.value;
+  const v1 = await scanRegistry((id) => id, false);
+  const v2 = REGISTRY_V2.chest ? await scanRegistry((id) => refOf(2, id), true) : [];
+  const out = [...v1, ...v2];
   chestsCache.set(net, { at: Date.now(), value: out });
   return out;
 }
@@ -84,9 +101,9 @@ export function statusOf(c: OnChainChest, nowSec = Math.floor(Date.now() / 1000)
 
 export async function toRow(c: OnChainChest): Promise<ChestRowData> {
   const { IS_MAINNET } = await cfg();
-  const demo = IS_MAINNET ? undefined : demoMeta(c.id);
+  const demo = IS_MAINNET || isV2Ref(c.id) ? undefined : demoMeta(c.id);
   let name = demo?.name;
-  let question = !IS_MAINNET && c.id === DEMO_CHEST.id ? DEMO_CHEST.question : demo?.question;
+  let question = !IS_MAINNET && !isV2Ref(c.id) && c.id === DEMO_CHEST.id ? DEMO_CHEST.question : demo?.question;
   let difficulty = demo?.difficulty ?? null;
   let set: SetRef | undefined;
   if (!question) {
@@ -100,7 +117,7 @@ export async function toRow(c: OnChainChest): Promise<ChestRowData> {
     id: c.id,
     code: chestPath(c.id).replace("/chest/", ""),
     href: chestPath(c.id),
-    name: name ?? `Chest #${String(c.id).padStart(4, "0")}`,
+    name: name ?? `Chest #${String(displayId(c.id)).padStart(4, "0")}`,
     question: question ?? "—",
     difficulty,
     status: statusOf(c),

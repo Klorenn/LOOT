@@ -13,7 +13,7 @@ describe("checkRegistryVerifier", () => {
   });
   it("is a no-op while the registry has no getter (current mainnet registry)", async () => {
     const read = vi.fn();
-    expect(await checkRegistryVerifier({ ...base, getter: undefined, read })).toEqual({ status: "unsupported" });
+    expect(await checkRegistryVerifier({ ...base, getter: null, read })).toEqual({ status: "unsupported" });
     expect(read).not.toHaveBeenCalled();
   });
   it("matches", async () => {

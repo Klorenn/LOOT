@@ -28,6 +28,12 @@ export type MainnetPublic = {
   creatorAllowlist: string[];
   /** MAINNET_PASSKEY_ENABLED=true: cuentas passkey en mainnet (apagado por defecto). */
   passkeyEnabled: boolean;
+  /** Registry v2 (MAINNET_REGISTRY_V2_ID). Vacío = v2 no configurado: mainnet sigue solo con v1. */
+  registryV2?: string;
+  /** Verifier de v2 (MAINNET_VERIFIER_V2_ID); sin él se usa MAINNET_VERIFIER_ID. */
+  verifierV2?: string;
+  /** MAINNET_REGISTRY_VERSION: 2 = los cofres NUEVOS van al registry v2 (requiere registryV2). Por defecto 1. */
+  registryVersion?: number;
 };
 
 const isContractId = (s: string) => /^C[A-Z2-7]{55}$/.test(s);
@@ -39,6 +45,9 @@ const num = (v: string | undefined, d: number) => {
   const n = Number(clean(v));
   return Number.isFinite(n) && n > 0 ? n : d;
 };
+
+/** v2 solo se usa para crear si se pidió (version 2) Y hay un id de contrato v2 válido. */
+const createVersion = (version: number | undefined, v2: string): 1 | 2 => (version === 2 && isContractId(v2) ? 2 : 1);
 
 /** Solo servidor (en el cliente las MAINNET_* no existen: se usa lo inyectado). */
 export function mainnetPublicFromEnv(): MainnetPublic {
@@ -54,6 +63,9 @@ export function mainnetPublicFromEnv(): MainnetPublic {
     sampleChestId: num(e.MAINNET_SAMPLE_CHEST_ID, 0),
     creatorAllowlist: parseCreatorAllowlist(e.MAINNET_CREATOR_ALLOWLIST),
     passkeyEnabled: clean(e.MAINNET_PASSKEY_ENABLED).toLowerCase() === "true",
+    registryV2: clean(e.MAINNET_REGISTRY_V2_ID),
+    verifierV2: clean(e.MAINNET_VERIFIER_V2_ID),
+    registryVersion: num(e.MAINNET_REGISTRY_VERSION, 1),
     listedIds: (clean(e.MAINNET_LISTED_IDS) || "")
       .split(",")
       .map((x) => Number(x.trim()))
@@ -76,7 +88,12 @@ export type NetConfig = {
     friendbotUrl: string | null;
     explorerUrl: string;
   };
+  /** `chest` = registry v1 (siempre; los cofres existentes siguen ahí). El v2 está en REGISTRY_V2. */
   CONTRACTS: { chest: string; verifier: string; token: string };
+  /** Registry v2 (lib/registry.ts). Vacío = no configurado: la app se comporta exactamente como antes. */
+  REGISTRY_V2: { chest: string; verifier: string };
+  /** Registry donde se crean los cofres NUEVOS: 1 por defecto; 2 solo con REGISTRY_VERSION=2 y un id v2 válido. */
+  CREATE_VERSION: 1 | 2;
   XLM_SAC: string;
   CAPS: { maxPrizePerPlaceXlm: number; maxTotalPrizeXlm: number };
   /** Id del cofre demo (testnet: 6). En mainnet 0 = no hay demo (no coincide con ningún cofre). */
@@ -119,6 +136,8 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
     const rpcUrls = uniq([mainnet.rpcUrl, "https://mainnet.sorobanrpc.com"]);
     const registry = isContractId(mainnet.registry) ? mainnet.registry : "";
     const verifier = isContractId(mainnet.verifier) ? mainnet.verifier : "";
+    const v2Id = mainnet.registryV2 ?? "";
+    const v2 = isContractId(v2Id);
     return {
       net,
       IS_MAINNET: true,
@@ -135,6 +154,11 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
         explorerUrl: "https://stellar.expert/explorer/public",
       },
       CONTRACTS: { chest: registry, verifier, token: MAINNET_SAC },
+      REGISTRY_V2: {
+        chest: v2 ? v2Id : "",
+        verifier: isContractId(mainnet.verifierV2 ?? "") ? (mainnet.verifierV2 as string) : verifier,
+      },
+      CREATE_VERSION: createVersion(mainnet.registryVersion, v2Id),
       XLM_SAC: MAINNET_SAC,
       CAPS: { maxPrizePerPlaceXlm: mainnet.maxPrizePerPlaceXlm, maxTotalPrizeXlm: mainnet.maxTotalPrizeXlm },
       DEMO_CHEST_ID: 0,
@@ -151,6 +175,10 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
   }
 
   const envRpc = clean(process.env.NEXT_PUBLIC_RPC_URL);
+  // Registry v2 en testnet (NEXT_PUBLIC_*: el cliente también lo necesita). Sin ellas, todo sigue en v1.
+  const tV2 = clean(process.env.NEXT_PUBLIC_REGISTRY_V2_ID);
+  const tV2Ok = isContractId(tV2);
+  const tV2Verifier = clean(process.env.NEXT_PUBLIC_VERIFIER_V2_ID);
   const rpcUrls = uniq([envRpc, "https://soroban-testnet.stellar.org", "https://soroban-rpc.testnet.stellar.gateway.fm"]);
   return {
     net,
@@ -172,6 +200,8 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
       verifier: "CCUF6M5Y6B6VR5HB72M7VFBHLC7ILBBKAGF6TI76PZ5YUOI6Q72HXTIE",
       token: TESTNET_SAC,
     },
+    REGISTRY_V2: { chest: tV2Ok ? tV2 : "", verifier: isContractId(tV2Verifier) ? tV2Verifier : "" },
+    CREATE_VERSION: createVersion(num(process.env.NEXT_PUBLIC_REGISTRY_VERSION, 1), tV2),
     XLM_SAC: TESTNET_SAC,
     CAPS: { maxPrizePerPlaceXlm: Infinity, maxTotalPrizeXlm: Infinity },
     DEMO_CHEST_ID: 6,
@@ -216,7 +246,7 @@ export function injectMainnet(m: MainnetPublic) {
 export function mainnetPublic(): MainnetPublic {
   if (typeof window === "undefined") return mainnetPublicFromEnv();
   return (
-    injected ?? { registry: "", verifier: "", rpcUrl: "", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 0, listedIds: [], creatorAllowlist: [], passkeyEnabled: false }
+    injected ?? { registry: "", verifier: "", rpcUrl: "", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 0, listedIds: [], creatorAllowlist: [], passkeyEnabled: false, registryV2: "", verifierV2: "", registryVersion: 1 }
   );
 }
 

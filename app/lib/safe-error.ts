@@ -3,6 +3,8 @@
  * URLs, simulation logs, XDR, stack fragments or env names, so routes must log the raw error server-side
  * and return only what this helper produces.
  */
+import { contractErrorMessage } from "./registry";
+
 export type SafeError = { code: string; error: string };
 
 const CONTRACT_RE = /Error\(Contract,\s*#(\d+)\)/;
@@ -16,7 +18,7 @@ export function contractErrorNumber(e: unknown): number | null {
 export function toSafeError(e: unknown, fallback = "request failed"): SafeError {
   const msg = e instanceof Error ? e.message : String(e);
   const n = contractErrorNumber(e);
-  if (n !== null) return { code: `contract_${n}`, error: `The contract rejected the request (#${n}).` };
+  if (n !== null) return { code: `contract_${n}`, error: contractErrorMessage(n) ?? `The contract rejected the request (#${n}).` };
   if (/timeout|timed out|TRY_AGAIN|ECONN|ENOTFOUND|fetch failed|network/i.test(msg))
     return { code: "network_busy", error: "The network is busy. Try again in a moment." };
   return { code: "internal_error", error: fallback };

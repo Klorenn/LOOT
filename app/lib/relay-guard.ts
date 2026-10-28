@@ -10,6 +10,7 @@ export { relayMaxFee };
 export async function vetRelayTx(xdrB64: string, c: NetConfig, relayerPublicKey?: string): Promise<RelayVerdict> {
   const v = await checkRelayable(xdrB64, c.NETWORK.passphrase, {
     registry: c.CONTRACTS.chest,
+    registryV2: c.REGISTRY_V2.chest || undefined,
     xlmSac: c.XLM_SAC,
     walletWasmHashHex: WALLET_WASM_HASH,
     relayerPublicKey,

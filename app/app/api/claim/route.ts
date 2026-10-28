@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
-import { Client } from "@findloot/chest";
+import { Client, ClientV2 } from "@findloot/chest";
+import { registryFor } from "@/lib/registry";
 import { cfg } from "@/lib/cfg";
 import { relayMaxFee, relayerSecretFor } from "@/lib/relay-guard";
 import { readChest } from "@/lib/chain";
@@ -113,6 +114,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: SET_ALREADY_CLAIMED_MSG, code: SET_ALREADY_CLAIMED_CODE }, { status: 409 });
     }
 
+    // registry that holds this chest (v1 by plain id, v2 by ref) and the on-chain id inside it
+    const reg = registryFor({ chest: CONTRACTS.chest, chestV2: c.REGISTRY_V2.chest }, chestId);
     const maxFee = relayMaxFee(c, "claim");
     class FeeCapError extends Error {}
 
@@ -121,9 +124,10 @@ export async function POST(req: NextRequest) {
     const attempt = (inclusion: string) =>
       withRpcUrl(
         async (rpcUrl) => {
-          const client = new Client({
+          const Registry = reg.version === 2 ? ClientV2 : Client;
+          const client = new Registry({
             networkPassphrase: NETWORK.passphrase,
-            contractId: CONTRACTS.chest,
+            contractId: reg.contractId,
             rpcUrl,
             allowHttp: true,
             publicKey: kp.publicKey(),
@@ -132,7 +136,7 @@ export async function POST(req: NextRequest) {
 
           const tx = await client.claim(
             {
-              chest_id: BigInt(body.chestId),
+              chest_id: BigInt(reg.id),
               recipient: body.recipient,
               nullifier: hexToBuf(body.nullifierHex),
               proof: {
