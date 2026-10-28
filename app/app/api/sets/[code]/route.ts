@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { decodeChestId, encodeChestId } from "@/lib/chest-code";
 import { getChestMeta, getSetClaim, getSetHeader, getSetMembers } from "@/lib/chest-store";
 import { readChest } from "@/lib/chain";
+import { cfg } from "@/lib/cfg";
+import { testnetFeatures } from "@/lib/testnet-features";
 import { statusOf, type ChestStatus } from "@/lib/listing";
 import { stroopsToXlm, tokenDecimals, tokenLabel } from "@/lib/config";
 
@@ -23,6 +25,7 @@ export type SetMemberView = {
 };
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ code: string }> }) {
+  if (!testnetFeatures(await cfg())) return NextResponse.json({ error: "not found" }, { status: 404 });
   const { code } = await ctx.params;
   const setId = decodeChestId(code);
   if (setId === null) return NextResponse.json({ error: "not found" }, { status: 404 });

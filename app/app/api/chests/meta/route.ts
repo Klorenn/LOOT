@@ -66,7 +66,7 @@ function parseSetRef(v: unknown): SetRef | string {
   return { id: id as number, index: index as number, size: size as number, title };
 }
 
-function parseReserve(b: Record<string, unknown>): PendingMeta | string {
+function parseReserve(b: Record<string, unknown>, mainnet: boolean): PendingMeta | string {
   const fp = typeof b.fingerprintHex === "string" ? b.fingerprintHex.toLowerCase() : "";
   if (!HEX64.test(fp)) return "bad fingerprint";
   if (typeof b.creator !== "string" || !StrKey.isValidEd25519PublicKey(b.creator)
@@ -90,6 +90,7 @@ function parseReserve(b: Record<string, unknown>): PendingMeta | string {
   }
   let set: SetRef | undefined;
   if (b.set !== undefined && b.set !== null) {
+    if (mainnet) return "chest sets are not available on mainnet";
     const r = parseSetRef(b.set);
     if (typeof r === "string") return r;
     set = r;
@@ -212,7 +213,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if (b.action === "reserve") {
-      const p = parseReserve(b);
+      const p = parseReserve(b, c.IS_MAINNET);
       if (typeof p === "string") return NextResponse.json({ error: p }, { status: 400 });
       if (!canReserve(gate, p.creator))
         return NextResponse.json({ error: "chest creation on mainnet is limited to approved creators" }, { status: 403 });

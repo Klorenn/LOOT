@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { decodeChestId } from "@/lib/chest-code";
+import { cfg } from "@/lib/cfg";
+import { testnetFeatures } from "@/lib/testnet-features";
 import { SetView } from "./set-view";
 
 export const metadata: Metadata = {
@@ -12,6 +14,6 @@ export const metadata: Metadata = {
 
 export default async function SetPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  if (decodeChestId(code) === null) notFound();
+  if (!testnetFeatures(await cfg()) || decodeChestId(code) === null) notFound();
   return <SetView code={code} />;
 }
