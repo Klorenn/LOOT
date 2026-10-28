@@ -13,12 +13,12 @@ export async function GET() {
   const noStore = { "cache-control": "private, no-store" };
   const secret = relayerSecretFor(c);
   const pub = secret ? Keypair.fromSecret(secret).publicKey() : process.env.RELAYER_ACCOUNT_MAINNET;
-  // Low-balance alert (structured log + optional webhook). Mainnet: logging only, the response is unchanged.
-  const balanceCheck = checkRelayerBalance(c, pub).catch(() => null);
   try {
     const status = await sponsorStatus(c, pub);
+    // Mainnet: strict parity, no extra reads, logs or fields.
     if (c.IS_MAINNET) return NextResponse.json(status, { headers: noStore });
-    const b = await balanceCheck;
+    // Testnet: low-balance alert (structured log + optional webhook) and a `relayerLow` field.
+    const b = await checkRelayerBalance(c, pub).catch(() => null);
     return NextResponse.json({ ...status, relayerLow: b ? b.low : true }, { headers: noStore });
   } catch {
     // mainnet falla cerrado: ante un error no se promete patrocinio
