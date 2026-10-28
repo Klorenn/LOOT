@@ -409,4 +409,8 @@ impl ChestZk {
 }
 
 #[cfg(test)]
+mod fixture_real_proof;
+#[cfg(test)]
+mod integration;
+#[cfg(test)]
 mod test;
