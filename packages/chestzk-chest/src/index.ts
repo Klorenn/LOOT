@@ -144,3 +144,14 @@ export class Client extends ContractClient {
 /** Registry v2 (sets, constructor, token/deadline checks, group_id). The v1 `Client` above is unchanged. */
 export { Client as ClientV2, Errors as ErrorsV2, networks as networksV2 } from "./v2.js";
 export type { Chest as ChestV2, Proof as ProofV2 } from "./v2.js";
+export {
+  AUTH_VALID_LEDGERS,
+  ClaimSimulationError,
+  buildClaimTxWithAuth,
+  checkClaimAuthEntry,
+  claimArgsToScVals,
+  prepareClaimAuth,
+  sendAndWait,
+  signClaimAuthEntry,
+} from "./claim-auth.js";
+export type { ClaimArgs, TxOpts as ClaimTxOpts } from "./claim-auth.js";

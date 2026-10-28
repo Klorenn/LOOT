@@ -55,3 +55,4 @@ export class Client extends ContractClient {
 }
 /** Registry v2 (sets, constructor, token/deadline checks, group_id). The v1 `Client` above is unchanged. */
 export { Client as ClientV2, Errors as ErrorsV2, networks as networksV2 } from "./v2.js";
+export { AUTH_VALID_LEDGERS, ClaimSimulationError, buildClaimTxWithAuth, checkClaimAuthEntry, claimArgsToScVals, prepareClaimAuth, sendAndWait, signClaimAuthEntry, } from "./claim-auth.js";
