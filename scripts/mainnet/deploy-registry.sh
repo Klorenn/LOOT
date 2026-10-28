@@ -1,29 +1,28 @@
 #!/usr/bin/env bash
-# Loot · mainnet deploy of the REGISTRY contract (contracts/chest) + post-ceremony Groth16 verifier
-# (contracts/verifier) + ONE sample chest.
+# Loot · mainnet deploy of the REGISTRY v2 contract (contracts/chest) against the EXISTING ceremony verifier.
+#
+# v2 uses a constructor: deploy and initialisation are ONE atomic transaction, so there is no init front-run
+# window. The verifier is NOT redeployed: this script checks the one that is already on mainnet.
 #
 # DRY-RUN BY DEFAULT. Nothing is signed or sent unless you pass --execute.
-#   scripts/mainnet/deploy-registry.sh                 # dry-run: preflight + simulate every tx vs mainnet + budget table
+#   scripts/mainnet/deploy-registry.sh                 # dry-run: preflight + verifier checks + simulate upload + budget table
 #   scripts/mainnet/deploy-registry.sh --execute       # really send (spends XLM)
 #
 # Env:
 #   SOURCE                  stellar identity name that pays and signs (G... pubkey allowed in dry-run only)
 #   SIM_SOURCE_ADDRESS      any funded mainnet G... address, used ONLY to simulate when SOURCE is unfunded/a bare key
-#   VERIFIER_WASM_SHA256    (alias CEREMONY_EXPORT_HASH) sha256 of the verifier wasm built from the ceremony export.
-#                           REQUIRED; must equal sha256 of the verifier wasm that will be uploaded. Otherwise REFUSE.
-#                           (also read from a circuits/**/ceremony manifest field "verifierWasmSha256" if one exists)
-#   WASM_DIR                dir with chestzk_verifier.wasm and chestzk_chest.wasm; else built from contracts/ (needs rustup rustc)
-#   ADMIN                   G... for init(admin, ...). init does admin.require_auth(), so it must be SOURCE's address (default)
+#   MAINNET_VERIFIER_ID     verifier contract the registry will point at (default: the ceremony verifier below).
+#                           Anything else is REFUSED unless it is this id.
+#   WASM_DIR                dir with chestzk_chest.wasm; else built from contracts/chest (needs rustup rustc >= 1.91)
 #   RELAYER_FLOAT_XLM       default 5         HARD_CAP_XLM     default 80
 #   RPC_URL / HORIZON_URL   defaults https://mainnet.sorobanrpc.com / https://horizon.stellar.org
-#   DRYRUN_ALLOW_TESTNET_VK=1   dry-run ONLY: skip the ceremony/testnet-VK refusals (output is flagged NOT EXECUTABLE)
 set -euo pipefail
 
 EXECUTE=0
 for a in "$@"; do
   case "$a" in
     --execute) EXECUTE=1 ;;
-    -h|--help) sed -n 2,23p "$0"; exit 0 ;;
+    -h|--help) sed -n 2,18p "$0"; exit 0 ;;
     *) echo "unknown arg: $a" >&2; exit 2 ;;
   esac
 done
@@ -40,15 +39,17 @@ HORIZON_URL="${HORIZON_URL:-https://horizon.stellar.org}"
 HARD_CAP_XLM="${HARD_CAP_XLM:-80}"
 RELAYER_FLOAT_XLM="${RELAYER_FLOAT_XLM:-5}"
 NATIVE_SAC="CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA"
-# VK fingerprint of the single-party (testnet) setup baked into the current contracts/verifier.
-TESTNET_VK_FP="161f9d198dd1bcc1aaaa5cc95566cf528ff582e4c27accddd808346d520991c1"
-OUT_JSON="deployments/registry-mainnet.json"
-OUT_DIR="${WASM_DIR:-$ROOT/.build-mainnet-registry}"
+# Ceremony verifier already on mainnet (wasm sha256 8df17eda...05b5; vk_fingerprint = manifest vk_sha256).
+CEREMONY_VERIFIER_ID="CALYISOENO2N4575DWF2K2PHB5UAEHCWI5ZJCZXYNHC4OXYHJWVBGZKY"
+CEREMONY_VERIFIER_WASM_SHA256="8df17eda8f2f901a9636804e0e173586723420d38af6407974218b53f98905b5"
+MANIFEST="contracts/verifier-mainnet/verifier-manifest.json"   # copy of circuits/ceremony/release-2026-10-26/verifier manifest
+CEREMONY_DIR="circuits/ceremony/release-2026-10-26"
+OUT_JSON="deployments/registry-v2-mainnet.json"                 # v1 record (registry-mainnet.json) is never touched
+OUT_DIR="${WASM_DIR:-$ROOT/.build-mainnet-registry-v2}"
+VERIFIER_ID="${MAINNET_VERIFIER_ID:-$CEREMONY_VERIFIER_ID}"
 
-# Estimates (XLM) for items that cannot be simulated before their prerequisites exist on-chain.
-EST_DEPLOY=0.5; EST_INIT=0.05
-# Budget lines from the plan (for comparison only).
-BUD_VER_UP=18.8; BUD_REG_UP=14.0
+EST_DEPLOY=0.5   # deploy instance with constructor: cannot be simulated before the wasm is uploaded
+BUD_REG_UP=14.0
 
 die()  { echo "REFUSING: $*" >&2; exit 1; }
 warn() { echo "WARNING: $*" >&2; }
@@ -57,18 +58,14 @@ need() { command -v "$1" >/dev/null 2>&1 || die "missing tool: $1"; }
 xlm()  { awk -v s="$1" 'BEGIN{printf "%.4f", s/10000000}'; }
 add()  { awk -v a="$1" -v b="$2" 'BEGIN{printf "%.4f", a+b}'; }
 
-need stellar; need jq; need curl; need shasum; need node; need rg; need fd; need xxd
+need stellar; need jq; need curl; need shasum; need node; need rg
 
 [ "$EXECUTE" = 1 ] && echo "MODE: EXECUTE (real mainnet transactions)" || echo "MODE: DRY-RUN (nothing is signed or sent; pass --execute to send)"
-OVERRIDE=0
-if [ "${DRYRUN_ALLOW_TESTNET_VK:-0}" = 1 ]; then
-  [ "$EXECUTE" = 0 ] || die "DRYRUN_ALLOW_TESTNET_VK is dry-run only; it can never be combined with --execute"
-  OVERRIDE=1; warn "DRYRUN_ALLOW_TESTNET_VK=1: ceremony/VK refusals are skipped. This run is NOT EXECUTABLE."
-fi
 
 # ---------------------------------------------------------------- preflight
 step "preflight"
 [ -n "${SOURCE:-}" ] || die "SOURCE (stellar identity name) is required"
+[ "$VERIFIER_ID" = "$CEREMONY_VERIFIER_ID" ] || die "MAINNET_VERIFIER_ID $VERIFIER_ID != the ceremony verifier $CEREMONY_VERIFIER_ID"
 RPC_PASS="$(curl -fsS -X POST "$RPC_URL" -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"getNetwork"}' | jq -r '.result.passphrase')" || die "RPC $RPC_URL unreachable"
 [ "$RPC_PASS" = "$MAINNET_PASSPHRASE" ] || die "RPC passphrase mismatch: '$RPC_PASS' (must be mainnet)"
@@ -94,70 +91,53 @@ else
 fi
 [ "$EXECUTE" = 0 ] || [ "$SIM_ADDR" = "$SOURCE_ADDR" ] || die "internal: simulation source differs from signer"
 
-ADMIN="${ADMIN:-$SOURCE_ADDR}"
-[[ "$ADMIN" =~ ^G[A-Z2-7]{55}$ ]] || die "ADMIN is not a G... address"
-[ "$EXECUTE" = 0 ] || [ "$ADMIN" = "$SOURCE_ADDR" ] || die "init() calls admin.require_auth(); ADMIN must be SOURCE's address ($SOURCE_ADDR)"
-echo "  admin   : $ADMIN"
+NET=(--rpc-url "$RPC_URL" --network-passphrase "$PASSPHRASE")
+NETQ="--rpc-url $RPC_URL --network-passphrase '$PASSPHRASE'"
 
-TOKEN="$(stellar contract id asset --asset native --rpc-url "$RPC_URL" --network-passphrase "$PASSPHRASE")"
+TOKEN="$(stellar contract id asset --asset native "${NET[@]}")"
 [ "$TOKEN" = "$NATIVE_SAC" ] || die "derived native SAC $TOKEN != expected $NATIVE_SAC"
-echo "  token   : $TOKEN (native XLM SAC; passed per chest, not stored by init)"
+echo "  token   : $TOKEN (native XLM SAC; FIXED in the constructor, the registry rejects any other token)"
+echo "  verifier: $VERIFIER_ID (ceremony verifier; constructor argument)"
+
+# read-only call (simulation only: --send=no never signs or submits)
+ro() { # contract fn [args...] -> JSON result on stdout
+  local id="$1" fn="$2"; shift 2
+  stellar contract invoke --id "$id" --source-account "$SIM_ADDR" "${NET[@]}" --send=no -- "$fn" "$@" 2>/dev/null | tail -1
+}
+unq() { tr -d '"'; }
+
+# ---------------------------------------------------------------- verifier gate
+step "verifier gate (the one already on mainnet must be the ceremony verifier)"
+MANIFEST_FP="$(jq -r '.vk_sha256 // empty' "$MANIFEST")"
+[[ "$MANIFEST_FP" =~ ^[0-9a-f]{64}$ ]] || die "no vk_sha256 in $MANIFEST"
+# the ceremony release folder pins verification_key.json; make sure the manifest we trust is the release one
+[ -f "$CEREMONY_DIR/verification_key.json" ] || die "missing $CEREMONY_DIR/verification_key.json"
+ONCHAIN_FP="$(ro "$VERIFIER_ID" vk_fingerprint | unq)"
+[[ "$ONCHAIN_FP" =~ ^[0-9a-f]{64}$ ]] || die "could not read vk_fingerprint() from $VERIFIER_ID (got '$ONCHAIN_FP')"
+[ "$ONCHAIN_FP" = "$MANIFEST_FP" ] || die "on-chain vk_fingerprint $ONCHAIN_FP != ceremony manifest $MANIFEST_FP"
+echo "  vk_fingerprint on-chain == ceremony manifest ($MANIFEST_FP) OK"
+FETCH_DIR="$(mktemp -d)"
+stellar contract fetch --id "$VERIFIER_ID" --out-file "$FETCH_DIR/verifier.wasm" "${NET[@]}" >/dev/null 2>&1 || die "could not fetch verifier wasm"
+ONCHAIN_WASM="$(shasum -a 256 "$FETCH_DIR/verifier.wasm" | awk '{print $1}')"
+[ "$ONCHAIN_WASM" = "$CEREMONY_VERIFIER_WASM_SHA256" ] || die "on-chain verifier wasm sha256 $ONCHAIN_WASM != ceremony $CEREMONY_VERIFIER_WASM_SHA256"
+echo "  verifier wasm sha256 == ceremony release ($ONCHAIN_WASM) OK"
 
 # ---------------------------------------------------------------- wasm
-step "wasm artifacts"
-VER_WASM="$OUT_DIR/chestzk_verifier.wasm"
+step "registry wasm"
 REG_WASM="$OUT_DIR/chestzk_chest.wasm"
 if [ -z "${WASM_DIR:-}" ]; then
   RUSTV="$(rustc -V | awk '{print $2}')"
   [ "$(printf '%s\n1.91.0\n' "$RUSTV" | sort -V | head -1)" = "1.91.0" ] || die "rustc $RUSTV < 1.91.0 (soroban-sdk 27.0.6); use rustup's toolchain or set WASM_DIR"
   mkdir -p "$OUT_DIR"
-  # Verifier: the CEREMONY crate (contracts/verifier-mainnet = circuits/ceremony/release-2026-10-26/verifier),
-  # built exactly like the release (plain cargo, NOT `stellar contract build`, which changes the wasm bytes):
-  # sha256 must be 8df17eda8f2f901a9636804e0e173586723420d38af6407974218b53f98905b5.
-  echo "  \$ cargo +stable build --release --target wasm32v1-none  (contracts/verifier-mainnet)"
-  (cd contracts/verifier-mainnet && cargo +stable build --release --target wasm32v1-none)
-  cp contracts/verifier-mainnet/target/wasm32v1-none/release/chestzk_verifier.wasm "$OUT_DIR/chestzk_verifier.wasm"
   echo "  \$ stellar contract build --manifest-path contracts/chest/Cargo.toml --out-dir $OUT_DIR"
   stellar contract build --manifest-path contracts/chest/Cargo.toml --out-dir "$OUT_DIR"
 fi
-[ -f "$VER_WASM" ] || die "missing $VER_WASM"
 [ -f "$REG_WASM" ] || die "missing $REG_WASM"
-VER_HASH="$(shasum -a 256 "$VER_WASM" | awk '{print $1}')"
 REG_HASH="$(shasum -a 256 "$REG_WASM" | awk '{print $1}')"
-echo "  verifier wasm sha256: $VER_HASH ($(wc -c <"$VER_WASM" | tr -d ' ') bytes)"
 echo "  registry wasm sha256: $REG_HASH ($(wc -c <"$REG_WASM" | tr -d ' ') bytes)"
-
-# ---------------------------------------------------------------- ceremony gate
-step "verifier gate (must be post-ceremony)"
-EXPECT_HASH="${VERIFIER_WASM_SHA256:-${CEREMONY_EXPORT_HASH:-8df17eda8f2f901a9636804e0e173586723420d38af6407974218b53f98905b5}}"  # default = ceremony release 2026-10-26
-EXPECT_SRC="env"
-if [ -z "$EXPECT_HASH" ] && [ -d circuits ]; then
-  while IFS= read -r f; do
-    h="$(jq -r '.verifierWasmSha256 // .verifier_wasm_sha256 // empty' "$f" 2>/dev/null || true)"
-    if [[ "$h" =~ ^[0-9a-f]{64}$ ]]; then EXPECT_HASH="$h"; EXPECT_SRC="$f"; break; fi
-  done < <(fd -HI -t f -d 5 -E node_modules -E build -g '*.json' circuits 2>/dev/null | rg -i 'ceremony|export|mainnet' || true)
-fi
-if [ "$OVERRIDE" = 1 ]; then
-  warn "ceremony hash check skipped (override)"
-else
-  [ -n "$EXPECT_HASH" ] || die "no ceremony export hash. Set VERIFIER_WASM_SHA256 (or CEREMONY_EXPORT_HASH) to the sha256 of the verifier wasm built from the post-ceremony export, or provide a ceremony manifest under circuits/ with a 'verifierWasmSha256' field. The testnet verifier (single-party setup) must NEVER be used on mainnet."
-  [[ "$EXPECT_HASH" =~ ^[0-9a-f]{64}$ ]] || die "ceremony hash is not 64 lowercase hex: $EXPECT_HASH"
-  [ "$EXPECT_HASH" = "$VER_HASH" ] || die "verifier wasm sha256 $VER_HASH != ceremony hash $EXPECT_HASH (from $EXPECT_SRC). Rebuild contracts/verifier from the ceremony export."
-  echo "  verifier wasm matches ceremony hash (from $EXPECT_SRC)"
-fi
-# Detect the testnet VK baked into the wasm (VK_FINGERPRINT constant is embedded as data).
-if xxd -p "$VER_WASM" | tr -d '\n' | rg -q "$TESTNET_VK_FP"; then
-  [ "$OVERRIDE" = 1 ] && warn "verifier wasm embeds the TESTNET VK fingerprint ${TESTNET_VK_FP:0:16}... (override active)" \
-    || die "verifier wasm embeds the TESTNET VK fingerprint $TESTNET_VK_FP (single-party setup). Rebuild from the ceremony export."
-else
-  echo "  testnet VK fingerprint not present in verifier wasm OK"
-fi
 if [ "$EXECUTE" = 1 ]; then
   [ ! -f "$OUT_JSON" ] || die "$OUT_JSON already exists; move it away to redeploy (never overwritten)"
 fi
-
-NET=(--rpc-url "$RPC_URL" --network-passphrase "$PASSPHRASE")
-NETQ="--rpc-url $RPC_URL --network-passphrase '$PASSPHRASE'"
 
 # ---------------------------------------------------------------- simulate
 step "simulation vs mainnet (unsigned; simulateTransaction only)"
@@ -169,23 +149,16 @@ sim_upload() { # wasm -> stroops or "ERR:..."
   else echo "ERR:$(printf '%s' "$res" | jq -r .error 2>/dev/null | head -1)"; fi
 }
 INCL=100 # base inclusion fee in stroops (one op)
-VU="$(sim_upload "$VER_WASM")"; RU="$(sim_upload "$REG_WASM")"
-FAILED=0
-[[ "$VU" =~ ^[0-9]+$ ]] || { echo "  verifier upload simulation failed: $VU" >&2; FAILED=1; }
-[[ "$RU" =~ ^[0-9]+$ ]] || { echo "  registry upload simulation failed: $RU" >&2; FAILED=1; }
-[ "$FAILED" = 0 ] || die "could not simulate wasm uploads against mainnet (nothing was sent)"
-VER_UP="$(xlm $((VU + INCL)))"; REG_UP="$(xlm $((RU + INCL)))"
-# A WASM already on-chain makes the upload cheap; deploy-tx simulation needs the wasm uploaded first.
-echo "  (deploy / init cannot be simulated before the wasm + instance exist: estimates used)"
+RU="$(sim_upload "$REG_WASM")"
+[[ "$RU" =~ ^[0-9]+$ ]] || die "registry upload simulation failed: $RU (nothing was sent)"
+REG_UP="$(xlm $((RU + INCL)))"
+echo "  (deploy with constructor cannot be simulated before the wasm is on-chain: estimate used)"
 
 # ---------------------------------------------------------------- plan table
 step "plan and budget (XLM)"
 ITEMS=(
-  "1|upload verifier wasm|simulated|$VER_UP|$BUD_VER_UP"
-  "2|deploy verifier instance|estimate|$EST_DEPLOY|0.5"
-  "3|upload registry wasm|simulated|$REG_UP|$BUD_REG_UP"
-  "4|deploy registry instance|estimate|$EST_DEPLOY|0.5"
-  "5|init(admin, verifier)|estimate|$EST_INIT|-"
+  "1|upload registry wasm|simulated|$REG_UP|$BUD_REG_UP"
+  "2|deploy registry instance + constructor(verifier, token)|estimate|$EST_DEPLOY|0.5"
 )
 TOTAL=0; SPEND=0
 printf '  %-3s %-52s %-9s %10s %8s\n' "#" "item" "basis" "XLM" "budget"
@@ -193,13 +166,11 @@ for it in "${ITEMS[@]}"; do
   IFS='|' read -r n name basis amt bud <<<"$it"
   printf '  %-3s %-52s %-9s %10.4f %8s\n' "$n" "$name" "$basis" "$amt" "$bud"
   TOTAL="$(add "$TOTAL" "$amt")"
-  [ "$basis" = funds ] || SPEND="$(add "$SPEND" "$amt")"
+  SPEND="$(add "$SPEND" "$amt")"
 done
-printf '  %-3s %-52s %-9s %10.4f %8s\n' "" "TOTAL (fees + funds)" "" "$TOTAL" "$HARD_CAP_XLM"
-printf '  %-3s %-52s %-9s %10.4f\n' "" "of which burned as fees/rent" "" "$SPEND"
+printf '  %-3s %-52s %-9s %10.4f %8s\n' "" "TOTAL (fees)" "" "$TOTAL" "$HARD_CAP_XLM"
 OVER=0
 awk -v t="$TOTAL" -v c="$HARD_CAP_XLM" 'BEGIN{exit !(t+0>c+0)}' && OVER=1 || true
-awk -v v="$VER_UP" -v b="$BUD_VER_UP" 'BEGIN{exit !(v+0>b+0)}' && warn "verifier upload ${VER_UP} > budget ${BUD_VER_UP}" || true
 awk -v v="$REG_UP" -v b="$BUD_REG_UP" 'BEGIN{exit !(v+0>b+0)}' && warn "registry upload ${REG_UP} > budget ${BUD_REG_UP}" || true
 if [ "$OVER" = 1 ]; then echo "  RESULT: total ${TOTAL} XLM EXCEEDS hard cap ${HARD_CAP_XLM} XLM" >&2; fi
 
@@ -209,22 +180,18 @@ if [ -n "$BAL" ]; then
 fi
 
 echo
-echo "  commands (verifier first, registry second):"
-echo "  \$ stellar contract upload --wasm $VER_WASM --source-account $SOURCE $NETQ"
-echo "  \$ stellar contract deploy --wasm-hash $VER_HASH --source-account $SOURCE $NETQ"
+echo "  commands:"
 echo "  \$ stellar contract upload --wasm $REG_WASM --source-account $SOURCE $NETQ"
-echo "  \$ stellar contract deploy --wasm-hash $REG_HASH --source-account $SOURCE $NETQ"
-echo "  \$ stellar contract invoke --id <REGISTRY> --source-account $SOURCE $NETQ -- init --admin $ADMIN --verifier <VERIFIER>"
-echo "  \$ node scripts/mainnet/verify-registry.mjs <tmp json>   # abort unless verifier/admin match"
+echo "  \$ stellar contract deploy --wasm-hash $REG_HASH --source-account $SOURCE $NETQ -- --verifier $VERIFIER_ID --token $TOKEN"
+echo "  \$ (read-only) registry verifier() == $VERIFIER_ID, token() == $TOKEN, version() == 2"
+echo "  \$ node scripts/mainnet/verify-registry.mjs <json>"
 echo
-echo "  NOTE: contracts/chest has a separate init() (no __constructor): deploy and init are TWO txs. Between them anyone can"
-echo "        call init(own_admin, evil_verifier) and own the registry. The script inits immediately and then reads the"
-echo "        instance storage back; if the verifier differs it STOPS (redeploy; the evil instance is abandoned)."
+echo "  NOTE: contracts/chest v2 has __constructor(verifier, token): deploy and init are ONE tx (no front-run window)."
+echo "        The contract is NOT upgradeable (no upgrade, no admin). Still verified after deploy, below."
 
 if [ "$EXECUTE" = 0 ]; then
   echo
   if [ "$OVER" = 1 ]; then echo "DRY-RUN FAILED: estimate exceeds hard cap." >&2; exit 3; fi
-  if [ "$OVERRIDE" = 1 ]; then echo "DRY-RUN complete (OVERRIDE active: NOT EXECUTABLE until a real ceremony verifier hash is supplied)."; exit 0; fi
   echo "DRY-RUN complete. Re-run with --execute to send."
   exit 0
 fi
@@ -233,43 +200,35 @@ fi
 # ---------------------------------------------------------------- execute
 LOG="$(mktemp -d)"
 txhash() { rg -o 'ransaction hash is ([0-9a-f]{64})' -r '$1' "$1" 2>/dev/null | tail -1 || true; }
-upload() { # name wasm expect_hash errfile
-  local got; got="$(stellar contract upload --wasm "$2" --source-account "$SOURCE" "${NET[@]}" 2> >(tee "$4" >&2) | tail -1)"
-  [ "$got" = "$3" ] || die "uploaded $1 hash $got != local $3 (STOP: do not continue)"
-}
-deploy() { # hash errfile -> contract id
-  local id; id="$(stellar contract deploy --wasm-hash "$1" --source-account "$SOURCE" "${NET[@]}" 2> >(tee "$2" >&2) | tail -1)"
-  [[ "$id" =~ ^C[A-Z2-7]{55}$ ]] || die "unexpected deploy output: $id"
-  echo "$id"
-}
 
-step "1/6 upload verifier";  upload verifier "$VER_WASM" "$VER_HASH" "$LOG/1.err"
-step "2/6 deploy verifier";  VERIFIER="$(deploy "$VER_HASH" "$LOG/2.err")"; echo "  verifier: $VERIFIER"
-step "3/6 upload registry";  upload registry "$REG_WASM" "$REG_HASH" "$LOG/3.err"
-step "4/6 deploy registry";  REGISTRY="$(deploy "$REG_HASH" "$LOG/4.err")"; echo "  registry: $REGISTRY"
-step "5/6 init registry (front-run window: do not pause here)"
-stellar contract invoke --id "$REGISTRY" --source-account "$SOURCE" "${NET[@]}" -- init --admin "$ADMIN" --verifier "$VERIFIER" 2> >(tee "$LOG/5.err" >&2) \
-  || die "init failed; registry $REGISTRY is UNINITIALISED or taken. Inspect with verify-registry.mjs before retrying; do not use it unverified."
+step "1/3 upload registry"
+GOT="$(stellar contract upload --wasm "$REG_WASM" --source-account "$SOURCE" "${NET[@]}" 2> >(tee "$LOG/1.err" >&2) | tail -1)"
+[ "$GOT" = "$REG_HASH" ] || die "uploaded registry hash $GOT != local $REG_HASH (STOP: do not continue)"
+step "2/3 deploy registry (constructor sets verifier + token atomically)"
+REGISTRY="$(stellar contract deploy --wasm-hash "$REG_HASH" --source-account "$SOURCE" "${NET[@]}" \
+  2> >(tee "$LOG/2.err" >&2) -- --verifier "$VERIFIER_ID" --token "$TOKEN" | tail -1)"
+[[ "$REGISTRY" =~ ^C[A-Z2-7]{55}$ ]] || die "unexpected deploy output: $REGISTRY"
+echo "  registry: $REGISTRY"
 
-mkjson() { # -> stdout
-  jq -n --arg pass "$PASSPHRASE" --arg rpc "$RPC_URL" --arg reg "$REGISTRY" --arg ver "$VERIFIER" --arg tok "$TOKEN" \
-    --arg admin "$ADMIN" --arg vh "$VER_HASH" --arg rh "$REG_HASH" \
-    --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    --arg t1 "$(txhash "$LOG/1.err")" --arg t2 "$(txhash "$LOG/2.err")" --arg t3 "$(txhash "$LOG/3.err")" \
-    --arg t4 "$(txhash "$LOG/4.err")" --arg t5 "$(txhash "$LOG/5.err")" '{
-      network:"mainnet", passphrase:$pass, rpcUrl:$rpc,
-      registry:$reg, verifier:$ver, token:$tok, admin:$admin,
-      registryWasmHash:$rh, verifierWasmHash:$vh,
-      deployedAt:$at,
-      txs:{verifierUpload:$t1, verifierDeploy:$t2, registryUpload:$t3, registryDeploy:$t4, init:$t5}
-    }'
-}
-step "6/6 verify on-chain state (admin/verifier must match)"
-mkjson > "$LOG/pre.json"
-node "$HERE/verify-registry.mjs" "$LOG/pre.json" || die "post-init verification FAILED: registry $REGISTRY was possibly front-run. STOP. Do not create chests. Abandon it and redeploy."
+step "3/3 verify on-chain state (verifier/token/version must match; STOP otherwise)"
+GOT_V="$(ro "$REGISTRY" verifier | unq)"; GOT_T="$(ro "$REGISTRY" token | unq)"; GOT_VER="$(ro "$REGISTRY" version | unq)"
+[ "$GOT_V" = "$VERIFIER_ID" ] || die "registry verifier() $GOT_V != $VERIFIER_ID. Abandon $REGISTRY."
+[ "$GOT_T" = "$TOKEN" ] || die "registry token() $GOT_T != $TOKEN. Abandon $REGISTRY."
+[ "$GOT_VER" = "2" ] || die "registry version() $GOT_VER != 2. Abandon $REGISTRY."
+ONCHAIN_FP2="$(ro "$GOT_V" vk_fingerprint | unq)"
+[ "$ONCHAIN_FP2" = "$MANIFEST_FP" ] || die "post-deploy verifier vk_fingerprint $ONCHAIN_FP2 != ceremony manifest. Abandon $REGISTRY."
+echo "  verifier() / token() / version() / vk_fingerprint OK"
+
 mkdir -p deployments
 [ ! -f "$OUT_JSON" ] || die "$OUT_JSON appeared meanwhile; refusing to overwrite"
-cp "$LOG/pre.json" "$OUT_JSON"; echo "  wrote $OUT_JSON"
-echo; jq . "$OUT_JSON"
+jq -n --arg pass "$PASSPHRASE" --arg rpc "$RPC_URL" --arg reg "$REGISTRY" --arg ver "$VERIFIER_ID" --arg tok "$TOKEN" \
+  --arg rh "$REG_HASH" --arg vh "$CEREMONY_VERIFIER_WASM_SHA256" --arg fp "$MANIFEST_FP" \
+  --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg t1 "$(txhash "$LOG/1.err")" --arg t2 "$(txhash "$LOG/2.err")" '{
+    network:"mainnet", version:2, passphrase:$pass, rpcUrl:$rpc,
+    registry:$reg, verifier:$ver, token:$tok,
+    registryWasmHash:$rh, verifierWasmHash:$vh, vkFingerprint:$fp,
+    deployedAt:$at, txs:{registryUpload:$t1, registryDeploy:$t2}
+  }' > "$OUT_JSON"
+echo "  wrote $OUT_JSON"; jq . "$OUT_JSON"
 node "$HERE/verify-registry.mjs" "$OUT_JSON" || warn "final verification reported mismatches"
-echo "next: Pau creates the sample chest from /create on the mainnet site (30 claims x 1 XLM, with an expiry: deadline 0 is refused)."
+echo "next: create the sample chest from the app (deadline must be in the future and <= 90 days)."

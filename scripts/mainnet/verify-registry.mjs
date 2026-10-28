@@ -50,20 +50,32 @@ if (!reg) check("registry instance exists", false, "(missing)", dep.registry);
 else {
   const h = wasmHashOf(reg);
   check("registry wasm hash", h === dep.registryWasmHash, h, dep.registryWasmHash);
-  let storedVerifier = null, nextId = null;
+  let storedVerifier = null, storedToken = null, nextId = null;
   for (const e of reg.storage() ?? []) {
     const k = scValToNative(e.key());
     if (Array.isArray(k) && k[0] === "Verifier") storedVerifier = scValToNative(e.val());
+    if (Array.isArray(k) && k[0] === "Token") storedToken = scValToNative(e.val());
     if (Array.isArray(k) && k[0] === "NextId") nextId = scValToNative(e.val());
   }
   check("registry initialised (Verifier set)", storedVerifier !== null, storedVerifier, "(set)");
   check("registry verifier == json verifier", storedVerifier === dep.verifier, storedVerifier, dep.verifier);
   check("registry NextId present", nextId !== null, nextId, ">=1");
   if (dep.sampleChest) check("NextId > sample chest id", nextId !== null && BigInt(nextId) > BigInt(dep.sampleChest.id), nextId, dep.sampleChest.id);
-  // A second init must fail with AlreadyInit (#10). Simulation only.
-  const s = await sim(dep.registry, "init", [new Address(dep.admin).toScVal(), new Address(dep.verifier).toScVal()]);
-  const err = rpc.Api.isSimulationError(s) ? String(s.error) : "";
-  check("second init rejected (AlreadyInit #10)", /Error\(Contract, #10\)/.test(err), err.slice(0, 80) || "init would succeed!", "Error #10");
+  if (dep.version === 2) {
+    // v2: constructor-initialised, token fixed, no init entrypoint, not upgradeable.
+    check("registry (v2) stored Token == json token", storedToken === dep.token, storedToken, dep.token);
+    const v = await sim(dep.registry, "version");
+    check("registry version() == 2", !rpc.Api.isSimulationError(v) && Number(scValToNative(v.result.retval)) === 2, "?", 2);
+    const g = await sim(dep.registry, "verifier");
+    check("registry verifier() getter == json verifier", !rpc.Api.isSimulationError(g) && scValToNative(g.result.retval) === dep.verifier, "?", dep.verifier);
+    const i = await sim(dep.registry, "init", [new Address(dep.verifier).toScVal(), new Address(dep.verifier).toScVal()]);
+    check("no init entrypoint (v2)", rpc.Api.isSimulationError(i), "init exists!", "error");
+  } else {
+    // v1: A second init must fail with AlreadyInit (#10). Simulation only.
+    const s = await sim(dep.registry, "init", [new Address(dep.admin).toScVal(), new Address(dep.verifier).toScVal()]);
+    const err = rpc.Api.isSimulationError(s) ? String(s.error) : "";
+    check("second init rejected (AlreadyInit #10)", /Error\(Contract, #10\)/.test(err), err.slice(0, 80) || "init would succeed!", "Error #10");
+  }
 }
 
 // Verifier: wasm hash + VK fingerprint must not be the testnet one.
@@ -88,7 +100,7 @@ if (dep.sampleChest) {
   if (rpc.Api.isSimulationError(s)) check("sample chest readable", false, s.error, "ok");
   else {
     const c = scValToNative(s.result.retval);
-    check("chest creator == admin", c.creator === dep.admin, c.creator, dep.admin);
+    if (dep.admin) check("chest creator == admin", c.creator === dep.admin, c.creator, dep.admin);
     check("chest token == native SAC", c.token === dep.token, c.token, dep.token);
     check("chest fingerprint", hex(c.fingerprint) === String(dep.sampleChest.fingerprint).toLowerCase(), hex(c.fingerprint), dep.sampleChest.fingerprint);
     check("chest prize", String(c.prize) === String(dep.sampleChest.prizeStroops), c.prize, dep.sampleChest.prizeStroops);

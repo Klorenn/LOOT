@@ -1,4 +1,5 @@
 #![no_std]
+//! TESTNET DEMO ONLY. DO NOT DEPLOY TO MAINNET.
 //! Cofre NORMAL (sin ZK) — contraparte vulnerable del demo de ataque.
 //! La respuesta viaja EN CLARO como argumento de `claim`: cualquiera que lea
 //! la tx del ledger la copia y cobra con su propia cuenta.
@@ -17,9 +18,14 @@ pub enum Error {
     AlreadyClaimed = 3,
     WrongAnswer = 4,
     BadAmounts = 5,
-    AlreadyInit = 6,
-    NotInit = 7,
+    // 6 and 7 were AlreadyInit / NotInit (removed: the constructor replaces init). Not reused.
+    /// Escrow above `MAX_TOTAL`: this contract is a demo, keep exposure tiny.
+    TooLarge = 8,
 }
+
+/// Cheap guard: a chest may escrow at most 1,000 XLM (7 decimals) in total.
+/// This contract is intentionally insecure (answer in clear): never hold real value.
+pub const MAX_TOTAL: i128 = 10_000_000_000;
 
 #[derive(Clone)]
 #[contracttype]
@@ -45,14 +51,14 @@ pub struct NormalChest;
 
 #[contractimpl]
 impl NormalChest {
-    pub fn init(env: Env, admin: Address, token: Address) -> Result<(), Error> {
-        admin.require_auth();
-        if env.storage().instance().has(&DataKey::Token) {
-            return Err(Error::AlreadyInit);
-        }
+    /// Deploy-time initialisation (no init front-run window). `token` is fixed forever.
+    pub fn __constructor(env: Env, token: Address) {
         env.storage().instance().set(&DataKey::Token, &token);
         env.storage().instance().set(&DataKey::NextId, &1u32);
-        Ok(())
+    }
+
+    pub fn token(env: Env) -> Address {
+        env.storage().instance().get(&DataKey::Token).unwrap()
     }
 
     pub fn create_chest(
@@ -62,7 +68,7 @@ impl NormalChest {
         max_claims: u32,
         answer_hash: BytesN<32>,
     ) -> Result<u32, Error> {
-        let token = Self::token(&env)?;
+        let token = Self::token(env.clone());
         creator.require_auth();
         if prize <= 0 || max_claims == 0 {
             return Err(Error::BadAmounts);
@@ -70,6 +76,9 @@ impl NormalChest {
         let total = prize
             .checked_mul(max_claims as i128)
             .ok_or(Error::BadAmounts)?;
+        if total > MAX_TOTAL {
+            return Err(Error::TooLarge);
+        }
         token::Client::new(&env, &token).transfer(
             &creator,
             &env.current_contract_address(),
@@ -101,7 +110,7 @@ impl NormalChest {
         recipient: Address,
         answer: String,
     ) -> Result<(), Error> {
-        let token = Self::token(&env)?;
+        let token = Self::token(env.clone());
         let key = DataKey::Chest(chest_id);
         let mut chest: Chest = env
             .storage()
@@ -137,13 +146,6 @@ impl NormalChest {
             .persistent()
             .get(&DataKey::Chest(chest_id))
             .ok_or(Error::ChestNotFound)
-    }
-
-    fn token(env: &Env) -> Result<Address, Error> {
-        env.storage()
-            .instance()
-            .get(&DataKey::Token)
-            .ok_or(Error::NotInit)
     }
 
     /// sha256 de los bytes UTF-8 de la respuesta; None si excede 128 bytes.
