@@ -8,6 +8,8 @@ import { PageHeader, Em } from "@/components/page-header";
 import { BetaNotice } from "@/components/network-banner";
 import { useNet } from "@/components/network-provider";
 import { answerToField, normalizeAnswer, randomSalt } from "@/lib/answer";
+import { AnswerStrengthNote } from "@/components/answer-strength-note";
+import { answerBlockError } from "@/lib/answer-strength";
 import { poseidon2, fieldToHex } from "@/lib/zk";
 import { chestPath, encodeChestId } from "@/lib/chest-code";
 import { SET_LIMITS, maxSetSize, setCapError, setSaltsFragment, validateSetShape } from "@/lib/chest-set";
@@ -103,6 +105,10 @@ export function SetCreate() {
     rows.forEach((r, i) => {
       if (!r.question.trim()) e[`q${i}`] = "Write the question.";
       if (!normalizeAnswer(r.answer)) e[`a${i}`] = "Enter the answer.";
+      else {
+        const weak = answerBlockError(r.answer, IS_MAINNET); // mainnet blocks weak answers, testnet only warns
+        if (weak) e[`a${i}`] = weak;
+      }
       if (!prizes[i] || prizes[i]! <= BigInt(0)) e[`p${i}`] = "Reward must be greater than 0 (up to 7 decimals).";
     });
     const shape = validateSetShape(rows.length, kind, IS_MAINNET);
@@ -494,7 +500,7 @@ export function SetCreate() {
               <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
                 <Field
                   label="Answer"
-                  hint="Hashed on this device with its own salt. Never sent to a server. Make it hard to guess."
+                  hint="Hashed on this device with its own salt. The answer is never sent to a server."
                   error={fieldErr[`a${i}`]}
                 >
                   <Input
@@ -504,6 +510,7 @@ export function SetCreate() {
                     onChange={(e) => setRow(i, { answer: e.target.value })}
                     className={`h-11 rounded-[10px] font-mono ${fieldErr[`a${i}`] ? "border-[var(--red)]" : ""}`}
                   />
+                  <AnswerStrengthNote text={r.answer} enforced={IS_MAINNET} />
                 </Field>
                 <Field label="Reward (XLM)" error={fieldErr[`p${i}`]}>
                   <Input
