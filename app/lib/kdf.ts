@@ -1,4 +1,3 @@
-import { argon2id } from "hash-wasm";
 import { answerToField } from "./answer";
 
 /**
@@ -13,8 +12,10 @@ import { answerToField } from "./answer";
  *
  * The version is stored in the chest metadata (`kdf`), so old chests keep the old derivation forever.
  */
-export type Kdf = "v1" | "argon2id-v1";
-export const KDF_ARGON2ID_V1 = "argon2id-v1" as const;
+import { KDF_ARGON2ID_V1, UnknownKdfError, type Kdf } from "./kdf-tag";
+
+// Tags live in ./kdf-tag (no crypto); re-exported for callers that already derive.
+export { KDF_ARGON2ID_V1, UnknownKdfError, parseKdf, type Kdf } from "./kdf-tag";
 
 /**
  * Pinned parameters of "argon2id-v1". NEVER change them: every chest made with this tag depends on them.
@@ -22,20 +23,6 @@ export const KDF_ARGON2ID_V1 = "argon2id-v1" as const;
  * stay usable on phones (single thread: no SharedArrayBuffer / cross-origin isolation needed).
  */
 export const ARGON2ID_V1 = { memoryKiB: 19 * 1024, iterations: 2, parallelism: 1, hashLength: 32 } as const;
-
-export class UnknownKdfError extends Error {
-  constructor(kdf: string) {
-    super(`This chest uses an answer format ("${kdf}") this version of Loot does not know. Update the app and retry.`);
-    this.name = "UnknownKdfError";
-  }
-}
-
-/** Metadata value -> Kdf. Absent = v1; anything unknown throws (never hash with the wrong scheme). */
-export function parseKdf(v: unknown): Kdf {
-  if (v === undefined || v === null || v === "v1") return "v1";
-  if (v === KDF_ARGON2ID_V1) return KDF_ARGON2ID_V1;
-  throw new UnknownKdfError(String(v));
-}
 
 /** Chest salt (decimal field element, < 2^248) as 31 big-endian bytes: the argon2id salt. */
 export function saltBytes(salt: bigint): Uint8Array {
@@ -47,6 +34,8 @@ export function saltBytes(salt: bigint): Uint8Array {
 /** argon2id-v1: 32-byte argon2id output with the top byte zeroed (248 bits, below the BN254 modulus). */
 export async function argon2idAnswerField(normalized: string, salt: bigint): Promise<bigint> {
   if (!normalized) throw new Error("empty answer");
+  // hash-wasm is loaded only when an argon2id chest is actually derived (not in the mainnet bundle path)
+  const { argon2id } = await import("hash-wasm");
   const out = await argon2id({
     password: new TextEncoder().encode(normalized),
     salt: saltBytes(salt),

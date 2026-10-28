@@ -19,7 +19,7 @@ import { canConfirm, canReserve, parseCreatorAllowlist, type MetaGate } from "@/
 import { QUIZ_LIMITS, parseQuiz, quizServerGuessable, type Quiz } from "@/lib/quiz";
 import { SET_LIMITS, setCapError, type SetRef } from "@/lib/chest-set";
 import { isV2Ref, resolveSetId } from "@/lib/registry";
-import { KDF_ARGON2ID_V1 } from "@/lib/kdf";
+import { KDF_ARGON2ID_V1 } from "@/lib/kdf-tag";
 
 /**
  * Metadatos off-chain de un cofre, en dos pasos (reserve-then-confirm):
