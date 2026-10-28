@@ -12,6 +12,7 @@ import {
 import { cfg } from "./cfg";
 import { withRpc } from "./rpc";
 import { refOf, registryFor } from "./registry";
+import { nextIdFromStorage } from "./registry-scan";
 
 /**
  * Lecturas de solo-lectura contra Soroban RPC. Sirven en server y en browser
@@ -481,6 +482,22 @@ export async function readSacTransfers(address: string): Promise<SacTransfer[]> 
       }
     });
   return [...parse(out.events, "out"), ...parse(inn.events, "in")].sort((x, y) => y.ledger - x.ledger);
+}
+
+/** Next id the registry v2 will assign (chests and sets share it), from its instance storage. Lanza si no se puede leer. */
+export async function readNextId(registryId: string): Promise<number> {
+  const key = xdr.LedgerKey.contractData(
+    new xdr.LedgerKeyContractData({
+      contract: Address.fromString(registryId).toScAddress(),
+      key: xdr.ScVal.scvLedgerKeyContractInstance(),
+      durability: xdr.ContractDataDurability.persistent(),
+    }),
+  );
+  const r = await withRpc((s) => s.getLedgerEntries(key));
+  const inst = r.entries[0]?.val.contractData().val().instance();
+  const n = nextIdFromStorage(inst?.storage());
+  if (n === null) throw new Error("registry next id unreadable");
+  return n;
 }
 
 /** ¿Existe la instancia del contrato `id` en la cadena (no archivada)? Lanza si el RPC no responde. */

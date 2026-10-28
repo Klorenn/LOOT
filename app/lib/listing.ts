@@ -1,10 +1,11 @@
 import { chestPath } from "./chest-code";
 import { displayId, isV2Ref, refOf } from "./registry";
-import { readChest, readClaimedEvents, type ClaimedEvent, type OnChainChest } from "./chain";
+import { readChest, readClaimedEvents, readNextId, type ClaimedEvent, type OnChainChest } from "./chain";
 import { getChest as demoMeta } from "./chests-demo";
 import { getChestMeta, listPublicMetas } from "./chest-store";
 import type { SetRef } from "./chest-set";
 import { cfg } from "./cfg";
+import { scanUpTo } from "./registry-scan";
 import { isChestAllowed } from "./chest-allow";
 import { DEMO_CHEST, stroopsToXlm, tokenDecimals, tokenLabel } from "./config";
 
@@ -22,11 +23,8 @@ const isMissing = (e: unknown) =>
     (e as { message?: string })?.message ?? String(e),
   );
 
-/**
- * Cofres de un registry: ids 1.. hasta el primero que no existe (v1) o hasta un bloque entero vacío (v2: los ids de
- * sets comparten contador con los cofres y dejan huecos). `toRef` convierte el id local en ref (lib/registry.ts).
- */
-async function scanRegistry(toRef: (id: number) => number, tolerateGaps: boolean): Promise<OnChainChest[]> {
+/** Cofres del registry v1: ids 1.. hasta el primero que no existe. `toRef` convierte el id local en ref (lib/registry.ts). */
+async function scanRegistry(toRef: (id: number) => number): Promise<OnChainChest[]> {
   const out: OnChainChest[] = [];
   const CHUNK = 6;
   for (let start = 1; start <= MAX_SCAN; start += CHUNK) {
@@ -39,11 +37,6 @@ async function scanRegistry(toRef: (id: number) => number, tolerateGaps: boolean
         }),
       ),
     );
-    if (tolerateGaps) {
-      for (const r of res) if (r) out.push(r);
-      if (res.every((r) => r === null)) break;
-      continue;
-    }
     const firstMissing = res.findIndex((r) => r === null);
     for (const r of firstMissing === -1 ? res : res.slice(0, firstMissing)) if (r) out.push(r);
     if (firstMissing !== -1) break;
@@ -51,13 +44,24 @@ async function scanRegistry(toRef: (id: number) => number, tolerateGaps: boolean
   return out;
 }
 
+/** Cofres del registry v2: ids de sets y cofres comparten contador, así que se lee hasta el contador on-chain (los sets son huecos). */
+async function scanRegistryV2(registryId: string): Promise<OnChainChest[]> {
+  const nextId = await readNextId(registryId);
+  return scanUpTo(nextId, (id) =>
+    readChest(refOf(2, id)).catch((e) => {
+      if (isMissing(e)) return null;
+      throw e;
+    }),
+  );
+}
+
 /** Todos los cofres de los registries configurados (v1 siempre; v2 solo si hay id v2). */
 export async function readAllChests(fresh = false): Promise<OnChainChest[]> {
   const { net, REGISTRY_V2 } = await cfg();
   const hit = chestsCache.get(net);
   if (!fresh && hit && Date.now() - hit.at < TTL) return hit.value;
-  const v1 = await scanRegistry((id) => id, false);
-  const v2 = REGISTRY_V2.chest ? await scanRegistry((id) => refOf(2, id), true) : [];
+  const v1 = await scanRegistry((id) => id);
+  const v2 = REGISTRY_V2.chest ? await scanRegistryV2(REGISTRY_V2.chest) : [];
   const out = [...v1, ...v2];
   chestsCache.set(net, { at: Date.now(), value: out });
   return out;
