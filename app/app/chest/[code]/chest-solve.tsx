@@ -67,6 +67,7 @@ type Fail =
   | { kind: "invalid" }
   | { kind: "browser"; detail: string }
   | { kind: "relayer"; detail: string }
+  | { kind: "signature"; detail: string }
   | { kind: "example" };
 
 /** Contrato (contracts/chest/src/lib.rs): 1 NotFound, 2 Closed, 3 Expired, 4 SoldOut, 5 NullifierUsed, 6 InvalidProof; v2 adds 12-16. */
@@ -90,6 +91,8 @@ const STEPS = [
   "Generate Groth16 proof",
   "Submit to Soroban via relayer",
 ];
+/** Registry v2: the last step also asks the wallet to sign the claim (the relayer still pays the fee). */
+const STEPS_V2 = [...STEPS.slice(0, 3), "Sign claim in your wallet, relayer submits"];
 
 function expiresIn(deadline?: number) {
   if (!deadline) return null;
@@ -289,18 +292,44 @@ export function ChestSolve({
       mark(2, "done");
 
       mark(3, "run");
-      const res = await fetch("/api/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chestId,
-          recipient: player.publicKey,
-          nullifierHex: result.nullifierHex,
-          proof: result.proof,
-        }),
-      }).catch((e) => {
-        throw new Error(`network: ${e instanceof Error ? e.message : String(e)}`);
-      });
+      const claimBody = {
+        chestId,
+        recipient: player.publicKey,
+        nullifierHex: result.nullifierHex,
+        proof: result.proof,
+      };
+      const post = (body: object) =>
+        fetch("/api/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).catch((e) => {
+          throw new Error(`network: ${e instanceof Error ? e.message : String(e)}`);
+        });
+      let res: Response;
+      if (version === 2) {
+        // Registry v2: the claim must be signed by the recipient's wallet (the relayer still pays the fee).
+        const prep = await post({ ...claimBody, phase: "prepare" });
+        const p = await prep.json().catch(() => ({}));
+        if (!prep.ok || !p.authEntry) {
+          setFail(classify(String(p.error || `HTTP ${prep.status}`)));
+          return;
+        }
+        let signedAuthEntry: string;
+        try {
+          const [{ signClaimAuth }, { NETWORK }] = await Promise.all([
+            import("@/lib/claim-auth-client"),
+            import("@/lib/client-cfg"),
+          ]);
+          signedAuthEntry = await signClaimAuth(player, p.authEntry, p.validUntilLedger, NETWORK.passphrase);
+        } catch (e) {
+          setFail({ kind: "signature", detail: e instanceof Error ? e.message : String(e) });
+          return;
+        }
+        res = await post({ ...claimBody, signedAuthEntry });
+      } else {
+        res = await post(claimBody);
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (data.code === SET_ALREADY_CLAIMED_CODE) {
@@ -635,7 +664,7 @@ export function ChestSolve({
               {failView ?? (
                 <>
                   <ol>
-                    {STEPS.map((s, i) => (
+                    {((meta?.registryVersion ?? splitRef(chestId).version) === 2 ? STEPS_V2 : STEPS).map((s, i) => (
                       <li
                         key={s}
                         className="grid grid-cols-[28px_1fr_auto] items-center gap-2 border-b border-[var(--line)] py-3 text-[14px]"
@@ -869,6 +898,25 @@ function FailBlock({
             { label: "Retry", onClick: onRetry, primary: true },
             { href: chestPath(chestId), label: "Reload chest" },
           ]}
+        />
+      );
+    case "signature":
+      return (
+        <StateBlock
+          tone="gold"
+          label="Signature needed"
+          title="Your wallet didn’t sign the claim."
+          body={
+            <>
+              This chest pays only when the receiving account signs the claim. The fee is still
+              covered for you; the signature only approves sending the prize to this account.
+              <span className="mt-2 block font-mono text-[12px] break-words text-[var(--dim)]">
+                {fail.detail.slice(0, 200)}
+              </span>
+            </>
+          }
+          chest="none"
+          actions={[{ label: "Try again", onClick: onRetry, primary: true }]}
         />
       );
     case "example":

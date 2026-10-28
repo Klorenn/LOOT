@@ -320,6 +320,39 @@ export async function signWithWallet(
   return signedTxXdr;
 }
 
+/** Wallets whose Stellar Wallets Kit module cannot sign Soroban auth entries (SEP-43 signAuthEntry). */
+export class AuthEntryUnsupportedError extends Error {
+  constructor() {
+    super("This wallet can't sign Soroban authorizations. Use Freighter, xBull, Hana or a passkey to claim.");
+    this.name = "AuthEntryUnsupportedError";
+  }
+}
+
+/**
+ * Signs a Soroban authorization preimage (base64 HashIdPreimage XDR) with the chosen wallet.
+ * Returns the raw ed25519 signature bytes (SEP-43 `signedAuthEntry`).
+ */
+export async function signAuthEntryWithWallet(
+  preimageXdr: string,
+  address: string,
+  walletId: string,
+  networkPassphrase: string,
+): Promise<Uint8Array> {
+  const kit = await loadKit();
+  kit.setWallet(walletId);
+  let out: { signedAuthEntry?: string };
+  try {
+    out = await kit.signAuthEntry(preimageXdr, { networkPassphrase, address });
+  } catch (e) {
+    const msg = (e as { message?: string })?.message ?? String(e);
+    if (/not support|unsupported|not implemented/i.test(msg)) throw new AuthEntryUnsupportedError();
+    throw e;
+  }
+  if (!out?.signedAuthEntry) throw new AuthEntryUnsupportedError();
+  const bin = atob(out.signedAuthEntry);
+  return Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+}
+
 export async function disconnectGWallet(): Promise<void> {
   try {
     const kit = await loadKit();
