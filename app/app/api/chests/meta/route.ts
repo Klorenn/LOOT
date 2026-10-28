@@ -19,6 +19,7 @@ import { canConfirm, canReserve, parseCreatorAllowlist, type MetaGate } from "@/
 import { QUIZ_LIMITS, parseQuiz, quizServerGuessable, type Quiz } from "@/lib/quiz";
 import { SET_LIMITS, setCapError, type SetRef } from "@/lib/chest-set";
 import { isV2Ref, resolveSetId } from "@/lib/registry";
+import { KDF_ARGON2ID_V1 } from "@/lib/kdf";
 
 /**
  * Metadatos off-chain de un cofre, en dos pasos (reserve-then-confirm):
@@ -66,7 +67,11 @@ function parseSetRef(v: unknown): SetRef | string {
   return { id: id as number, index: index as number, size: size as number, title };
 }
 
-function parseReserve(b: Record<string, unknown>, mainnet: boolean): PendingMeta | string {
+/**
+ * `mainnet` keeps every mainnet rule as before. `createVersion` = the registry new chests go to: chest sets and the
+ * argon2id answer KDF exist only for registry v2 (testnet), so a v1 deployment refuses them.
+ */
+function parseReserve(b: Record<string, unknown>, mainnet: boolean, createVersion: 1 | 2 = 1): PendingMeta | string {
   const fp = typeof b.fingerprintHex === "string" ? b.fingerprintHex.toLowerCase() : "";
   if (!HEX64.test(fp)) return "bad fingerprint";
   if (typeof b.creator !== "string" || !StrKey.isValidEd25519PublicKey(b.creator)
@@ -91,9 +96,17 @@ function parseReserve(b: Record<string, unknown>, mainnet: boolean): PendingMeta
   let set: SetRef | undefined;
   if (b.set !== undefined && b.set !== null) {
     if (mainnet) return "chest sets are not available on mainnet";
+    if (createVersion !== 2) return "chest sets need registry v2";
     const r = parseSetRef(b.set);
     if (typeof r === "string") return r;
     set = r;
+  }
+  let kdf: typeof KDF_ARGON2ID_V1 | undefined;
+  if (b.kdf !== undefined && b.kdf !== null) {
+    if (mainnet) return "answer kdf is not available on mainnet";
+    if (createVersion !== 2) return "answer kdf needs registry v2";
+    if (b.kdf !== KDF_ARGON2ID_V1) return "bad kdf";
+    kdf = KDF_ARGON2ID_V1;
   }
   const listed = b.listed !== false;
   let salt: string | undefined;
@@ -108,6 +121,7 @@ function parseReserve(b: Record<string, unknown>, mainnet: boolean): PendingMeta
     difficulty: difficulty as 1 | 2 | 3 | 4 | undefined,
     ...(quiz ? { quiz } : {}),
     ...(set ? { set } : {}),
+    ...(kdf ? { kdf } : {}),
     salt,
     listed,
     fingerprintHex: fp,
@@ -213,7 +227,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if (b.action === "reserve") {
-      const p = parseReserve(b, c.IS_MAINNET);
+      const p = parseReserve(b, c.IS_MAINNET, c.CREATE_VERSION);
       if (typeof p === "string") return NextResponse.json({ error: p }, { status: 400 });
       if (!canReserve(gate, p.creator))
         return NextResponse.json({ error: "chest creation on mainnet is limited to approved creators" }, { status: 403 });
@@ -245,6 +259,9 @@ export async function POST(req: NextRequest) {
       }
       if (chest.fingerprintHex !== fp || chest.creator !== pending.creator)
         return NextResponse.json({ error: "chest does not match the reservation" }, { status: 403 });
+      // the KDF tag only ever describes a registry v2 chest
+      if (pending.kdf && !isV2Ref(id))
+        return NextResponse.json({ error: "answer kdf needs a registry v2 chest" }, { status: 403 });
       if (!canConfirm(gate, pending.creator, id))
         return NextResponse.json({ error: "this chest is not enabled on mainnet" }, { status: 403 });
 
