@@ -30,6 +30,8 @@ export type ChestMeta = {
   set?: SetRef;
   /** Solo en cofres públicos: hace falta para armar la prueba. Los privados viajan en #s= del link. */
   salt?: string;
+  /** How the answer becomes answer_field (lib/kdf.ts). Absent = "v1" (all older chests). Registry v2 testnet only. */
+  kdf?: "argon2id-v1";
   /** false = cofre privado: no aparece en /explore y su sal no se guarda. Ausente = legado (público). */
   listed?: boolean;
   fingerprintHex: string;

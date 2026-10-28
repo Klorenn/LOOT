@@ -52,6 +52,8 @@ type Meta = {
   groupId?: number;
   /** Registry the chest lives in (1 = original, 2 = new registry). */
   registryVersion?: 1 | 2;
+  /** Answer KDF tag from the metadata (lib/kdf.ts). Absent = v1. */
+  kdf?: string;
 };
 
 type StepState = "idle" | "run" | "done";
@@ -169,6 +171,7 @@ export function ChestSolve({
           set: m.set,
           groupId: m.groupId,
           registryVersion: m.registryVersion,
+          kdf: m.kdf,
         }),
       )
       .catch(() => {
@@ -236,15 +239,19 @@ export function ChestSolve({
     try {
       // Respuesta incorrecta: se detecta antes de probar comparando Poseidon(respuesta, sal)
       // con la huella pública (la respuesta nunca vive en el código ni sale del dispositivo).
-      const { answerToField, normalizeAnswer } = await import("@/lib/answer");
+      const { normalizeAnswer } = await import("@/lib/answer");
       const { poseidon2, fieldToHex, proveChest } = await import("@/lib/zk");
+      const { deriveAnswerField, parseKdf } = await import("@/lib/kdf");
+      let kdf: ReturnType<typeof parseKdf>;
+      try {
+        kdf = parseKdf(meta.kdf);
+      } catch (e) {
+        setFail({ kind: "relayer", detail: e instanceof Error ? e.message : String(e) });
+        return;
+      }
       if (meta.fingerprint) {
-        const fp = fieldToHex(
-          await poseidon2(
-            answerToField(normalizeAnswer(secretAnswer)),
-            BigInt(salt ?? "0"),
-          ),
-        );
+        const s = BigInt(salt ?? "0");
+        const fp = fieldToHex(await poseidon2(await deriveAnswerField(normalizeAnswer(secretAnswer), s, kdf), s));
         if (fp !== meta.fingerprint) {
           setFail({ kind: "wrong", quiz: !!meta.quiz });
           return;
@@ -273,6 +280,7 @@ export function ChestSolve({
           playerSecret: player.playerSecret,
           chestId: circuitId,
           registryVersion: version,
+          kdf,
           recipientField: recipient,
           onStage: (stage) => {
             if (stage === "witness") mark(1, "run");

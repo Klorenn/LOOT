@@ -51,6 +51,8 @@ export type ChestMetaInput = {
   listed: boolean;
   /** solo se envía si listed */
   salt?: string;
+  /** Answer KDF tag (lib/kdf.ts); absent = v1. Testnet registry v2 only. */
+  kdf?: "argon2id-v1";
 };
 
 const SIM_ACCOUNT = "GAKD2FSFFNLBVTUB4JHFYVUUMTKKEEJO2TG77BHV2KCZTDPUB64JU7E2";

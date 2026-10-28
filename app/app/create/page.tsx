@@ -9,7 +9,7 @@ import { LogoChest } from "@/components/logo-chest";
 import { ExampleTag } from "@/components/example-tag";
 import { KV } from "@/components/kv";
 import { TEMPLATES, type ChestTemplate } from "@/lib/templates";
-import { answerToField, normalizeAnswer, randomSalt } from "@/lib/answer";
+import { normalizeAnswer, randomSalt } from "@/lib/answer";
 import { poseidon2, fieldToHex } from "@/lib/zk";
 import { chestPath } from "@/lib/chest-code";
 import { useSession } from "@/lib/session";
@@ -28,6 +28,8 @@ import { useNet } from "@/components/network-provider";
 import { SetCreate } from "@/components/set-create";
 import { expiryError } from "@/lib/expiry";
 import { testnetFeatures } from "@/lib/testnet-features";
+import { answerBlockError } from "@/lib/answer-strength";
+import { KDF_ARGON2ID_V1, deriveAnswerField, type Kdf } from "@/lib/kdf";
 
 type Mode = "riddle" | "quiz";
 
@@ -44,10 +46,10 @@ const QUIZ_WEAK_MSG =
 
 /** /create: one chest (riddle or quiz) or a set of chests (one question and one prize each). */
 export default function CreateChestPage() {
-  const { IS_MAINNET } = useNet();
+  const { IS_MAINNET, CREATE_VERSION } = useNet();
   const [kind, setKind] = useState<"single" | "set">("single");
-  // chest sets are testnet-only for now (lib/testnet-features.ts)
-  if (!testnetFeatures({ IS_MAINNET })) return <SingleChestCreate />;
+  // chest sets are testnet-only (lib/testnet-features.ts) and need registry v2 (on-chain sets): no toggle otherwise
+  if (!testnetFeatures({ IS_MAINNET }) || CREATE_VERSION !== 2) return <SingleChestCreate />;
   return (
     <>
       <div className="mx-auto max-w-[1200px] px-6 pt-6">
@@ -83,7 +85,11 @@ export default function CreateChestPage() {
 }
 
 function SingleChestCreate() {
-  const { NETWORK, NETWORK_LC, CONFIG_INCOMPLETE, CAPS, IS_MAINNET } = useNet();
+  const { NETWORK, NETWORK_LC, CONFIG_INCOMPLETE, CAPS, IS_MAINNET, CREATE_VERSION } = useNet();
+  // Testnet only: weak typed answers are blocked (mainnet keeps its flow unchanged), and NEW registry v2 chests hash
+  // the answer with argon2id before Poseidon (lib/kdf.ts), tagged in the metadata so older chests keep v1.
+  const testnet = testnetFeatures({ IS_MAINNET });
+  const kdf: Kdf = testnet && CREATE_VERSION === 2 ? KDF_ARGON2ID_V1 : "v1";
   const [step, setStep] = useState(0);
   const [tpl, setTpl] = useState<ChestTemplate>(TEMPLATES[2]);
   const [question, setQuestion] = useState(TEMPLATES[2].question);
@@ -139,7 +145,8 @@ function SingleChestCreate() {
       return;
     }
     attempt.current ??= { salt: randomSalt() };
-    const fp = await poseidon2(answerToField(n), attempt.current.salt);
+    const salt = attempt.current.salt;
+    const fp = await poseidon2(await deriveAnswerField(n, salt, kdf), salt);
     setHashHex(fieldToHex(fp));
     setHashOk(true);
     setFieldErr((e) => ({ ...e, answer: "" }));
@@ -250,6 +257,10 @@ function SingleChestCreate() {
       } else setQuizErrIdx(undefined);
     } else if (step === 1 && !hashOk)
       e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
+    else if (step === 1 && mode === "riddle") {
+      const weak = answerBlockError(answer, testnet);
+      if (weak) e.answer = weak;
+    }
     if (step === 2 && !prizeStroops) e.prize = "Enter a reward greater than 0 (up to 7 decimals).";
     if (step === 2 && prizeStroops) {
       const cb = perClaimError(prizeStroops, CAPS); // el total se valida en el paso de claims y al enviar
@@ -291,10 +302,17 @@ function SingleChestCreate() {
         setFieldErr({ answer: quizWeak ? QUIZ_WEAK_MSG : "Finish the quiz first." });
         return;
       }
+      const weak = mode === "riddle" ? answerBlockError(answer, testnet) : null;
+      if (weak) {
+        setStep(1);
+        setFieldErr({ answer: weak });
+        return;
+      }
       attempt.current ??= { salt: randomSalt() };
       const salt = attempt.current.salt;
       const n = normalizeAnswer(secretText);
-      const fp = await poseidon2(answerToField(n), salt);
+      if (kdf !== "v1") setPhase("Hashing your answer…");
+      const fp = await poseidon2(await deriveAnswerField(n, salt, kdf), salt);
       const fingerprintHex = fieldToHex(fp);
       const ee = expiryError(expires, IS_MAINNET);
       if (ee) {
@@ -315,6 +333,7 @@ function SingleChestCreate() {
         prize: Number(stroopsToXlm(prizeStroops)),
         listed,
         salt: salt.toString(),
+        ...(kdf !== "v1" ? { kdf } : {}),
       });
 
       const { chestId, hash } = await createChestOnChain(player, input, (p) =>
@@ -689,7 +708,7 @@ function SingleChestCreate() {
                           : ""
                     }`}
                   />
-                  {testnetFeatures({ IS_MAINNET }) && <AnswerStrengthNote text={answer} enforced={false} />}
+                  {testnet && <AnswerStrengthNote text={answer} enforced />}
                 </Field>
               )}
 

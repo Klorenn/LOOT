@@ -20,6 +20,8 @@ export type ProveInput = {
   recipientField: string; // decimal field element
   /** Registry del cofre: elige la zkey (v2 usa la de la ceremonia también en testnet). Por defecto 1. */
   registryVersion?: 1 | 2;
+  /** How the answer becomes answer_field (lib/kdf.ts). Absent = "v1". Read from the chest metadata. */
+  kdf?: import("./kdf").Kdf;
   /** Etapas para la UI: "witness" al empezar, "prove" antes de snarkjs. */
   onStage?: (stage: "witness" | "prove") => void;
 };
@@ -66,11 +68,11 @@ export function snarkToContractProof(proof: snarkjs.Groth16Proof): ChestProof {
 }
 
 export async function proveChest(input: ProveInput): Promise<ProveResult> {
-  const { answerToField, normalizeAnswer } = await import("./answer");
+  const [{ normalizeAnswer }, { deriveAnswerField }] = await Promise.all([import("./answer"), import("./kdf")]);
   input.onStage?.("witness");
   const t0 = performance.now();
-  const answer = answerToField(normalizeAnswer(input.answer));
   const salt = BigInt(input.salt);
+  const answer = await deriveAnswerField(normalizeAnswer(input.answer), salt, input.kdf ?? "v1");
   const playerSecret = BigInt(input.playerSecret);
   const chestId = BigInt(input.chestId);
   const recipient = BigInt(input.recipientField);

@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { PageHeader, Em } from "@/components/page-header";
 import { BetaNotice } from "@/components/network-banner";
 import { useNet } from "@/components/network-provider";
-import { answerToField, normalizeAnswer, randomSalt } from "@/lib/answer";
+import { normalizeAnswer, randomSalt } from "@/lib/answer";
+import { KDF_ARGON2ID_V1, deriveAnswerField, type Kdf } from "@/lib/kdf";
 import { AnswerStrengthNote } from "@/components/answer-strength-note";
 import { answerBlockError } from "@/lib/answer-strength";
 import { poseidon2, fieldToHex } from "@/lib/zk";
@@ -36,6 +37,8 @@ const emptyRow = (): Row => ({ question: "", hint: "", answer: "", prize: "1" })
  */
 export function SetCreate() {
   const { NETWORK, NETWORK_LC, CONFIG_INCOMPLETE, CAPS, IS_MAINNET, CREATE_VERSION } = useNet();
+  // New registry v2 set chests hash answers with argon2id (lib/kdf.ts), tagged per chest in the metadata.
+  const kdf: Kdf = !IS_MAINNET && CREATE_VERSION === 2 ? KDF_ARGON2ID_V1 : "v1";
   const { player } = useSession();
   const net = IS_MAINNET ? "mainnet" : "testnet";
 
@@ -145,6 +148,7 @@ export function SetCreate() {
             listed: d.listed,
             salt: item.salt,
             set: { index: item.index, size: d.items.length, title: d.title, id: setId },
+            ...(kdf !== "v1" ? { kdf } : {}),
           },
         );
       },
@@ -220,10 +224,16 @@ export function SetCreate() {
     try {
       // Each question gets its own random salt and fingerprint, computed on this device. Answers never leave it.
       while (salts.current.length < rows.length) salts.current.push(randomSalt().toString());
+      if (kdf !== "v1") setPhase("Hashing your answers…");
       const items: SetItem[] = await Promise.all(
         rows.map(async (r, i) => ({
           index: i,
-          fingerprintHex: fieldToHex(await poseidon2(answerToField(normalizeAnswer(r.answer)), BigInt(salts.current[i]))),
+          fingerprintHex: fieldToHex(
+            await poseidon2(
+              await deriveAnswerField(normalizeAnswer(r.answer), BigInt(salts.current[i]), kdf),
+              BigInt(salts.current[i]),
+            ),
+          ),
           salt: salts.current[i],
           question: r.question.trim(),
           hint: r.hint.trim() || undefined,
