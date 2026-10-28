@@ -1,6 +1,6 @@
 # Proposal: argon2id before Poseidon for `answer_field`
 
-Status: proposal only. Nothing here is implemented. No fingerprint computation, circuit, contract or SDK code was changed.
+Status: implemented for NEW testnet registry v2 chests only (`app/lib/kdf.ts`, tag `kdf: "argon2id-v1"` in chest metadata; absent = v1). Parameters chosen for phones: argon2id m = 19 MiB, t = 2, p = 1, 32-byte output with the top byte zeroed, salt = chest salt as 31 big-endian bytes, password = UTF-8 of `normalizeAnswer(answer)` (hash-wasm 4.12.0; vectors cross-checked against @noble/hashes in `app/lib/kdf.test.ts`). About 30 ms on a desktop in Node. The 64 MiB profile below was not used. Mainnet chests, older chests and `@findloot/sdk` still use v1: the SDK cannot solve `argon2id-v1` chests yet. Circuit, zkey and verifier are unchanged.
 
 ## Problem
 
