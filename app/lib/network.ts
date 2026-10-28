@@ -196,7 +196,7 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
     CREATOR_ALLOWLIST: [],
     ALLOWED_CHEST_IDS: null,
     LISTED_CHEST_IDS: [6],
-    HIDDEN_CHEST_IDS: [9, 10, 11],
+    HIDDEN_CHEST_IDS: [9, 10, 11, 1_000_000_009, 1_000_000_010],
     CONFIG_ISSUES: [],
     CONFIG_INCOMPLETE: false,
     mainnetReady,

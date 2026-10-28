@@ -457,7 +457,7 @@ export function ChestSolve({
                                 </Link>{" "}
                                 · question {meta.set.index + 1} of {meta.set.size}
                                 <span className="mt-1 block text-[12px] text-[var(--dim)]">
-                                  One chest per account in this set (app rule, not an on-chain guarantee).
+                                  One chest per account in this set.
                                 </span>
                               </span>
                             ),
@@ -768,7 +768,7 @@ function FailBlock({
           tone="proof"
           label="One per account"
           title="This account already claimed from this set."
-          body="This app lets each account take one chest per set. It is an app rule, not an on-chain guarantee. Nothing was sent for this claim."
+          body="Each account can claim one chest per set. Nothing was sent for this claim."
           chest="none"
           actions={[
             { href: "/explore", label: "Explore chests", primary: true },

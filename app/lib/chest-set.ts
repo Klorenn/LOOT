@@ -113,7 +113,7 @@ export function decideSetClaim(existing: SetClaimMarker | null, chestId: number)
 
 export const SET_ALREADY_CLAIMED_CODE = "set_already_claimed";
 export const SET_ALREADY_CLAIMED_MSG =
-  "This account already claimed a chest from this set. The app allows one per account per set (this is an app rule, not an on-chain guarantee).";
+  "This account already claimed a chest from this set. Each account can claim one chest per set.";
 
 // ---------- grouping for /explore ----------
 
