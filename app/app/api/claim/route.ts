@@ -12,6 +12,7 @@ import { decideSponsor, relayerBalance, reserveFee } from "@/lib/relay-limits";
 import { withRpcUrl } from "@/lib/rpc";
 import { relayLimit } from "@/lib/rate-limit";
 import { relayGate } from "@/lib/relay-gate";
+import { testnetFeatures } from "@/lib/testnet-features";
 import { inclusionFee } from "@/lib/inclusion-fee";
 import { Server } from "@stellar/stellar-sdk/rpc";
 import { getChestMeta, reserveSetClaim, type SetClaimReservation } from "@/lib/chest-store";
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
     // relayer; it does NOT stop someone who uses a second account (sybil) or calls the contract directly.
     // On-chain enforcement is a separate contract change. Reserved atomically BEFORE anything is sent.
     // The metadata read fails open: if the store is unreachable the chest is treated as a normal chest.
-    const setRef = (await getChestMeta(chestId).catch(() => null))?.set;
+    const setRef = testnetFeatures(c) ? (await getChestMeta(chestId).catch(() => null))?.set : undefined;
     if (setRef) {
       setClaim = await reserveSetClaim(setRef.id, body.recipient, chestId);
       if (!setClaim.ok)

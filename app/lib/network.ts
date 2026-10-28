@@ -28,12 +28,6 @@ export type MainnetPublic = {
   creatorAllowlist: string[];
   /** MAINNET_PASSKEY_ENABLED=true: cuentas passkey en mainnet (apagado por defecto). */
   passkeyEnabled: boolean;
-  /** Registry v2 (MAINNET_REGISTRY_V2_ID). Vacío = v2 no configurado: mainnet sigue solo con v1. */
-  registryV2?: string;
-  /** Verifier de v2 (MAINNET_VERIFIER_V2_ID); sin él se usa MAINNET_VERIFIER_ID. */
-  verifierV2?: string;
-  /** MAINNET_REGISTRY_VERSION: 2 = los cofres NUEVOS van al registry v2 (requiere registryV2). Por defecto 1. */
-  registryVersion?: number;
 };
 
 const isContractId = (s: string) => /^C[A-Z2-7]{55}$/.test(s);
@@ -63,9 +57,6 @@ export function mainnetPublicFromEnv(): MainnetPublic {
     sampleChestId: num(e.MAINNET_SAMPLE_CHEST_ID, 0),
     creatorAllowlist: parseCreatorAllowlist(e.MAINNET_CREATOR_ALLOWLIST),
     passkeyEnabled: clean(e.MAINNET_PASSKEY_ENABLED).toLowerCase() === "true",
-    registryV2: clean(e.MAINNET_REGISTRY_V2_ID),
-    verifierV2: clean(e.MAINNET_VERIFIER_V2_ID),
-    registryVersion: num(e.MAINNET_REGISTRY_VERSION, 1),
     listedIds: (clean(e.MAINNET_LISTED_IDS) || "")
       .split(",")
       .map((x) => Number(x.trim()))
@@ -136,8 +127,6 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
     const rpcUrls = uniq([mainnet.rpcUrl, "https://mainnet.sorobanrpc.com"]);
     const registry = isContractId(mainnet.registry) ? mainnet.registry : "";
     const verifier = isContractId(mainnet.verifier) ? mainnet.verifier : "";
-    const v2Id = mainnet.registryV2 ?? "";
-    const v2 = isContractId(v2Id);
     return {
       net,
       IS_MAINNET: true,
@@ -154,11 +143,9 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
         explorerUrl: "https://stellar.expert/explorer/public",
       },
       CONTRACTS: { chest: registry, verifier, token: MAINNET_SAC },
-      REGISTRY_V2: {
-        chest: v2 ? v2Id : "",
-        verifier: isContractId(mainnet.verifierV2 ?? "") ? (mainnet.verifierV2 as string) : verifier,
-      },
-      CREATE_VERSION: createVersion(mainnet.registryVersion, v2Id),
+      // registry v2 is testnet-only for now (lib/testnet-features.ts): no mainnet env var can turn it on
+      REGISTRY_V2: { chest: "", verifier: "" },
+      CREATE_VERSION: 1,
       XLM_SAC: MAINNET_SAC,
       CAPS: { maxPrizePerPlaceXlm: mainnet.maxPrizePerPlaceXlm, maxTotalPrizeXlm: mainnet.maxTotalPrizeXlm },
       DEMO_CHEST_ID: 0,
@@ -246,7 +233,7 @@ export function injectMainnet(m: MainnetPublic) {
 export function mainnetPublic(): MainnetPublic {
   if (typeof window === "undefined") return mainnetPublicFromEnv();
   return (
-    injected ?? { registry: "", verifier: "", rpcUrl: "", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 0, listedIds: [], creatorAllowlist: [], passkeyEnabled: false, registryV2: "", verifierV2: "", registryVersion: 1 }
+    injected ?? { registry: "", verifier: "", rpcUrl: "", horizonUrl: "", maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30, sampleChestId: 0, listedIds: [], creatorAllowlist: [], passkeyEnabled: false }
   );
 }
 

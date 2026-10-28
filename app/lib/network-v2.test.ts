@@ -58,24 +58,15 @@ describe("registry v2 config (off by default)", () => {
     withEnv({ NEXT_PUBLIC_REGISTRY_VERSION: "2", NEXT_PUBLIC_REGISTRY_V2_ID: "C..." }, () => expect(configFor("testnet", ready).CREATE_VERSION).toBe(1));
   });
 
-  it("mainnet follows its own values and defaults to v1", () => {
-    const m2 = configFor("mainnet", { ...ready, registryV2: V2, registryVersion: 2 });
-    expect(m2.CREATE_VERSION).toBe(2);
-    expect(m2.REGISTRY_V2.chest).toBe(V2);
-    expect(m2.REGISTRY_V2.verifier).toBe(VER); // no verifier override: same ceremony verifier
-    expect(configFor("mainnet", { ...ready, registryV2: V2 }).CREATE_VERSION).toBe(1);
-    expect(configFor("mainnet", { ...ready, registryVersion: 2 }).CREATE_VERSION).toBe(1);
-    expect(configFor("mainnet", { ...ready, registryV2: V2, verifierV2: V2VER }).REGISTRY_V2.verifier).toBe(V2VER);
-  });
-
-  it("mainnet env: MAINNET_REGISTRY_V2_ID / MAINNET_REGISTRY_VERSION are read; default is v1", () => {
-    withEnv({}, () => {
-      const d = mainnetPublicFromEnv();
-      expect([d.registryV2, d.verifierV2, d.registryVersion]).toEqual(["", "", 1]);
-    });
-    withEnv({ MAINNET_REGISTRY_V2_ID: V2, MAINNET_REGISTRY_VERSION: "2" }, () => {
-      const e = mainnetPublicFromEnv();
-      expect([e.registryV2, e.registryVersion]).toEqual([V2, 2]);
-    });
+  it("mainnet ignores v2 entirely, even with every v2 env var set (testnet-only release)", () => {
+    withEnv(
+      { MAINNET_REGISTRY_V2_ID: V2, MAINNET_VERIFIER_V2_ID: V2VER, MAINNET_REGISTRY_VERSION: "2", NEXT_PUBLIC_REGISTRY_V2_ID: V2, NEXT_PUBLIC_REGISTRY_VERSION: "2" },
+      () => {
+        const m = configFor("mainnet", mainnetPublicFromEnv());
+        expect(m.REGISTRY_V2).toEqual({ chest: "", verifier: "" });
+        expect(m.CREATE_VERSION).toBe(1);
+        expect(configFor("mainnet", ready).REGISTRY_V2.chest).toBe("");
+      },
+    );
   });
 });

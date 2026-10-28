@@ -110,7 +110,7 @@ export async function toRow(c: OnChainChest): Promise<ChestRowData> {
     const meta = await getChestMeta(c.id).catch(() => null);
     question = meta?.question;
     difficulty = meta?.difficulty ?? difficulty;
-    set = meta?.set;
+    set = IS_MAINNET ? undefined : meta?.set; // sets are testnet-only (lib/testnet-features.ts)
   }
   const amount = stroopsToXlm(c.prize, tokenDecimals(c.token));
   return {
