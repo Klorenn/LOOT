@@ -16,7 +16,7 @@ export async function GET() {
     memo.set(net, { at: Date.now(), value });
     return NextResponse.json(value, { headers: { "cache-control": "private, max-age=60" } });
   } catch (e) {
-    const message = (e as { message?: string })?.message ?? String(e);
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("stats", e);
+    return NextResponse.json({ error: "chain read failed", code: "chain_read_failed" }, { status: 502 });
   }
 }

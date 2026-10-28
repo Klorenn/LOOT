@@ -17,6 +17,8 @@ import { pickRpcUrl } from "@/lib/rpc";
 import { inclusionFee } from "@/lib/inclusion-fee";
 import { TxPendingError, waitForConfirmation, waitSeconds } from "@/lib/tx-confirm";
 import { relayLimit } from "@/lib/rate-limit";
+import { relayGate } from "@/lib/relay-gate";
+import { safeUpstreamCode, toSafeError } from "@/lib/safe-error";
 import { relayMaxFee, relayerSecretFor, vetRelayTx } from "@/lib/relay-guard";
 import { decideSponsor, relayerBalance, reserveFee, reserveRegistration } from "@/lib/relay-limits";
 
@@ -219,6 +221,7 @@ export async function POST(req: NextRequest) {
   let slot: Awaited<ReturnType<typeof reserveRegistration>> = null;
   let release: () => void = () => {};
   let relayKind: RelayKind | undefined;
+  let gateRelease: () => Promise<void> = async () => undefined;
   const c = await cfg(); // red de la petición (cookie): fija passphrase, contratos, secretos y límites
   // Mainnet: apagado salvo MAINNET_PASSKEY_ENABLED=true (el deploy de un smart wallet simulaba a ~49.4 XLM
   // de costo de recursos hasta extender el TTL del wasm). Testnet no cambia.
@@ -229,8 +232,8 @@ export async function POST(req: NextRequest) {
     );
   }
   try {
-    const body = (await req.json()) as Body;
-    if (!body?.xdr) {
+    const body = (await req.json().catch(() => null)) as Body | null;
+    if (typeof body?.xdr !== "string" || !body.xdr) {
       return NextResponse.json({ error: "xdr required" }, { status: 400 });
     }
 
@@ -253,6 +256,11 @@ export async function POST(req: NextRequest) {
     }
 
     relayKind = verdict.kind;
+    // Persistent limits: global per minute, plus wallet deploys per IP and global per day. Taken after vetting
+    // so malformed requests do not burn quota; returned if the request fails before anything is sent.
+    const gate = await relayGate(req, c, "passkey-send", verdict.kind === "wallet_deploy");
+    if (!gate.ok) return gate.res;
+    gateRelease = gate.release;
     // Mainnet: saldo mínimo del relayer y tope de registros de wallet (ver lib/relay-limits.ts).
     const deploy = verdict.kind === "wallet_deploy";
     if (c.IS_MAINNET) {
@@ -276,7 +284,9 @@ export async function POST(req: NextRequest) {
       : process.env.RELAYER_BASE_URL || "https://channels.openzeppelin.com/testnet";
     if (apiKey && !baseUrl) {
       await slot?.release();
-      return NextResponse.json({ error: "Set RELAYER_BASE_URL_MAINNET for mainnet Channels" }, { status: 500 });
+      await gateRelease();
+      console.error(`passkey/send: relayer base url missing for ${c.net}`);
+      return NextResponse.json({ error: "server not configured", code: "not_configured" }, { status: 500 });
     }
 
     // fees en vuelo: el saldo efectivo del relayer las descuenta mientras la tx no se confirma (mainnet)
@@ -292,11 +302,13 @@ export async function POST(req: NextRequest) {
       const result = await server.send(body.xdr);
       if (!result.success) {
         await slot?.release();
+        await gateRelease();
+        console.error("passkey/send: channels failure", result.error?.code, result.error?.message);
         return NextResponse.json(
           {
             ok: false,
-            error: result.error?.message || "relayer failed",
-            code: result.error?.code,
+            error: "The relayer could not submit the transaction.",
+            code: safeUpstreamCode(result.error?.code) ?? "relayer_failed",
             via: "openzeppelin-channels",
           },
           { status: 502 },
@@ -311,19 +323,16 @@ export async function POST(req: NextRequest) {
 
     if (!secret) {
       await slot?.release();
-      return NextResponse.json(
-        {
-          error:
-            `Set a relayer for ${c.NETWORK_LC}: OZ Channels key or RELAYER_SECRET${c.IS_MAINNET ? "_MAINNET" : ""}`,
-        },
-        { status: 500 },
-      );
+      await gateRelease();
+      console.error(`passkey/send: no relayer configured for ${c.NETWORK_LC}`);
+      return NextResponse.json({ error: "server not configured", code: "not_configured" }, { status: 500 });
     }
 
     const out = await submitAsChannel(c, verdict.kind, body.xdr, secret);
     return NextResponse.json({ ok: true, ...out });
   } catch (e) {
     await slot?.release(); // el cupo de registro se devuelve si el deploy no llegó a enviarse
+    if (!(e instanceof TxPendingError)) await gateRelease(); // pending = maybe sent: keep the quota taken
     if (e instanceof RelayCapError) {
       console.warn("passkey/send: over the fee cap, minResourceFee", e.minResourceFee);
       // mensaje claro (no un error de fee crudo) para el alta con passkey en mainnet
@@ -339,9 +348,9 @@ export async function POST(req: NextRequest) {
         { status: 504 },
       );
     }
-    const message = e instanceof Error ? e.message : String(e);
     console.error("passkey/send", e);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const safe = toSafeError(e, "The relayer could not submit the transaction.");
+    return NextResponse.json({ error: safe.error, code: safe.code }, { status: 500 });
   } finally {
     release();
   }

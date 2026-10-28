@@ -1,25 +1,10 @@
 import { WALLET_WASM_HASH, type NetConfig } from "./network";
 import { checkRelayable, type RelayVerdict } from "./relay-policy";
 import { readChest } from "./chain";
+import { relayMaxFee } from "./relay-fee-cap";
 
-type Kind = Extract<RelayVerdict, { ok: true }>["kind"];
-
-const envNum = (v: string | undefined) => (Number(v) > 0 ? Number(v) : 0);
-
-/**
- * Tope de la fee de la tx FINAL que paga el relayer (stroops), por forma de tx.
- *  - mainnet: 0.3 XLM (RELAY_MAX_FEE_STROOPS_MAINNET); el deploy de wallet tiene tope propio de 1 XLM
- *    (RELAY_MAX_DEPLOY_FEE_STROOPS_MAINNET) porque crea la instancia + signers y todavía no se midió en mainnet
- *    (el primer registro real loguea minResourceFee). Mainnet NUNCA lee las variables de testnet.
- *  - testnet: RELAY_MAX_FEE_STROOPS (6e9 por defecto: el rent de una wallet nueva pasa de 4,29e9).
- */
-export function relayMaxFee(c: NetConfig, kind?: Kind): bigint {
-  if (c.IS_MAINNET) {
-    if (kind === "wallet_deploy") return BigInt(envNum(process.env.RELAY_MAX_DEPLOY_FEE_STROOPS_MAINNET) || 10_000_000);
-    return BigInt(envNum(process.env.RELAY_MAX_FEE_STROOPS_MAINNET) || 3_000_000);
-  }
-  return BigInt(envNum(process.env.RELAY_MAX_FEE_STROOPS) || 6_000_000_000);
-}
+// Per-kind fee caps live in ./relay-fee-cap (both networks); re-exported for the routes.
+export { relayMaxFee };
 
 /** Valida la tx contra la política de la red (contratos, argumentos, cofres) y el tope de fee declarada. */
 export async function vetRelayTx(xdrB64: string, c: NetConfig, relayerPublicKey?: string): Promise<RelayVerdict> {

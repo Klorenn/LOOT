@@ -58,7 +58,8 @@ export async function POST(req: NextRequest) {
 
   const secret = process.env.RELAYER_SECRET;
   if (!secret) {
-    return NextResponse.json({ error: "RELAYER_SECRET missing", logs }, { status: 500 });
+    console.error("attack/normal: relayer secret missing");
+    return NextResponse.json({ error: "server not configured", logs }, { status: 500 });
   }
 
   try {

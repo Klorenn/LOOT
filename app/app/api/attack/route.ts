@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           rejected: true,
           reason: "the proof is not for this account",
-          error: message,
+          error: "proof rejected by the contract",
           logs,
         });
       }

@@ -264,8 +264,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "bad action" }, { status: 400 });
   } catch (e) {
-    if (e instanceof StorageNotConfiguredError)
-      return NextResponse.json({ error: e.message }, { status: 503 });
+    if (e instanceof StorageNotConfiguredError) {
+      console.error("chests/meta", e.message);
+      return NextResponse.json({ error: "Chest metadata storage is unavailable.", code: "storage_unavailable" }, { status: 503 });
+    }
     console.error("chests/meta", e);
     return NextResponse.json({ error: "could not save chest metadata" }, { status: 500 });
   }

@@ -26,7 +26,7 @@ const noteLedger = (net: string, seq: number | undefined) => {
   if (seq) seenByNet.set(net, { seq, at: Date.now() });
 };
 
-async function simulateRead(
+export async function simulateRead(
   contractId: string,
   method: string,
   args: xdr.ScVal[],

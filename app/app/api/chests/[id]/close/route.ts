@@ -6,6 +6,7 @@ import { cfg } from "@/lib/cfg";
 import { legacyOff } from "@/lib/mainnet-guard";
 import { withRpcUrl } from "@/lib/rpc";
 import { requireAdmin } from "@/lib/admin-auth";
+import { toSafeError } from "@/lib/safe-error";
 
 /**
  * Cierra el cofre y retira el remanente (creator auth).
@@ -22,14 +23,12 @@ export async function POST(
   try {
     const secret = process.env.CREATOR_SECRET;
     if (!secret) {
-      return NextResponse.json(
-        { error: "CREATOR_SECRET missing" },
-        { status: 500 },
-      );
+      console.error("close_chest: creator secret not configured");
+      return NextResponse.json({ error: "server not configured", code: "not_configured" }, { status: 500 });
     }
     const { id } = await ctx.params;
     const chestId = Number(id);
-    if (!Number.isFinite(chestId)) {
+    if (!Number.isSafeInteger(chestId) || chestId < 0) {
       return NextResponse.json({ error: "bad id" }, { status: 400 });
     }
 
@@ -80,8 +79,8 @@ export async function POST(
         : null,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
     console.error("close_chest", e);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const safe = toSafeError(e, "close failed");
+    return NextResponse.json({ error: safe.error, code: safe.code }, { status: 500 });
   }
 }
