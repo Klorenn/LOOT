@@ -2,6 +2,8 @@
 
 Status: implemented for NEW testnet registry v2 chests only (`app/lib/kdf.ts`, tag `kdf: "argon2id-v1"` in chest metadata; absent = v1). Parameters chosen for phones: argon2id m = 19 MiB, t = 2, p = 1, 32-byte output with the top byte zeroed, salt = chest salt as 31 big-endian bytes, password = UTF-8 of `normalizeAnswer(answer)` (hash-wasm 4.12.0; vectors cross-checked against @noble/hashes in `app/lib/kdf.test.ts`). About 30 ms on a desktop in Node. The 64 MiB profile below was not used. Mainnet chests, older chests and `@findloot/sdk` still use v1: the SDK cannot solve `argon2id-v1` chests yet. Circuit, zkey and verifier are unchanged.
 
+Weak-answer blocking on testnet (single chests and sets) is CLIENT-SIDE ONLY: the answer never leaves the creator's device, so the server cannot check its strength and does not enforce it. A creator who calls the API or the contract directly can still use a weak answer; the check protects honest creators from a mistake, not players from a malicious creator.
+
 ## Problem
 
 A chest stores `fingerprint = Poseidon(answer_field, salt)` on-chain, and the salt is public for listed chests (it is in the URL fragment for private ones). Today `answer_field` is a single SHA-256 of the normalized answer with the top byte zeroed. So one guess costs one SHA-256 plus one Poseidon, about 1e8 guesses per second per GPU. Anyone can take the public `(fingerprint, salt)` pair and test guesses offline, with no rate limit and no signal to the creator. Short or common answers fall in seconds to hours. The app now warns and (on mainnet) blocks answers below an estimated 48 bits, which raises the floor but does not make weak answers safe. A slow KDF multiplies the cost of every guess.

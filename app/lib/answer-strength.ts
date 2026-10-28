@@ -5,6 +5,7 @@ import { QUIZ_MIN_BITS, typedAnswerKey } from "./quiz";
  * Strength check for typed answers on /create (single chests and sets). Quizzes keep their own combined rule
  * in lib/quiz.ts (choice questions count their combinations; typed parts use the same estimate).
  * Fingerprints are NOT changed by any of this: it only gates and explains what the creator types.
+ * CLIENT-SIDE ONLY: the answer never leaves the device, so no server enforces this (direct API/contract use can skip it).
  */
 export const ANSWER_MIN_BITS = QUIZ_MIN_BITS; // 48: same floor quizzes already enforce
 export const ANSWER_GOOD_BITS = 64;
