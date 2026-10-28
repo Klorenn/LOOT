@@ -24,8 +24,7 @@ fn setup<'a>() -> Setup<'a> {
     let creator = Address::generate(&env);
     StellarAssetClient::new(&env, &sac.address()).mint(&creator, &1_000_000);
 
-    let chest = NormalChestClient::new(&env, &env.register(NormalChest, ()));
-    chest.init(&creator, &sac.address());
+    let chest = NormalChestClient::new(&env, &env.register(NormalChest, (sac.address(),)));
 
     let answer_hash = env.crypto().sha256(&Bytes::from_slice(&env, b"8")).to_bytes();
     Setup { env, chest, token, creator, answer_hash }
@@ -124,4 +123,21 @@ fn bad_amounts_fail() {
         s.chest.try_create_chest(&s.creator, &100, &0, &s.answer_hash),
         Err(Ok(Error::BadAmounts))
     );
+}
+
+#[test]
+fn constructor_fixes_token() {
+    let s = setup();
+    assert_eq!(s.chest.token(), s.token.address);
+}
+
+#[test]
+fn demo_cap_rejects_large_escrow() {
+    let s = setup();
+    StellarAssetClient::new(&s.env, &s.token.address).mint(&s.creator, &MAX_TOTAL);
+    let r = s
+        .chest
+        .try_create_chest(&s.creator, &(MAX_TOTAL + 1), &1, &s.answer_hash);
+    assert_eq!(r.unwrap_err().unwrap(), Error::TooLarge);
+    s.chest.create_chest(&s.creator, &MAX_TOTAL, &1, &s.answer_hash);
 }
