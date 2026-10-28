@@ -1,5 +1,4 @@
 import { normalizeAnswer } from "./answer";
-import { estimateAnswerBits } from "./answer-entropy";
 
 /**
  * Cofre cuestionario (todo o nada). La parte pública (preguntas y opciones) va en los metadatos;
@@ -118,7 +117,10 @@ export function quizChoiceBits(quiz: Quiz): number {
  * letras al azar); mezcla u otros símbolos 4/carácter. Es una cota gruesa, no una garantía.
  */
 export function typedAnswerBits(text: string): number {
-  return estimateAnswerBits(typedAnswerKey(text)); // reglas en lib/answer-entropy.ts
+  const key = typedAnswerKey(text);
+  if (!key) return 0;
+  const perChar = /^\d+$/.test(key) ? Math.log2(10) : /^\p{L}+$/u.test(key) ? 2.3 : 4;
+  return key.length * perChar;
 }
 
 /** Bits totales: opciones + respuestas escritas (necesita las respuestas: solo en /create). */

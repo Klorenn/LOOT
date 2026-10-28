@@ -1,4 +1,5 @@
-import { QUIZ_MIN_BITS, typedAnswerBits } from "./quiz";
+import { estimateAnswerBits } from "./answer-entropy";
+import { QUIZ_MIN_BITS, typedAnswerKey } from "./quiz";
 
 /**
  * Strength check for typed answers on /create (single chests and sets). Quizzes keep their own combined rule
@@ -11,7 +12,7 @@ export const ANSWER_GOOD_BITS = 64;
 export type AnswerStrength = { bits: number; level: "empty" | "weak" | "fair" | "strong" };
 
 export function answerStrength(text: string): AnswerStrength {
-  const bits = typedAnswerBits(text);
+  const bits = estimateAnswerBits(typedAnswerKey(text));
   if (bits === 0) return { bits, level: "empty" };
   if (bits < ANSWER_MIN_BITS) return { bits, level: "weak" };
   if (bits < ANSWER_GOOD_BITS) return { bits, level: "fair" };

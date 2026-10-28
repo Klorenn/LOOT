@@ -24,10 +24,10 @@ import { QuizBuilder } from "@/components/quiz-builder";
 import { draftToQuiz, emptyDraftQuestion, type DraftQuestion } from "@/lib/quiz-draft";
 import { QUIZ_LIMITS, quizIsGuessable } from "@/lib/quiz";
 import { AnswerStrengthNote } from "@/components/answer-strength-note";
-import { answerBlockError } from "@/lib/answer-strength";
 import { useNet } from "@/components/network-provider";
 import { SetCreate } from "@/components/set-create";
 import { expiryError } from "@/lib/expiry";
+import { testnetFeatures } from "@/lib/testnet-features";
 
 type Mode = "riddle" | "quiz";
 
@@ -40,11 +40,14 @@ const STEPS = [
 ] as const;
 
 const QUIZ_WEAK_MSG =
-  "Too easy to guess. The fingerprint of your answers is public on-chain, so anyone can try every combination on their own computer. Use longer typed answers, or add more questions and options.";
+  "Too easy to guess: someone could try every combination offline. Use a longer typed answer, or add more questions and options.";
 
 /** /create: one chest (riddle or quiz) or a set of chests (one question and one prize each). */
 export default function CreateChestPage() {
+  const { IS_MAINNET } = useNet();
   const [kind, setKind] = useState<"single" | "set">("single");
+  // chest sets are testnet-only for now (lib/testnet-features.ts)
+  if (!testnetFeatures({ IS_MAINNET })) return <SingleChestCreate />;
   return (
     <>
       <div className="mx-auto max-w-[1200px] px-6 pt-6">
@@ -247,10 +250,6 @@ function SingleChestCreate() {
       } else setQuizErrIdx(undefined);
     } else if (step === 1 && !hashOk)
       e.answer = "Enter an answer; it's hashed on this device when you leave the field.";
-    else if (step === 1) {
-      const weak = answerBlockError(answer, IS_MAINNET); // mainnet blocks weak answers, testnet only warns
-      if (weak) e.answer = weak;
-    }
     if (step === 2 && !prizeStroops) e.prize = "Enter a reward greater than 0 (up to 7 decimals).";
     if (step === 2 && prizeStroops) {
       const cb = perClaimError(prizeStroops, CAPS); // el total se valida en el paso de claims y al enviar
@@ -290,12 +289,6 @@ function SingleChestCreate() {
       if (mode === "quiz" && (!quizOk || quizWeak)) {
         setStep(1);
         setFieldErr({ answer: quizWeak ? QUIZ_WEAK_MSG : "Finish the quiz first." });
-        return;
-      }
-      const weakAnswer = mode === "riddle" ? answerBlockError(answer, IS_MAINNET) : null;
-      if (weakAnswer) {
-        setStep(1);
-        setFieldErr({ answer: weakAnswer });
         return;
       }
       attempt.current ??= { salt: randomSalt() };
@@ -667,7 +660,11 @@ function SingleChestCreate() {
               {step === 1 && mode === "riddle" && (
                 <Field
                   label="Answer"
-                  hint="Normalized to lowercase, no accents, no spaces. The answer is never sent to any server."
+                  hint={
+                    IS_MAINNET
+                      ? "Normalized to lowercase, no accents, no spaces. Never sent to any server. Security depends on the answer being hard to guess: the fingerprint is public, so short or common answers can be brute-forced offline."
+                      : "Normalized to lowercase, no accents, no spaces. The answer is never sent to any server."
+                  }
                   error={fieldErr.answer}
                   ok={
                     hashOk && hashHex
@@ -692,7 +689,7 @@ function SingleChestCreate() {
                           : ""
                     }`}
                   />
-                  <AnswerStrengthNote text={answer} enforced={IS_MAINNET} />
+                  {testnetFeatures({ IS_MAINNET }) && <AnswerStrengthNote text={answer} enforced={false} />}
                 </Field>
               )}
 
