@@ -1,0 +1,21 @@
+{
+  "network": "testnet",
+  "version": 2,
+  "passphrase": "Test SDF Network ; September 2015",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "registry": "CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG",
+  "verifier": "CCFHJHU2DSVEYXRH7JE457654JB7N2RKDG5A5HJCKT42PZS3ZMMIZPTV",
+  "verifierNote": "TESTNET ceremony verifier (same wasm and vk as the mainnet verifier CALYISOE..., but a different, testnet-only contract)",
+  "token": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+  "deployer": "GADNYHTC5RSY4WGE2NOMNPKNQ3EDVL7Q4NPKIUEHGUW55DXT6ND5I2PP",
+  "registryWasmHash": "88b24f3915e6d8f2a8f6fa63e6fec1392560020dd7bf6b0ed640877fbd462a7f",
+  "verifierWasmHash": "8df17eda8f2f901a9636804e0e173586723420d38af6407974218b53f98905b5",
+  "vkFingerprint": "3889d2e915b1118b40c0c825608bde088208f5d5b6e60ce4145b47a40fe070ef",
+  "claimRequiresRecipientAuth": true,
+  "burnedIds": "1-20 (create_set by the deployer) so app refs never collide with metadata of the previous testnet v2 registry CAEBFT22...277NJ (its ids 1-10)",
+  "previousRegistry": "CAEBFT22DIJNNJ6CLHY5L3SKLSACRHJLJW22VQAKTI3MCCP5KTO277NJ",
+  "deployedAt": "2026-10-28",
+  "txs": {
+    "registryDeploy": "499e7d899c542f2168248c1b6857fd32ec377872134bc8e067340f5846442849"
+  }
+}
