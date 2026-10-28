@@ -23,6 +23,7 @@ import { relayLimit } from "@/lib/rate-limit";
 import { relayGate } from "@/lib/relay-gate";
 import { testnetFeatures } from "@/lib/testnet-features";
 import { inclusionFee } from "@/lib/inclusion-fee";
+import { checkRelayerBalance } from "@/lib/relayer-alert";
 import { Server } from "@stellar/stellar-sdk/rpc";
 import { getChestMeta, reserveSetClaim, type SetClaimReservation } from "@/lib/chest-store";
 import { SET_ALREADY_CLAIMED_CODE, SET_ALREADY_CLAIMED_MSG } from "@/lib/chest-set";
@@ -304,6 +305,8 @@ export async function POST(req: NextRequest) {
       release();
     }
     const { hash, ledger } = sent;
+    // testnet: low-balance alert after each paid claim (structured log + optional webhook); never blocks the reply
+    if (!c.IS_MAINNET) void checkRelayerBalance(c, kp.publicKey()).catch(() => undefined);
 
     return NextResponse.json({
       ok: true,

@@ -80,16 +80,20 @@ describe("persistentGate", () => {
   it("mainnet fails closed when the store errors", async () => {
     expect(await persistentGate({ ...base, store: memStore({ failAfter: 0 }) })).toEqual({ ok: false, reason: "unavailable" });
   });
-  it("testnet fails open when the store errors", async () => {
+  it("testnet also fails closed when the store errors (503 rate_limit_unavailable)", async () => {
     const r = await persistentGate({ ...base, net: "testnet", mainnet: false, store: memStore({ failAfter: 0 }) });
-    expect(r.ok).toBe(true);
+    expect(r).toEqual({ ok: false, reason: "unavailable" });
+    expect(gateDenial("unavailable")).toMatchObject({ status: 503, body: { code: "rate_limit_unavailable" } });
+  });
+  it("testnet deploy limits: 3 per IP per day, 50 per day overall", () => {
+    expect(persistentLimits(false, "passkey-send")).toMatchObject({ deployPerIpPerDay: 3, deployGlobalPerDay: 50 });
   });
   it("maps denial reasons to safe statuses", () => {
     expect(gateDenial("unavailable").status).toBe(503);
     expect(gateDenial("deploy_ip").body.code).toBe("deploy_limit");
     expect(gateDenial("global")).toMatchObject({ status: 429, retryAfter: "60" });
   });
-  it("mainnet defaults are stricter than testnet", () => {
-    expect(persistentLimits(true, "claim").deployPerIpPerDay).toBeLessThan(persistentLimits(false, "claim").deployPerIpPerDay);
+  it("mainnet defaults are unchanged", () => {
+    expect(persistentLimits(true, "claim")).toMatchObject({ globalPerMin: 120, deployPerIpPerDay: 3, deployGlobalPerDay: 60 });
   });
 });

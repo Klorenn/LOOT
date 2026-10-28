@@ -3,6 +3,7 @@ import { Keypair } from "@stellar/stellar-sdk";
 import { cfg } from "@/lib/cfg";
 import { relayerSecretFor } from "@/lib/relay-guard";
 import { NOTICES, sponsorStatus } from "@/lib/relay-limits";
+import { checkRelayerBalance } from "@/lib/relayer-alert";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +13,13 @@ export async function GET() {
   const noStore = { "cache-control": "private, no-store" };
   const secret = relayerSecretFor(c);
   const pub = secret ? Keypair.fromSecret(secret).publicKey() : process.env.RELAYER_ACCOUNT_MAINNET;
+  // Low-balance alert (structured log + optional webhook). Mainnet: logging only, the response is unchanged.
+  const balanceCheck = checkRelayerBalance(c, pub).catch(() => null);
   try {
-    return NextResponse.json(await sponsorStatus(c, pub), { headers: noStore });
+    const status = await sponsorStatus(c, pub);
+    if (c.IS_MAINNET) return NextResponse.json(status, { headers: noStore });
+    const b = await balanceCheck;
+    return NextResponse.json({ ...status, relayerLow: b ? b.low : true }, { headers: noStore });
   } catch {
     // mainnet falla cerrado: ante un error no se promete patrocinio
     return NextResponse.json(c.IS_MAINNET ? { sponsoring: false, reason: "relayer_low", notice: NOTICES.relayer_low } : { sponsoring: true }, {

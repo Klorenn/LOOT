@@ -19,8 +19,8 @@ IPs are stored only as a truncated salted SHA-256, never raw. Old buckets are ne
 | --- | --- | --- | --- | --- |
 | Global requests per minute, `/api/claim` | persistent | 600 | 120 | `RELAY_PERSIST_CLAIM_GLOBAL_PER_MIN[_MAINNET]` |
 | Global requests per minute, `/api/passkey/send` | persistent | 600 | 120 | `RELAY_PERSIST_PASSKEY_GLOBAL_PER_MIN[_MAINNET]` |
-| Passkey wallet deploys per IP per day | persistent | 20 | 3 | `RELAY_DEPLOY_PER_IP_PER_DAY[_MAINNET]` |
-| Passkey wallet deploys per day, all IPs | persistent | 500 | 60 | `RELAY_DEPLOY_GLOBAL_PER_DAY[_MAINNET]` |
+| Passkey wallet deploys per IP per day | persistent | 3 | 3 | `RELAY_DEPLOY_PER_IP_PER_DAY[_MAINNET]` |
+| Passkey wallet deploys per day, all IPs | persistent | 50 | 60 | `RELAY_DEPLOY_GLOBAL_PER_DAY[_MAINNET]` |
 | Requests per minute per IP (best effort) | in-memory | 60 | 10 | `RELAY_RATE_PER_IP_PER_MIN[_MAINNET]` |
 | Mainnet lifetime sponsored registrations | persistent | none | 60 | `RELAY_MAX_REGISTRATIONS` |
 
@@ -31,18 +31,19 @@ The wallet-deploy counters are taken only for requests the policy check classifi
 | Kind | Testnet | Mainnet |
 | --- | --- | --- |
 | claim, create_chest, close_chest, transfer | 10 XLM (`RELAY_MAX_FEE_STROOPS`) | 0.3 XLM (`RELAY_MAX_FEE_STROOPS_MAINNET`) |
-| wallet_deploy | 600 XLM (`RELAY_MAX_DEPLOY_FEE_STROOPS`) | 1 XLM (`RELAY_MAX_DEPLOY_FEE_STROOPS_MAINNET`) |
+| wallet_deploy | 1 XLM (`RELAY_MAX_DEPLOY_FEE_STROOPS`) | 1 XLM (`RELAY_MAX_DEPLOY_FEE_STROOPS_MAINNET`) |
 
-The testnet deploy cap stays high because Protocol 29 rent for a new wallet was observed at 4.29e9 stroops (about 429 XLM). Mainnet never reads the testnet variables.
+The testnet deploy cap is the measured cost plus margin: `app/scripts/measure-wallet-deploy.mjs` simulates the real shared-deployer deploy (secp256r1 signer + Genesis binding proof) and measured a resource fee of 3,434,759 stroops (0.343 XLM) on 2026-10-28; the cap is 1 XLM. An earlier observation of 4.29e9 stroops (about 429 XLM) came from a deploy that had to pay for the wallet wasm entry; if that happens again the deploy is refused with `fee_cap` instead of draining the relayer (extend the wasm TTL, or raise `RELAY_MAX_DEPLOY_FEE_STROOPS` on purpose). Mainnet never reads the testnet variables.
 
 ### Failure behavior
 
 | Situation | Mainnet | Testnet |
 | --- | --- | --- |
-| Blob store unreachable or token missing during a limit check | Request denied, HTTP 503, code `rate_limit_unavailable` (fail closed) | Persistent check skipped, in-memory limit still applies (fail open) |
+| Blob store unreachable or token missing during a limit check | Request denied, HTTP 503, code `rate_limit_unavailable` (fail closed) | Same: request denied, HTTP 503, `rate_limit_unavailable` (fail closed) |
 | Registry verifier does not match `MAINNET_VERIFIER_ID` (once the registry exposes it) | HTTP 503, code `config_mismatch` | not checked |
 | Verifier getter missing or RPC error while checking | not blocked (a proven mismatch is the only blocker) | not checked |
-| Relayer balance unreadable | Request denied (existing behavior) | not checked |
+| Relayer balance unreadable | Request denied (existing behavior) | not blocked; counts as low for the alert |
+| Relayer balance under `RELAYER_LOW_BALANCE_XLM` (testnet, default 500) / `RELAYER_LOW_BALANCE_XLM_MAINNET` (default 10) | `console.error` line tagged `[relayer-low-balance]` (JSON), plus a POST to `RELAYER_LOW_BALANCE_WEBHOOK` if set; responses unchanged | Same alert (after each paid claim and on `/api/relayer/status`); `/api/relayer/status` also returns `relayerLow` |
 
 Denials never return internal error text. Codes: `rate_limited`, `deploy_limit`, `rate_limit_unavailable`, `config_mismatch`.
 

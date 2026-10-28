@@ -14,8 +14,9 @@ describe("relayMaxFee", () => {
     for (const k of ["claim", "create_chest", "close_chest", "transfer"] as const) expect(relayMaxFee(T, k)).toBe(BigInt(100_000_000));
     expect(relayMaxFee(T)).toBe(BigInt(100_000_000));
   });
-  it("testnet wallet deploy keeps headroom above the observed 4.29e9 rent", () => {
-    expect(relayMaxFee(T, "wallet_deploy")).toBeGreaterThan(BigInt(4_290_000_000));
+  it("testnet wallet deploy cap = measured cost (3,434,759 stroops) + margin, not a 600 XLM blank check", () => {
+    expect(relayMaxFee(T, "wallet_deploy")).toBe(BigInt(10_000_000));
+    expect(relayMaxFee(T, "wallet_deploy")).toBeGreaterThan(BigInt(3_434_759));
   });
   it("mainnet defaults are unchanged and ignore testnet variables", () => {
     process.env.RELAY_MAX_FEE_STROOPS = "999999999999";

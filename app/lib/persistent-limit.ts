@@ -8,9 +8,9 @@ import { del, list, put } from "@vercel/blob";
  * when over the limit. Concurrent hits can only over-deny (both see limit + 1 and both back off), never
  * over-allow. Cost per checked request: one put + one list (+ one delete when denied).
  *
- * Fail behavior (see docs/FIREWALL.md): on mainnet, a store error or a missing token DENIES the request
- * ("unavailable", HTTP 503). On testnet it fails open, because the in-memory limiter still applies and
- * a demo should not break when the store is not configured.
+ * Fail behavior (see docs/FIREWALL.md): on BOTH networks a store error or a missing token DENIES the request
+ * ("unavailable", HTTP 503 rate_limit_unavailable). Testnet used to fail open; a faucet-funded relayer is still
+ * a shared resource, so without the shared counters nothing is sponsored.
  *
  * Old buckets are never read again; they are small private JSON markers. Purge `relay/<net>/rl/` older than
  * 2 days from the Blob dashboard or a cron if the count ever matters.
@@ -89,8 +89,8 @@ export function persistentLimits(mainnet: boolean, scope: RelayScope): Persisten
       }
     : {
         globalPerMin: num(process.env[`RELAY_PERSIST_${g}_GLOBAL_PER_MIN`], 600),
-        deployPerIpPerDay: num(process.env.RELAY_DEPLOY_PER_IP_PER_DAY, 20),
-        deployGlobalPerDay: num(process.env.RELAY_DEPLOY_GLOBAL_PER_DAY, 500),
+        deployPerIpPerDay: num(process.env.RELAY_DEPLOY_PER_IP_PER_DAY, 3),
+        deployGlobalPerDay: num(process.env.RELAY_DEPLOY_GLOBAL_PER_DAY, 50),
       };
 }
 
@@ -102,8 +102,6 @@ export function ipKey(ip: string): string {
 export type GateResult =
   | { ok: true; release: () => Promise<void> }
   | { ok: false; reason: "global" | "deploy_ip" | "deploy_global" | "unavailable" };
-
-const noop = async () => undefined;
 
 /**
  * Persistent gate for one relayed request. `deploy` adds the per-IP and global daily wallet-deploy counters.
@@ -150,8 +148,8 @@ export async function persistentGate(i: {
   } catch (e) {
     await releaseAll();
     console.error(`rate-limit store error (${i.net}/${i.scope})`, (e as Error)?.name);
-    // Mainnet fails closed: no store, no sponsored tx. Testnet falls back to the in-memory limiter only.
-    return i.mainnet ? { ok: false, reason: "unavailable" } : { ok: true, release: noop };
+    // Fails closed on both networks: no store, no sponsored tx.
+    return { ok: false, reason: "unavailable" };
   }
 }
 
