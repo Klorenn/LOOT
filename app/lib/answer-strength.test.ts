@@ -34,9 +34,23 @@ describe("answerStrength", () => {
 });
 
 describe("answerBlockError", () => {
-  it("blocks weak answers only when enforcing", () => {
-    expect(answerBlockError("yes", true)).toMatch(/Too easy to guess/);
+  it("blocks trivial answers only when enforcing", () => {
+    expect(answerBlockError("yes", true)).toMatch(/Too short/);
     expect(answerBlockError("yes", false)).toBeNull();
+  });
+  it("blocks digit-only answers of any length", () => {
+    expect(answerBlockError("1234567890", true)).toMatch(/Numbers alone/);
+    expect(answerBlockError(" 1987 ", true)).toMatch(/Numbers alone/);
+  });
+  it("lets a normal single word through with a warning, not a block", () => {
+    expect(answerBlockError("alexandria", true)).toBeNull();
+    expect(answerBlockError("Lázarus", true)).toBeNull();
+    expect(weakAnswerMessage("alexandria")).toMatch(/Too easy to guess/);
+  });
+  it("counts characters after normalization (case, accents, spaces)", () => {
+    expect(answerBlockError("  ROMA  ", true)).toMatch(/Too short/);
+    expect(answerBlockError("ab cd e", true)).toMatch(/Too short/);
+    expect(answerBlockError("ab cd ef", true)).toBeNull();
   });
   it("never blocks a strong answer", () => {
     expect(answerBlockError("the third door on the left past the old bakery in town", true)).toBeNull();

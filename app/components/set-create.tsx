@@ -110,7 +110,7 @@ export function SetCreate() {
       if (!r.question.trim()) e[`q${i}`] = "Write the question.";
       if (!normalizeAnswer(r.answer)) e[`a${i}`] = "Enter the answer.";
       else {
-        const weak = answerBlockError(r.answer, IS_MAINNET); // mainnet blocks weak answers, testnet only warns
+        const weak = answerBlockError(r.answer, !IS_MAINNET); // sets are testnet-only: block trivial answers, warn on weak
         if (weak) e[`a${i}`] = weak;
       }
       if (!prizes[i] || prizes[i]! <= BigInt(0)) e[`p${i}`] = "Reward must be greater than 0 (up to 7 decimals).";
@@ -538,7 +538,7 @@ export function SetCreate() {
                     onChange={(e) => setRow(i, { answer: e.target.value })}
                     className={`h-11 rounded-[10px] font-mono ${fieldErr[`a${i}`] ? "border-[var(--red)]" : ""}`}
                   />
-                  <AnswerStrengthNote text={r.answer} enforced={IS_MAINNET} />
+                  <AnswerStrengthNote text={r.answer} enforced={!IS_MAINNET} />
                 </Field>
                 <Field label="Reward (XLM)" error={fieldErr[`p${i}`]}>
                   <Input

@@ -26,15 +26,27 @@ export const GUESSING_WARNING =
 
 export const WEAK_ANSWER_ADVICE = "Use a longer answer: a full phrase of 5 or more words that only your players would know. Avoid names, dates, single words and anything easy to look up.";
 
-/**
- * Message when the answer is too weak, else null. `enforce` = block (mainnet); otherwise the same text is shown
- * as a warning only (testnet keeps short answers for demos and templates).
- */
+/** Message when the answer is weak (shown as a warning), else null. */
 export function weakAnswerMessage(text: string): string | null {
   return answerStrength(text).level === "weak" ? `Too easy to guess. ${WEAK_ANSWER_ADVICE}` : null;
 }
 
-/** Blocking error: only when enforcing and the answer is weak. Empty answers are reported elsewhere. */
+export const MIN_ANSWER_CHARS = 6;
+
+/** Answers guessed in seconds: digits only, or fewer than MIN_ANSWER_CHARS characters. Else null. */
+export function trivialAnswerMessage(text: string): string | null {
+  const key = typedAnswerKey(text);
+  if (!key) return null;
+  if (/^[\d\s]+$/.test(key)) return `Numbers alone are guessed in seconds. ${WEAK_ANSWER_ADVICE}`;
+  if ([...key.replace(/\s/g, "")].length < MIN_ANSWER_CHARS)
+    return `Too short: answers under ${MIN_ANSWER_CHARS} characters are guessed in seconds. ${WEAK_ANSWER_ADVICE}`;
+  return null;
+}
+
+/**
+ * Blocking error when enforcing: only trivial answers (digits only, under 6 characters). Other weak answers
+ * (a single word like a city name) get a warning, not a block. Empty answers are reported elsewhere.
+ */
 export function answerBlockError(text: string, enforce: boolean): string | null {
-  return enforce ? weakAnswerMessage(text) : null;
+  return enforce ? trivialAnswerMessage(text) : null;
 }
