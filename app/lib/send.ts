@@ -18,7 +18,7 @@ import { contract } from "@stellar/stellar-sdk";
 import { latestLedgerHint } from "./chain";
 import { PRIZE } from "./config";
 import { CONTRACTS, NETWORK } from "./client-cfg";
-import { getPasskeyKit } from "./passkey-client";
+import { playerPasskeyKit } from "./passkey-client";
 import { submitPasskeyTx, type Player } from "./wallet";
 import { signWithWallet } from "./wallets-kit";
 
@@ -280,16 +280,7 @@ async function sendFromPasskey(
   memo: MemoInput,
   onPhase?: (phase: "signing" | "pending") => void,
 ): Promise<{ hash: string }> {
-  const kit = getPasskeyKit();
-  // passkey-kit 0.19: connectWallet fija wallet+keyId y luego crashea (bug conocido de expiración
-  // nula); el estado queda listo para firmar, así que el error se ignora si el kit ya quedó conectado.
-  if (!kit.keyId || !kit.wallet || kit.wallet.options.contractId !== player.publicKey) {
-    try {
-      await kit.connectWallet({ keyId: player.keyId });
-    } catch (e) {
-      console.warn("connectWallet (send):", e);
-    }
-  }
+  const kit = playerPasskeyKit(player);
   if (!kit.keyId || !kit.wallet) throw new SendError("Couldn’t unlock your passkey wallet. Try logging in again.");
 
   const at = await contract.AssembledTransaction.build({

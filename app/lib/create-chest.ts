@@ -9,7 +9,7 @@ import { capError } from "./caps";
 import { CONTRACTS, NETWORK } from "./client-cfg";
 import { clientCfg } from "./network";
 import { resourceFeeOf } from "./sim-fee";
-import { getPasskeyKit } from "./passkey-client";
+import { playerPasskeyKit } from "./passkey-client";
 import { SendError } from "./send";
 import { contractErrorCode, contractErrorMessage, createMethod, deadlineError, refOf, splitRef, type RegistryVersion } from "./registry";
 import { submitPasskeyTx, type Player } from "./wallet";
@@ -241,14 +241,7 @@ async function invokeRaw(player: Player, build: Build, onPhase?: Phase, version:
 }
 
 async function invokePasskey(player: Player, build: Build, onPhase?: Phase, version: RegistryVersion = 1): Promise<string> {
-  const kit = getPasskeyKit();
-  if (!kit.keyId || !kit.wallet || kit.wallet.options.contractId !== player.publicKey) {
-    try {
-      await kit.connectWallet({ keyId: player.keyId });
-    } catch (e) {
-      console.warn("connectWallet (create):", e); // bug conocido de passkey-kit 0.19 (parche en patches/)
-    }
-  }
+  const kit = playerPasskeyKit(player);
   if (!kit.keyId || !kit.wallet) throw new SendError("Couldn’t unlock your passkey wallet. Try logging in again.");
 
   const client = newClient(SIM_ACCOUNT, undefined, version);

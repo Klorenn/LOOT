@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { getPasskeyKit } from "./passkey-client";
 import {
   clearPlayer,
   enrollClassic,
@@ -99,15 +98,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!ready || !player) return;
     let cancelled = false;
     (async () => {
-      if (player.kind === "passkey" && player.keyId) {
-        try {
-          await getPasskeyKit().connectWallet({ keyId: player.keyId });
-        } catch (e) {
-          // passkey-kit 0.19 crashea con signer sin expiración. La sesión sigue válida:
-          // el claim lo envía el relayer y no necesita el estado del kit.
-          console.warn("connectWallet (restore):", e);
-        }
-      } else if (player.kind === "wallet" && player.walletId) {
+      // Passkey: nada que rearmar. Cada firma apunta el kit a la wallet de la sesión (playerPasskeyKit) y
+      // pide su propio Face ID; un connectWallet acá abría un prompt de WebAuthn al cargar la página.
+      if (player.kind === "wallet" && player.walletId) {
         const addr = await restoreGWallet(player.walletId);
         if (!cancelled && addr && addr !== player.publicKey) {
           // la wallet cambió de cuenta mientras tanto: la sesión sigue a la wallet

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bindPasskeyWallet } from "./claim-auth-client";
+import { bindPasskeyWallet } from "./passkey-bind";
 
 const C1 = "CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG";
 const C2 = "CCFHJHU2DSVEYXRH7JE457654JB7N2RKDG5A5HJCKT42PZS3ZMMIZPTV";
