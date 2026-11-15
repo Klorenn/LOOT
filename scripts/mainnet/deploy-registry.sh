@@ -231,4 +231,4 @@ jq -n --arg pass "$PASSPHRASE" --arg rpc "$RPC_URL" --arg reg "$REGISTRY" --arg 
   }' > "$OUT_JSON"
 echo "  wrote $OUT_JSON"; jq . "$OUT_JSON"
 node "$HERE/verify-registry.mjs" "$OUT_JSON" || warn "final verification reported mismatches"
-echo "next: create the sample chest from the app (deadline must be in the future and <= 90 days)."
+echo "next: create the sample chest from the app (deadline must be in the future and <= 30 days, and prize x places <= 50 XLM per chest)."
