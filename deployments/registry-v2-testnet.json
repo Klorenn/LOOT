@@ -3,19 +3,29 @@
   "version": 2,
   "passphrase": "Test SDF Network ; September 2015",
   "rpcUrl": "https://soroban-testnet.stellar.org",
-  "registry": "CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG",
+  "registry": "CDCUQY2EI3D64YNMHULCIEQE2P4KOCZ2ZTQALZB3GZYPBY5JNQ7WDPMI",
   "verifier": "CCFHJHU2DSVEYXRH7JE457654JB7N2RKDG5A5HJCKT42PZS3ZMMIZPTV",
   "verifierNote": "TESTNET ceremony verifier (same wasm and vk as the mainnet verifier CALYISOE..., but a different, testnet-only contract)",
   "token": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
   "deployer": "GADNYHTC5RSY4WGE2NOMNPKNQ3EDVL7Q4NPKIUEHGUW55DXT6ND5I2PP",
-  "registryWasmHash": "88b24f3915e6d8f2a8f6fa63e6fec1392560020dd7bf6b0ed640877fbd462a7f",
+  "registryWasmHash": "87d25664de1881693290f166cd09e0da21ce0b432ad8795607ba9abd1dab2652",
   "verifierWasmHash": "8df17eda8f2f901a9636804e0e173586723420d38af6407974218b53f98905b5",
   "vkFingerprint": "3889d2e915b1118b40c0c825608bde088208f5d5b6e60ce4145b47a40fe070ef",
   "claimRequiresRecipientAuth": true,
-  "burnedIds": "1-20 (create_set by the deployer) so app refs never collide with metadata of the previous testnet v2 registry CAEBFT22...277NJ (its ids 1-10)",
-  "previousRegistry": "CAEBFT22DIJNNJ6CLHY5L3SKLSACRHJLJW22VQAKTI3MCCP5KTO277NJ",
-  "deployedAt": "2026-10-28",
+  "burnedIds": "1-50 (create_set by the deployer). The previous registry CCK222... had NextId 39 (ids 1-38 used), so app refs (1e9 + id) never collide with its metadata; the first real chest of this registry is id 51.",
+  "previousRegistry": "CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG",
+  "deployedAt": "2026-11-14",
   "txs": {
-    "registryDeploy": "499e7d899c542f2168248c1b6857fd32ec377872134bc8e067340f5846442849"
-  }
+    "registryUpload": "2a1be3f2a7386fe18c261845d818bf19914d12792b0282d1b144b47f80b23986",
+    "registryDeploy": "e69f2a9c17a4c6f46be17cdb6471692c360fb6d79c7224e185cf4bb0862a3782"
+  },
+  "caps": {
+    "maxTotalFundingStroops": "500000000",
+    "maxDeadlineSecs": 2592000,
+    "errors": {
+      "FundingCapExceeded": 17,
+      "BadDeadline": 15
+    }
+  },
+  "burnedIdsOlder": "previous-previous registry CAEBFT22...277NJ (ids 1-10)"
 }

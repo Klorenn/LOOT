@@ -25,7 +25,7 @@ import {
 import { buildPoseidon } from "circomlibjs";
 import * as snarkjs from "snarkjs";
 
-const REGISTRY = process.argv[2] || "CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG";
+const REGISTRY = process.argv[2] || "CDCUQY2EI3D64YNMHULCIEQE2P4KOCZ2ZTQALZB3GZYPBY5JNQ7WDPMI";
 const RPC = process.env.RPC_URL || "https://soroban-testnet.stellar.org";
 const PASS = Networks.TESTNET;
 const ZK = join(dirname(fileURLToPath(import.meta.url)), "../../circuits/ceremony/release-2026-10-26/app/zk");

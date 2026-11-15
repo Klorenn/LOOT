@@ -38,6 +38,7 @@ Circuit public input order is unchanged: `[fingerprint, nullifier, chestId, reci
 - Sets: `create_set`, `create_chest_in_set`, `Chest.group_id`. A normal chest has `group_id == chest id`; a set chest has the set id. `claim` pushes `group_id` as the `chestId` public input, so the nullifier `Poseidon(playerSecret, groupId)` is shared across a set.
 - Constructor `__constructor(verifier, token)` replaces `init`. Deploy and initialisation are one transaction, so nobody can front-run an init and install their own verifier.
 - Token is fixed to the registry token (XLM SAC on mainnet). Any other token is rejected with `WrongToken`.
+- Total funding `prize * max_claims` must be at most `MAX_TOTAL_FUNDING = 50 XLM` (500,000,000 stroops); more, or an overflowing product, fails with `FundingCapExceeded` (#17). Applies to `create_chest` and `create_chest_in_set`.
 - Deadline must satisfy `now < deadline <= now + MAX_DEADLINE`, with `MAX_DEADLINE = 30 days`. `0` ("never expires") is rejected with `BadDeadline`.
 - `close_chest` writes `closed = true` before the token transfer (checks-effects-interactions).
 - TTL: `create_chest` and `claim` extend the instance and the Chest entry past the deadline plus a 30-day close grace (clamped to the network max TTL; ledger time assumed 4 s so it over-extends). Nullifier, Claimed and SetOwner entries are extended to the network max TTL.
@@ -98,11 +99,9 @@ It writes `deployments/registry-v2-mainnet.json` (the v1 record `registry-mainne
 
 - Identity `loot-v2-throwaway` (testnet only): `GADNYHTC5RSY4WGE2NOMNPKNQ3EDVL7Q4NPKIUEHGUW55DXT6ND5I2PP`.
 - TESTNET ceremony verifier (wasm `8df17eda...`, vk `3889d2e9...`): `CCFHJHU2DSVEYXRH7JE457654JB7N2RKDG5A5HJCKT42PZS3ZMMIZPTV`.
-- Registry v2 (current, claim needs the recipient's signature): `CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG`, wasm sha256 `88b24f39...2a7f`, token = testnet native SAC `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`. Deploy tx `499e7d89...2849`. Record: `deployments/registry-v2-testnet.json`.
-- Old registry `NextId` read on-chain on 2026-10-28: 11 (ids 1 to 10 used), so burning 1 to 20 covers every old metadata key.
-- Ids 1 to 20 of the new registry were burned with `create_set` right after deploy. The app keys off-chain metadata (chests, sets, set claim markers) by ref = `1e9 + id`, and the previous registry used ids 1 to 10: without the burn, new chest 1 would inherit the old chest 1's question and salt. A later fix is to namespace v2 metadata by registry id.
-- Previous registry v2 (superseded, no claim auth): `CAEBFT22DIJNNJ6CLHY5L3SKLSACRHJLJW22VQAKTI3MCCP5KTO277NJ`. Its chests are not migrated; once the app points to the new registry they are no longer listed.
-- App env (testnet): `NEXT_PUBLIC_REGISTRY_V2_ID=CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG`, `NEXT_PUBLIC_VERIFIER_V2_ID=CCFHJHU2DSVEYXRH7JE457654JB7N2RKDG5A5HJCKT42PZS3ZMMIZPTV`.
+- Registry v2 (current, with the D1 caps: 50 XLM per chest, 30 days): `CDCUQY2EI3D64YNMHULCIEQE2P4KOCZ2ZTQALZB3GZYPBY5JNQ7WDPMI`, wasm sha256 `87d25664...2652`, token = testnet native SAC `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`, same testnet verifier. Deploy tx `e69f2a9c...3782` (upload `2a1be3f2...3986`). Record: `deployments/registry-v2-testnet.json`.
+- Previous registry (no caps): `CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG`, `NextId` read on-chain on 2026-11-14: 39 (ids 1 to 38 used). Ids 1 to 50 of the new registry were burned with `create_set` right after deploy, so the first real chest is id 51 and app refs (`1e9 + id`) never collide with the old registry's metadata. Older still: `CAEBFT22DIJNNJ6CLHY5L3SKLSACRHJLJW22VQAKTI3MCCP5KTO277NJ` (ids 1 to 10).
+- App env (testnet): `NEXT_PUBLIC_REGISTRY_V2_ID=CDCUQY2EI3D64YNMHULCIEQE2P4KOCZ2ZTQALZB3GZYPBY5JNQ7WDPMI`, `NEXT_PUBLIC_VERIFIER_V2_ID=CCFHJHU2DSVEYXRH7JE457654JB7N2RKDG5A5HJCKT42PZS3ZMMIZPTV`.
 
 ## Migration
 
