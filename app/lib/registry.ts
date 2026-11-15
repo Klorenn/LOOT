@@ -68,13 +68,15 @@ export function usesCeremonyZkey(mainnet: boolean, version: RegistryVersion): bo
 
 // ---------- deadline (mirrors the v2 contract: now < deadline <= now + MAX_DEADLINE) ----------
 
-export const MAX_DEADLINE_SECS = 90 * 24 * 3600;
+export const MAX_DEADLINE_SECS = 30 * 24 * 3600;
+/** Largest `prize * max_claims` (XLM) one v2 chest may hold; the contract rejects more (#17). */
+export const MAX_TOTAL_FUNDING_XLM = 50;
 
 /** null when the deadline is acceptable for the registry; otherwise a plain English message. */
 export function deadlineError(deadline: number, nowSec: number = Math.floor(Date.now() / 1000)): string | null {
   if (!Number.isSafeInteger(deadline) || deadline <= nowSec)
     return "The chest needs an expiry in the future; otherwise the prize could never be recovered.";
-  if (deadline > nowSec + MAX_DEADLINE_SECS) return "The expiry can be at most 90 days from now.";
+  if (deadline > nowSec + MAX_DEADLINE_SECS) return "The expiry can be at most 30 days from now.";
   return null;
 }
 
@@ -95,8 +97,9 @@ const CONTRACT_MESSAGES: Record<number, string> = {
   12: "Only the owner of this set can add chests to it.",
   13: "This set doesn’t exist.",
   14: "This registry only pays its own token (XLM). Other tokens are not accepted.",
-  15: "The expiry must be in the future and at most 90 days from now.",
+  15: "The expiry must be in the future and at most 30 days from now.",
   16: ALREADY_CLAIMED_MSG,
+  17: "A chest can hold at most 50 XLM in total (prize × places).",
 };
 
 /** `Error(Contract, #N)` in any thrown value or string, or null. */

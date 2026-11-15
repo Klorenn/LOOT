@@ -113,4 +113,11 @@ describe("relay policy: registry v2", () => {
     expect(v1.ok).toBe(false);
     expect(seen).toEqual([refOf(2, 3), 3]);
   });
+  it("testnet is open: any wallet can create a v2 chest, mainnet still needs an approved creator", async () => {
+    const stranger = Keypair.random().publicKey();
+    const tx = build(call(REG2, "create_chest", [addr(stranger), ...chestArgs()], [addrCred(stranger, REG2)]));
+    expect((await checkRelayable(tx, PASS, base)).ok).toBe(true);
+    const onMainnet = await checkRelayable(tx, PASS, mainnet);
+    expect(onMainnet).toMatchObject({ ok: false, reason: expect.stringMatching(/not approved on mainnet/) });
+  });
 });

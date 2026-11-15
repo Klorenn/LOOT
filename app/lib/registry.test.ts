@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ALREADY_CLAIMED_MSG,
   MAX_DEADLINE_SECS,
+  MAX_TOTAL_FUNDING_XLM,
   V2_REF_OFFSET,
   contractErrorCode,
   contractErrorMessage,
@@ -73,9 +74,16 @@ describe("zkey selection", () => {
   });
 });
 
+describe("registry v2 caps", () => {
+  it("mirrors the contract: 30 days and 50 XLM per chest", () => {
+    expect(MAX_DEADLINE_SECS).toBe(30 * 24 * 3600);
+    expect(MAX_TOTAL_FUNDING_XLM).toBe(50);
+  });
+});
+
 describe("deadlineError", () => {
   const now = 1_800_000_000;
-  it("accepts a deadline in the future up to 90 days", () => {
+  it("accepts a deadline in the future up to 30 days", () => {
     expect(deadlineError(now + 3600, now)).toBeNull();
     expect(deadlineError(now + MAX_DEADLINE_SECS, now)).toBeNull();
   });
@@ -84,8 +92,8 @@ describe("deadlineError", () => {
     expect(deadlineError(now - 1, now)).toMatch(/future/);
     expect(deadlineError(now, now)).toMatch(/future/);
   });
-  it("rejects more than 90 days", () => {
-    expect(deadlineError(now + MAX_DEADLINE_SECS + 1, now)).toMatch(/90 days/);
+  it("rejects more than 30 days", () => {
+    expect(deadlineError(now + MAX_DEADLINE_SECS + 1, now)).toMatch(/30 days/);
   });
   it("rejects non-integers", () => {
     expect(deadlineError(NaN, now)).toMatch(/future/);
@@ -116,7 +124,8 @@ describe("contract error messages", () => {
     expect(contractErrorMessage(16)).toBe("This address already claimed from this chest/set.");
     expect(contractErrorMessage(16)).toBe(ALREADY_CLAIMED_MSG);
     expect(contractErrorMessage(14)).toMatch(/XLM/);
-    expect(contractErrorMessage(15)).toMatch(/90 days/);
+    expect(contractErrorMessage(15)).toMatch(/30 days/);
+    expect(contractErrorMessage(17)).toMatch(/50 XLM/);
     expect(contractErrorMessage(12)).toMatch(/owner of this set/);
     expect(contractErrorMessage(13)).toMatch(/set doesn’t exist/);
   });

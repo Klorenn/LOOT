@@ -70,3 +70,22 @@ describe("registry v2 config (off by default)", () => {
     );
   });
 });
+
+describe("testnet v2 funding cap", () => {
+  it("creating on v2 shows the 50 XLM per chest cap (the contract enforces it)", () => {
+    withEnv({ NEXT_PUBLIC_REGISTRY_V2_ID: V2, NEXT_PUBLIC_REGISTRY_VERSION: "2" }, () => {
+      const t = configFor("testnet", ready);
+      expect(t.CREATE_VERSION).toBe(2);
+      expect(t.CAPS).toEqual({ maxPrizePerPlaceXlm: Infinity, maxTotalPrizeXlm: 50 });
+    });
+  });
+  it("v1 testnet and mainnet caps are untouched", () => {
+    withEnv({}, () => {
+      expect(configFor("testnet", ready).CAPS.maxTotalPrizeXlm).toBe(Infinity);
+      expect(configFor("mainnet", ready).CAPS).toEqual({ maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30 });
+    });
+    withEnv({ NEXT_PUBLIC_REGISTRY_V2_ID: V2, NEXT_PUBLIC_REGISTRY_VERSION: "2", MAINNET_REGISTRY_VERSION: "2" }, () => {
+      expect(configFor("mainnet", ready).CAPS).toEqual({ maxPrizePerPlaceXlm: 1, maxTotalPrizeXlm: 30 });
+    });
+  });
+});

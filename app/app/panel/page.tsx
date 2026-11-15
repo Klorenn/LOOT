@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { chestPath } from "@/lib/chest-code";
+import { displayId, isV2Ref } from "@/lib/registry";
+import type { PanelState, PanelStatus } from "@/lib/chest-panel-state";
 
 type Row = {
   id: number;
@@ -13,6 +15,17 @@ type Row = {
   maxClaims: number;
   createdAt: string;
   onchain?: boolean | null;
+  /** real state from the registry that holds the chest (null = could not be read) */
+  state?: PanelState | null;
+  chain?: { claims: number; maxClaims: number; deadline: number } | null;
+};
+
+const STATUS_LABEL: Record<PanelStatus, string> = {
+  open: "Open",
+  sold_out: "Sold out",
+  expired: "Expired",
+  closed: "Closed",
+  not_created: "Not created",
 };
 
 export default function PanelPage() {
@@ -50,7 +63,7 @@ export default function PanelPage() {
   }, []);
 
   async function closeChest(id: number) {
-    if (!confirm(`Close chest #${id} and withdraw the remaining prize?`)) return;
+    if (!confirm(`Close chest #${displayId(id)} and send the remaining prize back to its creator?`)) return;
     setBusyId(id);
     setError(null);
     try {
@@ -118,17 +131,22 @@ export default function PanelPage() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-3 font-mono">{r.id}</td>
+                <td className="px-4 py-3 font-mono">
+                  {displayId(r.id)}
+                  {isV2Ref(r.id) && <span className="ml-1 text-xs text-muted-foreground">v2</span>}
+                </td>
                 <td className="px-4 py-3">{r.template}</td>
                 <td className="max-w-[14rem] truncate px-4 py-3">
                   {r.question}
                 </td>
                 <td className="px-4 py-3 font-mono text-gold">
                   {r.prize} XLM
-                  {r.onchain === false && (
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      no creado
-                    </span>
+                  <div className="mt-1 font-sans text-xs text-muted-foreground" title={r.state?.note}>
+                    {r.state ? STATUS_LABEL[r.state.status] : "State unavailable"}
+                    {r.chain && ` · ${r.chain.claims}/${r.chain.maxClaims} claimed`}
+                  </div>
+                  {r.state && !r.state.canClose && r.state.status === "open" && (
+                    <div className="mt-1 max-w-[16rem] whitespace-normal font-sans text-xs text-muted-foreground">{r.state.note}</div>
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
@@ -143,7 +161,8 @@ export default function PanelPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      disabled={busyId === r.id || r.onchain === false}
+                      disabled={busyId === r.id || !r.state?.canClose}
+                      title={r.state?.note}
                       onClick={() => closeChest(r.id)}
                       className="h-8 text-destructive"
                     >
