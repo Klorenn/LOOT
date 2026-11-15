@@ -33,7 +33,11 @@ export const Errors = {
     /**
      * This recipient already claimed in this group (chest or set). Does NOT stop fresh addresses.
      */
-    16: { message: "AlreadyClaimed" }
+    16: { message: "AlreadyClaimed" },
+    /**
+     * prize * max_claims (what the creator escrows) must not exceed MAX_TOTAL_FUNDING (50 XLM), and must not overflow.
+     */
+    17: { message: "FundingCapExceeded" }
 };
 export class Client extends ContractClient {
     options;
