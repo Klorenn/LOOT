@@ -801,3 +801,118 @@ fn someone_else_cannot_sign_for_the_recipient() {
     assert!(matches!(res, Err(Err(_))), "expected an auth failure, got {res:?}");
     assert_eq!(s.token.balance(&victim), 0);
 }
+
+// --- D1 testnet caps: 50 XLM per chest, 30 day max lifetime ---
+
+const XLM: i128 = 10_000_000;
+
+fn fund(s: &Setup, amount: i128) {
+    let admin = StellarAssetClient::new(&s.env, &s.token.address);
+    admin.mint(&s.creator, &amount);
+}
+
+#[test]
+fn max_deadline_is_30_days() {
+    assert_eq!(MAX_DEADLINE, 30 * 24 * 60 * 60);
+    assert_eq!(MAX_TOTAL_FUNDING, 50 * XLM);
+}
+
+#[test]
+fn deadline_above_30_days_is_rejected_and_exactly_30_accepted() {
+    let s = setup();
+    let now = s.env.ledger().timestamp();
+    let thirty = 30 * 24 * 60 * 60;
+    let mk = |d: u64| {
+        s.chest
+            .try_create_chest(&s.creator, &fp(&s.env), &s.token.address, &100, &1, &d)
+    };
+    assert_eq!(mk(now + thirty + 1).unwrap_err().unwrap(), Error::BadDeadline);
+    mk(now + thirty).unwrap().unwrap();
+}
+
+#[test]
+fn total_funding_above_50_xlm_is_rejected() {
+    let s = setup();
+    fund(&s, 100 * XLM);
+    let before = s.token.balance(&s.creator);
+    // 50 XLM + 1 stroop in one place
+    let err = s
+        .chest
+        .try_create_chest(&s.creator, &fp(&s.env), &s.token.address, &(50 * XLM + 1), &1, &dl(&s.env))
+        .unwrap_err()
+        .unwrap();
+    assert_eq!(err, Error::FundingCapExceeded);
+    // prize * max_claims = 51 XLM
+    let err = s
+        .chest
+        .try_create_chest(&s.creator, &fp(&s.env), &s.token.address, &(17 * XLM), &3, &dl(&s.env))
+        .unwrap_err()
+        .unwrap();
+    assert_eq!(err, Error::FundingCapExceeded);
+    assert_eq!(s.token.balance(&s.creator), before);
+}
+
+#[test]
+fn total_funding_of_exactly_50_xlm_is_accepted() {
+    let s = setup();
+    fund(&s, 100 * XLM);
+    s.chest
+        .create_chest(&s.creator, &fp(&s.env), &s.token.address, &(50 * XLM), &1, &dl(&s.env));
+    s.chest
+        .create_chest(&s.creator, &fp(&s.env), &s.token.address, &(5 * XLM), &10, &dl(&s.env));
+}
+
+#[test]
+fn prize_times_claims_overflow_is_rejected() {
+    let s = setup();
+    let err = s
+        .chest
+        .try_create_chest(&s.creator, &fp(&s.env), &s.token.address, &i128::MAX, &2, &dl(&s.env))
+        .unwrap_err()
+        .unwrap();
+    assert_eq!(err, Error::FundingCapExceeded);
+}
+
+#[test]
+fn set_chests_apply_the_same_funding_cap() {
+    let s = setup();
+    fund(&s, 100 * XLM);
+    let set = s.chest.create_set(&s.creator);
+    let err = s
+        .chest
+        .try_create_chest_in_set(
+            &s.creator,
+            &set,
+            &fp(&s.env),
+            &s.token.address,
+            &(51 * XLM),
+            &1,
+            &dl(&s.env),
+        )
+        .unwrap_err()
+        .unwrap();
+    assert_eq!(err, Error::FundingCapExceeded);
+    s.chest.create_chest_in_set(
+        &s.creator,
+        &set,
+        &fp(&s.env),
+        &s.token.address,
+        &(50 * XLM),
+        &1,
+        &dl(&s.env),
+    );
+}
+
+#[test]
+fn wrong_token_is_rejected_before_the_funding_cap() {
+    let s = setup();
+    let other = s
+        .env
+        .register_stellar_asset_contract_v2(Address::generate(&s.env));
+    let err = s
+        .chest
+        .try_create_chest(&s.creator, &fp(&s.env), &other.address(), &(60 * XLM), &1, &dl(&s.env))
+        .unwrap_err()
+        .unwrap();
+    assert_eq!(err, Error::WrongToken);
+}

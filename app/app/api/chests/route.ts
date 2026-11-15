@@ -1,32 +1,23 @@
 import { NextResponse } from "next/server";
 import { legacyOff } from "@/lib/mainnet-guard";
-import { Keypair } from "@stellar/stellar-sdk";
-import { Client } from "@findloot/chest";
-import { cfg } from "@/lib/cfg";
 import { DEMO_CHEST } from "@/lib/config";
-import { withRpcUrl } from "@/lib/rpc";
+import { readAllChests } from "@/lib/listing";
+import { panelStateForRef, type PanelChain } from "@/lib/chest-panel-state";
+import { isLegacyV2Ref } from "@/lib/registry";
 import { listChests } from "@/lib/chest-store";
 
-/** true = exists on-chain, false = ChestNotFound (#1), null = could not verify. */
-async function existsOnChain(id: number): Promise<boolean | null> {
-  const secret = process.env.RELAYER_SECRET; // solo testnet (la ruta está apagada en mainnet)
-  if (!secret) return null;
-  const { NETWORK, CONTRACTS } = await cfg();
+/**
+ * Chain records for the panel come from `readAllChests` (registry scan with a shared 30 s cache), so repeated
+ * unauthenticated GETs do not multiply RPC reads. A chest created in the last 30 s may show as not created until the
+ * cache refreshes. null = the scan failed: state unknown, not "not created".
+ */
+async function chainMap(): Promise<Map<number, PanelChain> | null> {
   try {
-    return await withRpcUrl(async (rpcUrl) => {
-      const client = new Client({
-        networkPassphrase: NETWORK.passphrase,
-        contractId: CONTRACTS.chest,
-        rpcUrl,
-        allowHttp: true,
-        publicKey: Keypair.fromSecret(secret).publicKey(),
-      });
-      const tx = await client.get_chest({ chest_id: BigInt(id) });
-      return tx.result.isOk();
-    });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    if (/Error\(Contract,\s*#1\)|ChestNotFound/i.test(message)) return false;
+    const all = await readAllChests();
+    return new Map(
+      all.map((c) => [c.id, { closed: c.closed, claims: c.claims, maxClaims: c.maxClaims, deadline: c.deadline, creator: c.creator }]),
+    );
+  } catch {
     return null;
   }
 }
@@ -34,7 +25,6 @@ async function existsOnChain(id: number): Promise<boolean | null> {
 export async function GET() {
   const off = await legacyOff();
   if (off) return off;
-  const { NETWORK, CONTRACTS } = await cfg();
   // Solo cofres públicos; la sal no sale en el listado.
   const stored = (await listChests()).map(({ salt: _s, ...c }) => (void _s, c));
   const demo = {
@@ -48,8 +38,13 @@ export async function GET() {
   };
   const ids = new Set(stored.map((c) => c.id));
   const all = ids.has(demo.id) ? stored : [demo, ...stored];
-  const chests = await Promise.all(
-    all.map(async (c) => ({ ...c, onchain: await existsOnChain(c.id) })),
-  );
+  const now = Math.floor(Date.now() / 1000);
+  const map = await chainMap();
+  const chests = all.map((c) => {
+    if (!map) return { ...c, onchain: null, state: null, chain: null };
+    // a legacy ref points at an unrelated burned slot of the new registry: never show its numbers
+    const chain = isLegacyV2Ref(c.id) ? null : (map.get(c.id) ?? null);
+    return { ...c, onchain: chain !== null, state: panelStateForRef(c.id, chain, now), chain };
+  });
   return NextResponse.json({ chests });
 }

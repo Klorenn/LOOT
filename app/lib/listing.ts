@@ -7,6 +7,7 @@ import type { SetRef } from "./chest-set";
 import { cfg } from "./cfg";
 import { scanUpTo } from "./registry-scan";
 import { isChestAllowed } from "./chest-allow";
+import { applyTestnetListingRules } from "./listing-rules";
 import { DEMO_CHEST, stroopsToXlm, tokenDecimals, tokenLabel } from "./config";
 
 /** Solo servidor. Lecturas de cadena con failover (lib/rpc.ts) y caché en memoria de 30 s. */
@@ -144,12 +145,17 @@ export async function listExploreRows(): Promise<ChestRowData[]> {
     (await listPublicMetas().catch(() => [])).filter((m) => m.listed === true).map((m) => m.id),
   );
   // mainnet: solo los ids habilitados (MAINNET_SAMPLE_CHEST_ID / MAINNET_LISTED_IDS), nunca los públicos del almacén
-  const listed = all.filter((c) =>
-    IS_MAINNET
-      ? isChestAllowed({ restricted: true, ids: ALLOWED_CHEST_IDS, creators: CREATOR_ALLOWLIST }, c.id, c.creator)
-      : (LISTED_CHEST_IDS.includes(c.id) || publicIds.has(c.id)) && !HIDDEN_CHEST_IDS.includes(c.id),
+  if (IS_MAINNET) {
+    const listed = all.filter((c) => isChestAllowed({ restricted: true, ids: ALLOWED_CHEST_IDS, creators: CREATOR_ALLOWLIST }, c.id, c.creator));
+    return Promise.all(listed.map(toRow));
+  }
+  // testnet: the hand-picked ids always show; community chests (public store) also need >= 1 XLM per place and
+  // at most 5 open chests per creator (lib/listing-rules.ts)
+  const fixed = all.filter((c) => LISTED_CHEST_IDS.includes(c.id) && !HIDDEN_CHEST_IDS.includes(c.id));
+  const community = applyTestnetListingRules(
+    all.filter((c) => !LISTED_CHEST_IDS.includes(c.id) && publicIds.has(c.id) && !HIDDEN_CHEST_IDS.includes(c.id)),
   );
-  return Promise.all(listed.map(toRow));
+  return Promise.all([...fixed, ...community].map(toRow));
 }
 
 export type DashboardData = {

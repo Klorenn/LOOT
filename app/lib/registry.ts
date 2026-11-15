@@ -29,6 +29,18 @@ export const displayId = (ref: number): number => splitRef(ref).id;
 
 export const isV2Ref = (ref: number): boolean => Number.isSafeInteger(ref) && ref >= V2_REF_OFFSET;
 
+/**
+ * Highest id burned (create_set by the deployer) in the current testnet v2 registry; mirrors `burnedIdRange.to` in
+ * deployments/registry-v2-testnet.json (a test keeps them equal). The previous testnet registry used ids 1-38, so
+ * refs in this range are chests of that old registry and can never be real chests of the current one.
+ */
+export const V2_BURNED_MAX_ID = 50;
+
+/** v2 ref that belongs to the previous testnet registry (id inside the burned range of the current one). */
+export function isLegacyV2Ref(ref: number): boolean {
+  return isV2Ref(ref) && splitRef(ref).id <= V2_BURNED_MAX_ID;
+}
+
 /** What the registry-aware code needs from the network config. */
 export type RegistryIds = { chest: string; chestV2: string };
 
@@ -68,13 +80,15 @@ export function usesCeremonyZkey(mainnet: boolean, version: RegistryVersion): bo
 
 // ---------- deadline (mirrors the v2 contract: now < deadline <= now + MAX_DEADLINE) ----------
 
-export const MAX_DEADLINE_SECS = 90 * 24 * 3600;
+export const MAX_DEADLINE_SECS = 30 * 24 * 3600;
+/** Largest `prize * max_claims` (XLM) one v2 chest may hold; the contract rejects more (#17). */
+export const MAX_TOTAL_FUNDING_XLM = 50;
 
 /** null when the deadline is acceptable for the registry; otherwise a plain English message. */
 export function deadlineError(deadline: number, nowSec: number = Math.floor(Date.now() / 1000)): string | null {
   if (!Number.isSafeInteger(deadline) || deadline <= nowSec)
     return "The chest needs an expiry in the future; otherwise the prize could never be recovered.";
-  if (deadline > nowSec + MAX_DEADLINE_SECS) return "The expiry can be at most 90 days from now.";
+  if (deadline > nowSec + MAX_DEADLINE_SECS) return "The expiry can be at most 30 days from now.";
   return null;
 }
 
@@ -95,8 +109,9 @@ const CONTRACT_MESSAGES: Record<number, string> = {
   12: "Only the owner of this set can add chests to it.",
   13: "This set doesn’t exist.",
   14: "This registry only pays its own token (XLM). Other tokens are not accepted.",
-  15: "The expiry must be in the future and at most 90 days from now.",
+  15: "The expiry must be in the future and at most 30 days from now.",
   16: ALREADY_CLAIMED_MSG,
+  17: "A chest can hold at most 50 XLM in total (prize × places).",
 };
 
 /** `Error(Contract, #N)` in any thrown value or string, or null. */

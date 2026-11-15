@@ -1,6 +1,6 @@
 const MIN_EXPIRY_S = 5 * 60;
-/** 1 h under the contract's 90-day bound, so clock drift or a late member tx of a set never hits BadDeadline (#15). */
-const MAX_EXPIRY_S = 90 * 24 * 3600 - 3600;
+/** 1 h under the contract's 30-day bound, so clock drift or a late member tx of a set never hits BadDeadline (#15). */
+const MAX_EXPIRY_S = 30 * 24 * 3600 - 3600;
 /** Mainnet: the relayer only sponsors deadlines up to 30 days. */
 const MAX_EXPIRY_MAINNET_S = 30 * 24 * 3600;
 
@@ -13,7 +13,7 @@ export function expiryError(expires: string, mainnet: boolean, nowMs: number = D
     return "Pick an expiry date — unclaimed prize can only be recovered after it.";
   if (sec < now + MIN_EXPIRY_S) return "Expiry must be at least 5 minutes from now.";
   if (mainnet && sec > now + MAX_EXPIRY_MAINNET_S) return "On mainnet the expiry can be at most 30 days from now.";
-  if (sec > now + MAX_EXPIRY_S) return "Expiry can be at most 90 days from now.";
+  if (!mainnet && sec > now + MAX_EXPIRY_S) return "Expiry can be at most 30 days from now.";
   return null;
 }
 

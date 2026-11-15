@@ -4,7 +4,7 @@ import type { u32, u64, i128 } from "@stellar/stellar-sdk/contract";
 export declare const networks: {
     readonly testnet: {
         readonly networkPassphrase: "Test SDF Network ; September 2015";
-        readonly contractId: "CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG";
+        readonly contractId: "CDCUQY2EI3D64YNMHULCIEQE2P4KOCZ2ZTQALZB3GZYPBY5JNQ7WDPMI";
     };
 };
 export interface Chest {
@@ -72,6 +72,12 @@ export declare const Errors: {
      * This recipient already claimed in this group (chest or set). Does NOT stop fresh addresses.
      */
     16: {
+        message: string;
+    };
+    /**
+     * prize * max_claims (what the creator escrows) must not exceed MAX_TOTAL_FUNDING (50 XLM), and must not overflow.
+     */
+    17: {
         message: string;
     };
 };

@@ -7,7 +7,7 @@ if (typeof window !== "undefined") {
 export const networks = {
     testnet: {
         networkPassphrase: "Test SDF Network ; September 2015",
-        contractId: "CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG",
+        contractId: "CDCUQY2EI3D64YNMHULCIEQE2P4KOCZ2ZTQALZB3GZYPBY5JNQ7WDPMI",
     }
 };
 export const Errors = {
@@ -33,7 +33,11 @@ export const Errors = {
     /**
      * This recipient already claimed in this group (chest or set). Does NOT stop fresh addresses.
      */
-    16: { message: "AlreadyClaimed" }
+    16: { message: "AlreadyClaimed" },
+    /**
+     * prize * max_claims (what the creator escrows) must not exceed MAX_TOTAL_FUNDING (50 XLM), and must not overflow.
+     */
+    17: { message: "FundingCapExceeded" }
 };
 export class Client extends ContractClient {
     options;

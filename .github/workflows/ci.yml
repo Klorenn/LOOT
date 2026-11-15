@@ -36,5 +36,3 @@ jobs:
           targets: wasm32-unknown-unknown
       - name: cargo test
         run: cargo test
-        env:
-          PATH: ${{ env.HOME }}/.cargo/bin:${{ env.PATH }}

@@ -19,7 +19,7 @@ import { buildPoseidon } from "circomlibjs";
 import Sqids from "sqids";
 
 const BASE = process.argv[2] || "http://localhost:3123";
-const REGISTRY = process.env.REGISTRY_V2_ID || "CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG";
+const REGISTRY = process.env.REGISTRY_V2_ID || "CDCUQY2EI3D64YNMHULCIEQE2P4KOCZ2ZTQALZB3GZYPBY5JNQ7WDPMI";
 const RPC = "https://soroban-testnet.stellar.org";
 const XLM_SAC = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
 const V2_REF_OFFSET = 1_000_000_000;

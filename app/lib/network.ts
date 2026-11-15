@@ -1,4 +1,5 @@
 import { parseCreatorAllowlist } from "./meta-gate";
+import { MAX_TOTAL_FUNDING_XLM } from "./registry";
 
 /**
  * Redes de Loot. findloot.xyz sirve testnet Y mainnet: la red se elige por petición con la cookie
@@ -190,7 +191,8 @@ export function configFor(net: Net, mainnet: MainnetPublic): NetConfig {
     REGISTRY_V2: { chest: tV2Ok ? tV2 : "", verifier: isContractId(tV2Verifier) ? tV2Verifier : "" },
     CREATE_VERSION: createVersion(num(process.env.NEXT_PUBLIC_REGISTRY_VERSION, 1), tV2),
     XLM_SAC: TESTNET_SAC,
-    CAPS: { maxPrizePerPlaceXlm: Infinity, maxTotalPrizeXlm: Infinity },
+    // creating on v2: the contract rejects chests above 50 XLM in total, so the UI shows the same cap
+    CAPS: { maxPrizePerPlaceXlm: Infinity, maxTotalPrizeXlm: createVersion(num(process.env.NEXT_PUBLIC_REGISTRY_VERSION, 1), tV2) === 2 ? MAX_TOTAL_FUNDING_XLM : Infinity },
     DEMO_CHEST_ID: 6,
     SAMPLE_CHEST_ID: 6,
     CREATOR_ALLOWLIST: [],

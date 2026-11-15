@@ -28,7 +28,7 @@ export type CreateInput = {
   /** stroops por cupo */
   prizeStroops: bigint;
   maxClaims: number;
-  /** segundos unix; siempre en el futuro y como máximo 90 días (el registry v2 lo exige) */
+  /** segundos unix; siempre en el futuro y como máximo 30 días (el registry v2 lo exige) */
   deadline: number;
   /**
    * Registry v2 only: ref (lib/registry.ts) of a set made with createSetOnChain. The chest is created with

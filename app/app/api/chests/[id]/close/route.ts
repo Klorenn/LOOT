@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
-import { Client } from "@findloot/chest";
+import { Client, ClientV2 } from "@findloot/chest";
 import { cfg } from "@/lib/cfg";
+import { readChest } from "@/lib/chain";
+import { closePreflightForRef } from "@/lib/chest-panel-state";
+import { isLegacyV2Ref, registryFor } from "@/lib/registry";
 import { legacyOff } from "@/lib/mainnet-guard";
 import { withRpcUrl } from "@/lib/rpc";
 import { requireAdmin } from "@/lib/admin-auth";
 import { toSafeError } from "@/lib/safe-error";
 
 /**
- * Cierra el cofre y retira el remanente (creator auth).
+ * Cierra el cofre y retira el remanente (creator auth). `id` is a chest ref (registry v1 id or v2 ref).
+ * The contract only closes after the deadline or once sold out, and only for the creator: both are checked first
+ * so the panel shows the reason instead of a contract error.
  */
 export async function POST(
   req: NextRequest,
@@ -17,7 +22,7 @@ export async function POST(
 ) {
   const off = await legacyOff();
   if (off) return off;
-  const { NETWORK, CONTRACTS } = await cfg();
+  const { NETWORK, CONTRACTS, REGISTRY_V2 } = await cfg();
   const denied = requireAdmin(req);
   if (denied) return denied;
   try {
@@ -33,12 +38,35 @@ export async function POST(
     }
 
     const kp = Keypair.fromSecret(secret);
+    // Preflight failures (legacy ref, registry not configured) answer with the same clear JSON as the rest.
+    if (isLegacyV2Ref(chestId)) {
+      const legacy = closePreflightForRef(chestId, null, kp.publicKey());
+      if (!legacy.ok) return NextResponse.json({ error: legacy.error, code: legacy.code }, { status: legacy.status });
+    }
+    let reg: ReturnType<typeof registryFor>;
+    try {
+      reg = registryFor({ chest: CONTRACTS.chest, chestV2: REGISTRY_V2.chest }, chestId);
+    } catch (e) {
+      if (/ChestNotFound/i.test(e instanceof Error ? e.message : String(e))) {
+        const missing = closePreflightForRef(chestId, null, kp.publicKey());
+        if (!missing.ok) return NextResponse.json({ error: missing.error, code: missing.code }, { status: missing.status });
+      }
+      throw e;
+    }
+    const chain = await readChest(chestId).catch((e) => {
+      if (/Error\(Contract,\s*#1\)|ChestNotFound/i.test(e instanceof Error ? e.message : String(e))) return null;
+      throw e;
+    });
+    const pre = closePreflightForRef(chestId, chain, kp.publicKey());
+    if (!pre.ok) return NextResponse.json({ error: pre.error, code: pre.code }, { status: pre.status });
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
     const sent = await withRpcUrl(
       async (rpcUrl) => {
-        const client = new Client({
+        // v2 chests need the v2 binding (its errors and wasm interface), v1 keeps the original one
+        const Bind = reg.version === 2 ? ClientV2 : Client;
+        const client = new Bind({
           networkPassphrase: NETWORK.passphrase,
-          contractId: CONTRACTS.chest,
+          contractId: reg.contractId,
           rpcUrl,
           allowHttp: true,
           publicKey: kp.publicKey(),
@@ -46,7 +74,7 @@ export async function POST(
         });
 
         const tx = await client.close_chest(
-          { chest_id: BigInt(chestId) },
+          { chest_id: BigInt(reg.id) },
           { fee: "10000000", timeoutInSeconds: 120 },
         );
         return tx.signAndSend();
