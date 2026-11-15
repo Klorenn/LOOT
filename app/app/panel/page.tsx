@@ -73,7 +73,9 @@ export default function PanelPage() {
         headers: { "x-admin-key": adminKey },
       });
       const data = await res.json().catch(() => ({}));
-      if (res.status === 403) throw new Error("Admin key invalid or missing (403)");
+      if (res.status === 403 && data.code !== "not_creator") {
+        throw new Error("Admin key invalid or missing (403)");
+      }
       if (!res.ok) throw new Error(data.error || "close failed");
       alert(`Closed. Refunded ${data.refunded} · ${data.hash?.slice(0, 12)}…`);
       reload();
