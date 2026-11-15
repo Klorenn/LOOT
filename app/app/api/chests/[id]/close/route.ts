@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
-import { Client } from "@findloot/chest";
+import { Client, ClientV2 } from "@findloot/chest";
 import { cfg } from "@/lib/cfg";
 import { readChest } from "@/lib/chain";
-import { closePreflight } from "@/lib/chest-panel-state";
-import { registryFor } from "@/lib/registry";
+import { closePreflightForRef } from "@/lib/chest-panel-state";
+import { isLegacyV2Ref, registryFor } from "@/lib/registry";
 import { legacyOff } from "@/lib/mainnet-guard";
 import { withRpcUrl } from "@/lib/rpc";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -38,17 +38,33 @@ export async function POST(
     }
 
     const kp = Keypair.fromSecret(secret);
-    const reg = registryFor({ chest: CONTRACTS.chest, chestV2: REGISTRY_V2.chest }, chestId);
+    // Preflight failures (legacy ref, registry not configured) answer with the same clear JSON as the rest.
+    if (isLegacyV2Ref(chestId)) {
+      const legacy = closePreflightForRef(chestId, null, kp.publicKey());
+      if (!legacy.ok) return NextResponse.json({ error: legacy.error, code: legacy.code }, { status: legacy.status });
+    }
+    let reg: ReturnType<typeof registryFor>;
+    try {
+      reg = registryFor({ chest: CONTRACTS.chest, chestV2: REGISTRY_V2.chest }, chestId);
+    } catch (e) {
+      if (/ChestNotFound/i.test(e instanceof Error ? e.message : String(e))) {
+        const missing = closePreflightForRef(chestId, null, kp.publicKey());
+        if (!missing.ok) return NextResponse.json({ error: missing.error, code: missing.code }, { status: missing.status });
+      }
+      throw e;
+    }
     const chain = await readChest(chestId).catch((e) => {
       if (/Error\(Contract,\s*#1\)|ChestNotFound/i.test(e instanceof Error ? e.message : String(e))) return null;
       throw e;
     });
-    const pre = closePreflight(chain, kp.publicKey());
+    const pre = closePreflightForRef(chestId, chain, kp.publicKey());
     if (!pre.ok) return NextResponse.json({ error: pre.error, code: pre.code }, { status: pre.status });
     const { signTransaction } = basicNodeSigner(kp, NETWORK.passphrase);
     const sent = await withRpcUrl(
       async (rpcUrl) => {
-        const client = new Client({
+        // v2 chests need the v2 binding (its errors and wasm interface), v1 keeps the original one
+        const Bind = reg.version === 2 ? ClientV2 : Client;
+        const client = new Bind({
           networkPassphrase: NETWORK.passphrase,
           contractId: reg.contractId,
           rpcUrl,
