@@ -41,6 +41,9 @@ describe("testnet listing rules", () => {
     expect(ids(applyTestnetListingRules([...done, ...open], NOW))).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
   it("the cap is on the number of chests, not on prizes already counted twice", () => {
-    expect(applyTestnetListingRules([], NOW)).toEqual([]);
+    const small = [1, 2, 3, 4, 5].map((i) => chest(i, { prize: XLM }));
+    const sixthLarge = chest(6, { prize: BigInt(1000) * XLM });
+    expect(ids(applyTestnetListingRules([...small, sixthLarge], NOW))).toEqual([1, 2, 3, 4, 5]);
+    expect(ids(applyTestnetListingRules([sixthLarge, ...small], NOW))).toEqual([1, 2, 3, 4, 5]);
   });
 });
