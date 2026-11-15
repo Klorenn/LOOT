@@ -35,14 +35,18 @@ pub enum Error {
     BadDeadline = 15,
     /// This recipient already claimed in this group (chest or set). Does NOT stop fresh addresses.
     AlreadyClaimed = 16,
+    /// `prize * max_claims` exceeds MAX_TOTAL_FUNDING (an overflowing product counts as exceeding it).
+    FundingCapExceeded = 17,
 }
 
 /// Registry version (immutable contract; a new version is a new deployment).
 pub const VERSION: u32 = 2;
 
-/// Longest allowed chest lifetime: 90 days. `deadline` must satisfy
+/// Longest allowed chest lifetime: 30 days. `deadline` must satisfy
 /// `now < deadline <= now + MAX_DEADLINE` (0 = "never expires" is NOT allowed).
-pub const MAX_DEADLINE: u64 = 90 * 24 * 60 * 60;
+pub const MAX_DEADLINE: u64 = 30 * 24 * 60 * 60;
+/// Largest total funding (`prize * max_claims`) one chest may hold: 50 XLM (7 decimals).
+pub const MAX_TOTAL_FUNDING: i128 = 50 * 10_000_000;
 /// After the deadline the entries stay alive this long so the creator can still `close_chest`.
 const CLOSE_GRACE: u64 = 30 * 24 * 60 * 60;
 /// Seconds per ledger assumed when converting time to a TTL in ledgers. Real mainnet is ~5s;
@@ -238,7 +242,10 @@ impl ChestZk {
         }
         let total = prize
             .checked_mul(max_claims as i128)
-            .ok_or(Error::BadAmounts)?;
+            .ok_or(Error::FundingCapExceeded)?;
+        if total > MAX_TOTAL_FUNDING {
+            return Err(Error::FundingCapExceeded);
+        }
 
         token::Client::new(&env, &token).transfer(
             &creator,

@@ -38,7 +38,7 @@ Circuit public input order is unchanged: `[fingerprint, nullifier, chestId, reci
 - Sets: `create_set`, `create_chest_in_set`, `Chest.group_id`. A normal chest has `group_id == chest id`; a set chest has the set id. `claim` pushes `group_id` as the `chestId` public input, so the nullifier `Poseidon(playerSecret, groupId)` is shared across a set.
 - Constructor `__constructor(verifier, token)` replaces `init`. Deploy and initialisation are one transaction, so nobody can front-run an init and install their own verifier.
 - Token is fixed to the registry token (XLM SAC on mainnet). Any other token is rejected with `WrongToken`.
-- Deadline must satisfy `now < deadline <= now + MAX_DEADLINE`, with `MAX_DEADLINE = 90 days`. `0` ("never expires") is rejected with `BadDeadline`.
+- Deadline must satisfy `now < deadline <= now + MAX_DEADLINE`, with `MAX_DEADLINE = 30 days`. `0` ("never expires") is rejected with `BadDeadline`.
 - `close_chest` writes `closed = true` before the token transfer (checks-effects-interactions).
 - TTL: `create_chest` and `claim` extend the instance and the Chest entry past the deadline plus a 30-day close grace (clamped to the network max TTL; ledger time assumed 4 s so it over-extends). Nullifier, Claimed and SetOwner entries are extended to the network max TTL.
 - One claim per address per group (see below), and the recipient must sign the claim (`require_auth`).
@@ -110,7 +110,7 @@ It writes `deployments/registry-v2-mainnet.json` (the v1 record `registry-mainne
 
 ## App changes needed
 
-- Deadlines are mandatory: send `now < deadline <= now + 90 days` (seconds). `0` fails with `BadDeadline`.
+- Deadlines are mandatory: send `now < deadline <= now + 30 days` (seconds). `0` fails with `BadDeadline`.
 - Token must be the registry token (`token()` getter or env). Anything else fails with `WrongToken`.
 - Sets: call `create_set`, then `create_chest_in_set` for each chest; store the set id.
 - Proving and claiming: use `chest.group_id` (from `get_chest`) as the circuit `chestId` input, not the chest id. For normal chests `group_id == chest id`, so reading `group_id` always works.
