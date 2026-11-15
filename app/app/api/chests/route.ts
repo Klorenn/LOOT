@@ -1,19 +1,24 @@
 import { NextResponse } from "next/server";
 import { legacyOff } from "@/lib/mainnet-guard";
 import { DEMO_CHEST } from "@/lib/config";
-import { readChest } from "@/lib/chain";
-import { panelState, type PanelChain } from "@/lib/chest-panel-state";
+import { readAllChests } from "@/lib/listing";
+import { panelStateForRef, type PanelChain } from "@/lib/chest-panel-state";
+import { isLegacyV2Ref } from "@/lib/registry";
 import { listChests } from "@/lib/chest-store";
 
-/** On-chain record of the chest (registry v1 or v2, by ref) or null when ChestNotFound; undefined = could not verify. */
-async function chainOf(ref: number): Promise<PanelChain | null | undefined> {
+/**
+ * Chain records for the panel come from `readAllChests` (registry scan with a shared 30 s cache), so repeated
+ * unauthenticated GETs do not multiply RPC reads. A chest created in the last 30 s may show as not created until the
+ * cache refreshes. null = the scan failed: state unknown, not "not created".
+ */
+async function chainMap(): Promise<Map<number, PanelChain> | null> {
   try {
-    const c = await readChest(ref);
-    return { closed: c.closed, claims: c.claims, maxClaims: c.maxClaims, deadline: c.deadline, creator: c.creator };
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    if (/Error\(Contract,\s*#1\)|ChestNotFound/i.test(message)) return null;
-    return undefined;
+    const all = await readAllChests();
+    return new Map(
+      all.map((c) => [c.id, { closed: c.closed, claims: c.claims, maxClaims: c.maxClaims, deadline: c.deadline, creator: c.creator }]),
+    );
+  } catch {
+    return null;
   }
 }
 
@@ -34,12 +39,12 @@ export async function GET() {
   const ids = new Set(stored.map((c) => c.id));
   const all = ids.has(demo.id) ? stored : [demo, ...stored];
   const now = Math.floor(Date.now() / 1000);
-  const chests = await Promise.all(
-    all.map(async (c) => {
-      const chain = await chainOf(c.id);
-      if (chain === undefined) return { ...c, onchain: null, state: null, chain: null };
-      return { ...c, onchain: chain !== null, state: panelState(chain, now), chain };
-    }),
-  );
+  const map = await chainMap();
+  const chests = all.map((c) => {
+    if (!map) return { ...c, onchain: null, state: null, chain: null };
+    // a legacy ref points at an unrelated burned slot of the new registry: never show its numbers
+    const chain = isLegacyV2Ref(c.id) ? null : (map.get(c.id) ?? null);
+    return { ...c, onchain: chain !== null, state: panelStateForRef(c.id, chain, now), chain };
+  });
   return NextResponse.json({ chests });
 }
