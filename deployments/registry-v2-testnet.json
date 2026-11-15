@@ -12,6 +12,7 @@
   "verifierWasmHash": "8df17eda8f2f901a9636804e0e173586723420d38af6407974218b53f98905b5",
   "vkFingerprint": "3889d2e915b1118b40c0c825608bde088208f5d5b6e60ce4145b47a40fe070ef",
   "claimRequiresRecipientAuth": true,
+  "burnedIdRange": { "from": 1, "to": 50 },
   "burnedIds": "1-50 (create_set by the deployer). The previous registry CCK222... had NextId 39 (ids 1-38 used), so app refs (1e9 + id) never collide with its metadata; the first real chest of this registry is id 51.",
   "previousRegistry": "CCK222I53CTDOAQTYRLK32LDNRKKLBEPDRBBGQWXFJC6YVNEN2OOSJJG",
   "deployedAt": "2026-11-14",

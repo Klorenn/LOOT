@@ -3,8 +3,10 @@
  * the creator can close only after the deadline (`now > deadline`) or once every place was claimed, and only once.
  * Pure module (unit-tested).
  */
+import { isLegacyV2Ref } from "./registry";
+
 export type PanelChain = { closed: boolean; claims: number; maxClaims: number; deadline: number; creator: string };
-export type PanelStatus = "open" | "sold_out" | "expired" | "closed" | "not_created";
+export type PanelStatus = "open" | "sold_out" | "expired" | "closed" | "not_created" | "legacy";
 export type PanelState = { status: PanelStatus; canClose: boolean; note: string };
 
 export function panelState(c: PanelChain | null, nowSec: number = Math.floor(Date.now() / 1000)): PanelState {
@@ -20,7 +22,7 @@ export function panelState(c: PanelChain | null, nowSec: number = Math.floor(Dat
   };
 }
 
-export type ClosePreflight = { ok: true } | { ok: false; status: 403 | 404 | 409; code: "not_created" | "already_closed" | "still_active" | "not_creator"; error: string };
+export type ClosePreflight = { ok: true } | { ok: false; status: 403 | 404 | 409; code: "not_created" | "legacy_registry" | "already_closed" | "still_active" | "not_creator"; error: string };
 
 /** Checks before the server signs `close_chest`, so the panel gets a clear reason instead of a contract error. */
 export function closePreflight(c: PanelChain | null, signerPublicKey: string, nowSec: number = Math.floor(Date.now() / 1000)): ClosePreflight {
@@ -36,4 +38,18 @@ export function closePreflight(c: PanelChain | null, signerPublicKey: string, no
       error: "Only the creator's wallet can close this chest, and the panel key is not it. Close it from /dashboard with the creator's account.",
     };
   return { ok: true };
+}
+
+const LEGACY_NOTE = "This chest belongs to the previous testnet registry, which was replaced. It can no longer be managed from this panel.";
+
+/** `panelState` for a stored chest ref: refs of the previous testnet registry are `legacy`, not `not_created`. */
+export function panelStateForRef(ref: number, c: PanelChain | null, nowSec?: number): PanelState {
+  if (isLegacyV2Ref(ref)) return { status: "legacy", canClose: false, note: LEGACY_NOTE };
+  return panelState(c, nowSec);
+}
+
+/** `closePreflight` for a chest ref: legacy refs are refused before anything is read from (or signed on) the new registry. */
+export function closePreflightForRef(ref: number, c: PanelChain | null, signerPublicKey: string, nowSec?: number): ClosePreflight {
+  if (isLegacyV2Ref(ref)) return { ok: false, status: 409, code: "legacy_registry", error: LEGACY_NOTE };
+  return closePreflight(c, signerPublicKey, nowSec);
 }

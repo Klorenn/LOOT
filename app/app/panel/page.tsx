@@ -26,6 +26,7 @@ const STATUS_LABEL: Record<PanelStatus, string> = {
   expired: "Expired",
   closed: "Closed",
   not_created: "Not created",
+  legacy: "Legacy registry",
 };
 
 export default function PanelPage() {

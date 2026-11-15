@@ -29,6 +29,18 @@ export const displayId = (ref: number): number => splitRef(ref).id;
 
 export const isV2Ref = (ref: number): boolean => Number.isSafeInteger(ref) && ref >= V2_REF_OFFSET;
 
+/**
+ * Highest id burned (create_set by the deployer) in the current testnet v2 registry; mirrors `burnedIdRange.to` in
+ * deployments/registry-v2-testnet.json (a test keeps them equal). The previous testnet registry used ids 1-38, so
+ * refs in this range are chests of that old registry and can never be real chests of the current one.
+ */
+export const V2_BURNED_MAX_ID = 50;
+
+/** v2 ref that belongs to the previous testnet registry (id inside the burned range of the current one). */
+export function isLegacyV2Ref(ref: number): boolean {
+  return isV2Ref(ref) && splitRef(ref).id <= V2_BURNED_MAX_ID;
+}
+
 /** What the registry-aware code needs from the network config. */
 export type RegistryIds = { chest: string; chestV2: string };
 

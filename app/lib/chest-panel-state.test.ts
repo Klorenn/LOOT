@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closePreflight, panelState } from "./chest-panel-state";
+import { closePreflight, closePreflightForRef, panelState, panelStateForRef } from "./chest-panel-state";
 
 const NOW = 1_800_000_000;
 const base = { closed: false, claims: 1, maxClaims: 3, deadline: NOW + 1000, creator: "GCREATOR" };
@@ -26,6 +26,46 @@ describe("panelState", () => {
   });
   it("no chain state means not created", () => {
     expect(panelState(null, NOW)).toMatchObject({ status: "not_created", canClose: false });
+  });
+});
+
+describe("v1 deadline = 0 (never expires)", () => {
+  const forever = { ...base, deadline: 0 };
+  it("never becomes expired: stays open however late it is", () => {
+    expect(panelState(forever, NOW)).toMatchObject({ status: "open", canClose: false });
+    expect(panelState(forever, NOW * 10)).toMatchObject({ status: "open", canClose: false });
+    expect(panelState(forever, NOW).note).not.toMatch(/\(\d{4}-/);
+  });
+  it("can still be closed once sold out", () => {
+    expect(panelState({ ...forever, claims: 3 }, NOW)).toMatchObject({ status: "sold_out", canClose: true });
+  });
+  it("closePreflight refuses with still_active, and lets the creator close it once sold out", () => {
+    expect(closePreflight(forever, "GCREATOR", NOW * 10)).toMatchObject({ ok: false, status: 409, code: "still_active" });
+    expect(closePreflight({ ...forever, claims: 3 }, "GCREATOR", NOW)).toEqual({ ok: true });
+  });
+});
+
+describe("legacy refs (previous testnet registry)", () => {
+  const LEGACY = 1_000_000_007;
+  const REAL = 1_000_000_051;
+  it("legacy refs show as legacy, not 'not created', even though the new registry has nothing there", () => {
+    expect(panelStateForRef(LEGACY, null, NOW)).toMatchObject({ status: "legacy", canClose: false });
+    expect(panelStateForRef(LEGACY, null, NOW).note).toMatch(/previous testnet registry/i);
+  });
+  it("legacy wins over whatever the new registry holds at that id (burned set)", () => {
+    expect(panelStateForRef(LEGACY, { ...base, deadline: NOW - 1 }, NOW)).toMatchObject({ status: "legacy", canClose: false });
+  });
+  it("non-legacy refs behave as before", () => {
+    expect(panelStateForRef(REAL, null, NOW)).toMatchObject({ status: "not_created" });
+    expect(panelStateForRef(7, base, NOW)).toMatchObject({ status: "open" });
+  });
+  it("closePreflightForRef: 409 legacy_registry, never reaches the new registry", () => {
+    expect(closePreflightForRef(LEGACY, { ...base, deadline: NOW - 1 }, "GCREATOR", NOW)).toMatchObject({
+      ok: false,
+      status: 409,
+      code: "legacy_registry",
+    });
+    expect(closePreflightForRef(REAL, { ...base, deadline: NOW - 1 }, "GCREATOR", NOW)).toEqual({ ok: true });
   });
 });
 
