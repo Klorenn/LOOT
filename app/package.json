@@ -15,7 +15,7 @@
     "@findloot/chest": "file:../packages/chestzk-chest",
     "@noble/hashes": "^2.4.0",
     "@shadcn/react": "^0.3.1",
-    "@stellar/stellar-sdk": "^16.3.0",
+    "@stellar/stellar-sdk": "^16.4.1",
     "@vercel/blob": "^2.8.2",
     "circomlibjs": "^0.1.7",
     "class-variance-authority": "^0.7.1",
