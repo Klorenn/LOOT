@@ -8,7 +8,7 @@ import { PageHeader, Em } from "@/components/page-header";
 import { LogoChest } from "@/components/logo-chest";
 import { ExampleTag } from "@/components/example-tag";
 import { KV } from "@/components/kv";
-import { TEMPLATES, type ChestTemplate } from "@/lib/templates";
+import { SecretField, SECRET_INPUT_PAD } from "@/components/secret-field";
 import { normalizeAnswer, randomSalt } from "@/lib/answer";
 import { poseidon2, fieldToHex } from "@/lib/zk";
 import { chestPath } from "@/lib/chest-code";
@@ -84,6 +84,9 @@ export default function CreateChestPage() {
   );
 }
 
+const DEFAULT_PRIZE_XLM = 1;
+const DEFAULT_MAX_CLAIMS = 5;
+
 function SingleChestCreate() {
   const { NETWORK, NETWORK_LC, CONFIG_INCOMPLETE, CAPS, IS_MAINNET, CREATE_VERSION } = useNet();
   // Testnet only: weak typed answers are blocked (mainnet keeps its flow unchanged), and NEW registry v2 chests hash
@@ -91,19 +94,18 @@ function SingleChestCreate() {
   const testnet = testnetFeatures({ IS_MAINNET });
   const kdf: Kdf = testnet && CREATE_VERSION === 2 ? KDF_ARGON2ID_V1 : "v1";
   const [step, setStep] = useState(0);
-  const [tpl, setTpl] = useState<ChestTemplate>(TEMPLATES[2]);
-  const [question, setQuestion] = useState(TEMPLATES[2].question);
-  const [hint, setHint] = useState(TEMPLATES[2].hint);
+  const [question, setQuestion] = useState("");
+  const [hint, setHint] = useState("");
   const [answer, setAnswer] = useState("");
   const [mode, setMode] = useState<Mode>("riddle");
   const [quizDraft, setQuizDraft] = useState<DraftQuestion[]>(() => [emptyDraftQuestion("single")]);
   const [quizErrIdx, setQuizErrIdx] = useState<number | undefined>(undefined);
   const [hashHex, setHashHex] = useState<string | null>(null);
   const [hashOk, setHashOk] = useState(false);
-  const [prize, setPrize] = useState(String(TEMPLATES[2].prize));
+  const [prize, setPrize] = useState(String(DEFAULT_PRIZE_XLM));
   const [difficulty, setDifficulty] = useState(2);
   const [expires, setExpires] = useState("");
-  const [maxClaims, setMaxClaims] = useState(() => clampClaims(xlmToStroops(Number(TEMPLATES[2].prize)), TEMPLATES[2].maxClaims, CAPS));
+  const [maxClaims, setMaxClaims] = useState(() => clampClaims(xlmToStroops(DEFAULT_PRIZE_XLM), DEFAULT_MAX_CLAIMS, CAPS));
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -176,22 +178,10 @@ function SingleChestCreate() {
     setQuizErrIdx(undefined);
     setFieldErr({});
     if (m === "riddle" && answer) void hashAnswer(answer);
-    if (m === "quiz" && question === tpl.question) {
+    if (m === "quiz") {
       setQuestion("");
       setHint("");
     }
-  }
-
-  function pick(t: ChestTemplate) {
-    setTpl(t);
-    setQuestion(t.question);
-    setHint(t.hint);
-    setAnswer("");
-    setPrize(String(t.prize));
-    setMaxClaims(clampClaims(xlmToStroops(Number(t.prize)), t.maxClaims, CAPS));
-    setHashHex(null);
-    setHashOk(false);
-    setResult(null);
   }
 
   const prizeStroops = parseXlmAmount(prize);
@@ -325,7 +315,7 @@ function SingleChestCreate() {
 
       setPhase("Saving chest details…");
       await reserveMeta(player, input, {
-        template: mode === "quiz" ? "quiz" : tpl.id,
+        template: mode === "quiz" ? "quiz" : "riddle",
         question,
         hint: hint || undefined,
         difficulty,
@@ -600,25 +590,6 @@ function SingleChestCreate() {
 
               {step === 0 && mode === "riddle" && (
                 <>
-                  <div className="grid grid-cols-2 gap-2">
-                    {TEMPLATES.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => pick(t)}
-                        className={`rounded-[10px] border p-3 text-left text-sm ${
-                          tpl.id === t.id
-                            ? "border-[var(--proof)] bg-[var(--s2)]"
-                            : "border-[var(--line)] hover:border-[var(--line2)]"
-                        }`}
-                      >
-                        <p className="font-medium">{t.name}</p>
-                        <p className="mt-1 text-[12px] text-[var(--dim)]">
-                          {t.blurb}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
                   <Field
                     label="Puzzle"
                     hint="Public: shown to everyone who opens the chest"
@@ -629,6 +600,7 @@ function SingleChestCreate() {
                       onChange={(e) => setQuestion(e.target.value)}
                       maxLength={QUIZ_LIMITS.title}
                       rows={4}
+                      placeholder="Write the question players must answer"
                       className={`w-full rounded-[10px] border bg-[var(--bg)] px-3 py-2.5 text-[15px] outline-none ${
                         fieldErr.question
                           ? "border-[var(--red)]"
@@ -691,23 +663,28 @@ function SingleChestCreate() {
                       : undefined
                   }
                 >
-                  <Input
-                    type="password"
-                    placeholder={tpl.answerPlaceholder}
-                    value={answer}
-                    onChange={(e) => {
-                      setAnswer(e.target.value);
-                      setHashOk(false);
-                    }}
-                    onBlur={() => void hashAnswer()}
-                    className={`h-11 rounded-[10px] font-mono ${
-                      hashOk
-                        ? "border-[var(--ok)]"
-                        : fieldErr.answer
-                          ? "border-[var(--red)]"
-                          : ""
-                    }`}
-                  />
+                  <SecretField>
+                    {(type) => (
+                      <Input
+                        type={type}
+                        autoComplete="off"
+                        placeholder="Your secret answer"
+                        value={answer}
+                        onChange={(e) => {
+                          setAnswer(e.target.value);
+                          setHashOk(false);
+                        }}
+                        onBlur={() => void hashAnswer()}
+                        className={`h-11 rounded-[10px] ${SECRET_INPUT_PAD} font-mono ${
+                          hashOk
+                            ? "border-[var(--ok)]"
+                            : fieldErr.answer
+                              ? "border-[var(--red)]"
+                              : ""
+                        }`}
+                      />
+                    )}
+                  </SecretField>
                   {testnet && <AnswerStrengthNote text={answer} enforced />}
                 </Field>
               )}
@@ -965,7 +942,7 @@ function SingleChestCreate() {
             <h2 className="mt-4 text-[20px] font-semibold tracking-[-0.02em]">
               {mode === "quiz"
                 ? `Quiz · ${quizDraft.length} question${quizDraft.length === 1 ? "" : "s"}`
-                : tpl.name}
+                : "Single riddle"}
             </h2>
             <p className="mt-1 font-mono text-[12px] text-[var(--dim)]">
               #draft · {diffLabel}

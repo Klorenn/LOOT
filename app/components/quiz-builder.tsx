@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, Plus, Trash2, X } from "lucide-react";
+import { SecretField, SECRET_INPUT_PAD } from "@/components/secret-field";
 import { emptyDraftQuestion, type DraftQuestion } from "@/lib/quiz-draft";
 import { QUIZ_LIMITS, QUIZ_MAX_QUESTIONS, type QuizKind } from "@/lib/quiz";
 
@@ -109,14 +110,18 @@ export function QuizBuilder({
           {q.kind === "text" ? (
             <label className="mt-3 flex flex-col gap-1.5">
               <span className="text-[13px] text-[var(--muted)]">Correct answer</span>
-              <input
-                type="password"
-                value={q.text}
-                onChange={(e) => set(i, { text: e.target.value })}
-                placeholder="Only you see this"
-                autoComplete="off"
-                className={`${inputCls} font-mono`}
-              />
+              <SecretField>
+                {(type) => (
+                  <input
+                    type={type}
+                    value={q.text}
+                    onChange={(e) => set(i, { text: e.target.value })}
+                    placeholder="Only you see this"
+                    autoComplete="off"
+                    className={`${inputCls} ${SECRET_INPUT_PAD} font-mono`}
+                  />
+                )}
+              </SecretField>
             </label>
           ) : (
             <div className="mt-3 flex flex-col gap-2">
