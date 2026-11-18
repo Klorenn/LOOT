@@ -22,6 +22,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - name: Unit tests (vitest)
+        run: pnpm test
       - run: pnpm build
 
   contracts:
@@ -36,3 +38,127 @@ jobs:
           targets: wasm32-unknown-unknown
       - name: cargo test
         run: cargo test
+
+  # CoinFabrik Scout: static security analysis of the Soroban contract. scout-actions is unmaintained
+  # (its image builds dylint_driver 4.1.2, which no longer compiles), so this runs the official
+  # pinned image directly. `--cicd` makes Scout write a FAIL file when it has findings, which fails the
+  # job; the markdown report is uploaded as an artifact either way.
+  scout:
+    runs-on: ubuntu-latest
+    env:
+      SCOUT_VERSION: 0.3.17
+    steps:
+      - uses: actions/checkout@v4
+      # Non-blocking while upstream Scout 0.3.17 cannot build its own dylint_driver 4.1.2
+      # ("revparse_ext failed for master"). Real findings still fail the job in the next step.
+      - name: Run Scout
+        id: scout
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/scout-out"
+          docker run --rm --platform linux/amd64 \
+            -e INPUT_TARGET=/scoutme/contracts/chest \
+            -e SCOUT_OFFLINE=1 \
+            -e INPUT_SCOUT_ARGS="--output-format md-gh --output-path /output/report.md --cicd /output" \
+            -v "$GITHUB_WORKSPACE:/scoutme" \
+            -v "$RUNNER_TEMP/scout-out:/output" \
+            "coinfabrik/scout:$SCOUT_VERSION"
+      - name: Warn when Scout could not run
+        if: steps.scout.outcome == 'failure'
+        run: echo "::warning::Scout did not run (upstream tooling error); the contract was not analyzed in this run"
+      - name: Fail on findings
+        if: steps.scout.outcome == 'success'
+        run: |
+          if [ -f "$RUNNER_TEMP/scout-out/FAIL" ]; then
+            echo "::error::Scout reported findings, see the scout-report artifact"
+            cat "$RUNNER_TEMP/scout-out/report.md" || true
+            exit 1
+          fi
+      - name: Upload Scout report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-report
+          path: ${{ runner.temp }}/scout-out/report.md
+          if-no-files-found: warn
+
+  # Browser e2e of the registry v2 passkey claim, TESTNET ONLY (app/scripts/e2e-passkey-claim.mjs).
+  # Needs funded testnet secrets, so it skips cleanly (green) when they are absent (fork PRs).
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: e2e-testnet
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: app
+    env:
+      E2E_CREATOR_SECRET: ${{ secrets.E2E_CREATOR_SECRET }}
+      E2E_RELAYER_SECRET: ${{ secrets.E2E_RELAYER_SECRET }}
+      E2E_BLOB_TOKEN: ${{ secrets.E2E_BLOB_TOKEN }}
+    steps:
+      - name: Check testnet secrets
+        id: gate
+        working-directory: .
+        run: |
+          if [ -n "$E2E_CREATOR_SECRET" ] && [ -n "$E2E_RELAYER_SECRET" ] && [ -n "$E2E_BLOB_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::e2e skipped: E2E_CREATOR_SECRET / E2E_RELAYER_SECRET / E2E_BLOB_TOKEN not available (fork PR or not configured)"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.enabled == 'true'
+      - uses: pnpm/action-setup@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Install app dependencies
+        if: steps.gate.outputs.enabled == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright (Chrome is preinstalled on the runner)
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" playwright-core@1.51.1
+          echo "PLAYWRIGHT=$RUNNER_TEMP/pw/node_modules/playwright-core/index.mjs" >> "$GITHUB_ENV"
+      - name: Build app (testnet, registry v2)
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          NEXT_PUBLIC_STELLAR_NETWORK: testnet
+          NEXT_PUBLIC_REGISTRY_VERSION: "2"
+          NEXT_PUBLIC_REGISTRY_V2_ID: CDCUQY2EI3D64YNMHULCIEQE2P4KOCZ2ZTQALZB3GZYPBY5JNQ7WDPMI
+          NEXT_PUBLIC_VERIFIER_V2_ID: CCFHJHU2DSVEYXRH7JE457654JB7N2RKDG5A5HJCKT42PZS3ZMMIZPTV
+        run: pnpm build
+      - name: Start app
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          RELAYER_SECRET: ${{ secrets.E2E_RELAYER_SECRET }}
+          RELAYER_API_KEY: ${{ secrets.E2E_RELAYER_API_KEY }}
+          # The persistent relay limits (lib/persistent-limit.ts) fail closed with 503 rate_limit_unavailable
+          # without a Blob token, so passkey signup cannot be relayed. Use a dedicated CI Blob store: the
+          # chest metadata of the e2e chests (listed) is written there too.
+          LOOT_READ_WRITE_TOKEN: ${{ secrets.E2E_BLOB_TOKEN }}
+        run: |
+          nohup pnpm start -p 3123 > "$GITHUB_WORKSPACE/app.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -fs -o /dev/null http://localhost:3123 && exit 0
+            sleep 2
+          done
+          cat "$GITHUB_WORKSPACE/app.log"
+          exit 1
+      - name: Passkey claim e2e (testnet)
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          CREATOR_SECRET: ${{ secrets.E2E_CREATOR_SECRET }}
+          REGISTRY_V2_ID: CDCUQY2EI3D64YNMHULCIEQE2P4KOCZ2ZTQALZB3GZYPBY5JNQ7WDPMI
+        run: node scripts/e2e-passkey-claim.mjs http://localhost:3123
+      - name: Show app log on failure
+        if: failure() && steps.gate.outputs.enabled == 'true'
+        run: tail -n 200 "$GITHUB_WORKSPACE/app.log" || echo "no app log"
