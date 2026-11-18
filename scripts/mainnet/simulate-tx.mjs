@@ -18,13 +18,15 @@ function loadSdk() {
 }
 const { rpc, TransactionBuilder, Networks } = loadSdk();
 const rpcUrl = process.argv[2] ?? process.env.RPC_URL ?? "https://mainnet.sorobanrpc.com";
+// Mainnet unless NETWORK_PASSPHRASE says otherwise (deploy scripts export it for testnet runs).
+const PASSPHRASE = process.env.NETWORK_PASSPHRASE ?? Networks.PUBLIC;
 const xdr = readFileSync(0, "utf8").trim();
 const out = (o) => { console.log(JSON.stringify(o)); process.exit(o.ok ? 0 : 1); };
 try {
   const server = new rpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith("http:") });
   const net = await server.getNetwork();
-  if (net.passphrase !== Networks.PUBLIC) out({ ok: false, error: `RPC is not mainnet: ${net.passphrase}` });
-  const tx = TransactionBuilder.fromXDR(xdr, Networks.PUBLIC);
+  if (net.passphrase !== PASSPHRASE) out({ ok: false, error: `RPC passphrase mismatch:  (expected )` });
+  const tx = TransactionBuilder.fromXDR(xdr, PASSPHRASE);
   const sim = await server.simulateTransaction(tx); // simulateTransaction never submits
   if (rpc.Api.isSimulationError(sim)) out({ ok: false, error: String(sim.error).slice(0, 300) });
   out({ ok: true, minResourceFeeStroops: String(sim.minResourceFee) });
