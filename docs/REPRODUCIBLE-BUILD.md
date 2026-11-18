@@ -55,20 +55,23 @@ The verifier is generated code. `contracts/verifier-mainnet/src/lib.rs` holds th
 `VK_DELTA`, `VK_IC`, `VK_FINGERPRINT`) under the header "AUTO-GENERATED VK BYTES". `verifier-manifest.json` records the generator
 (`soroban-verifier-gen-core 0.4.3`) and the `vk_sha256` of the source `verification_key.json`. The generator is not vendored in this repo.
 
-Regenerate from the final ceremony vk with the crates.io CLI (same version as the manifest):
+**Recipe (verified 2026-11-18):** this exact command reproduces the committed `contracts/verifier-mainnet` byte for byte
+(`src/lib.rs`, `verifier-manifest.json` and `Cargo.toml` identical) from the 2026-10-26 ceremony files:
 ```bash
 cargo install --locked soroban-verifier-gen --version 0.4.3
-soroban-verifier-gen --vk circuits/ceremony/multiparty-2026-12/verification_key.json \
-  --out /tmp/verifier-gen --crate-name chestzk-verifier --contract-name Groth16Verifier
+C=circuits/ceremony/release-2026-10-26
+soroban-verifier-gen --vk $C/verification_key.json --proof $C/proof.json --public $C/public.json \
+  --out /tmp/verifier-gen --crate-name chestzk-verifier
+diff -r /tmp/verifier-gen contracts/verifier-mainnet   # only Cargo.lock and rust-toolchain.toml are extra in the repo
 ```
-Then copy the new vk constants and `verifier-manifest.json` into `contracts/verifier-mainnet` (keep the hand-maintained parts of
-`lib.rs`: `Cargo.toml`, `[profile.release]`, `#![no_std]` layout), and check:
-- `vk_sha256` in the manifest equals `sha256sum verification_key.json`;
-- `git diff` on `lib.rs` only touches the generated constants (and test vectors if you pass `--proof`/`--public`);
-- `cargo test` in `contracts/verifier-mainnet` passes.
+`--proof`/`--public` embed a real proof as test vectors (`verifies_embedded_test_vectors`). Without them the vk constants are
+identical but the test vectors are missing. Note: the manifest's `vk_sha256` is computed by the generator over the parsed vk,
+not the raw file bytes, so it does not equal `shasum` of `verification_key.json`; compare it with a fresh generator run instead.
 
-The exact flags used for the 2026-10-26 verifier were not recorded. Before the ceremony closes, run the command above on the OLD vk
-(`circuits/ceremony/release-2026-10-26`) and confirm it reproduces the committed constants; that proves the recipe.
+After the ceremony, run the same command with `C=circuits/ceremony/multiparty-2026-12`, after producing `proof.json` and
+`public.json` with the final zkey (`snarkjs groth16 prove chest_final.zkey <witness.wtns> proof.json public.json`, from the
+same circuit input used for the October fixture). Copy the output over `contracts/verifier-mainnet` (keep `Cargo.lock` and
+`rust-toolchain.toml`) and run `cargo test` there.
 
 ## After the ceremony (order matters)
 
