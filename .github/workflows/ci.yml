@@ -67,6 +67,7 @@ jobs:
         if: steps.scout.outcome == 'failure'
         run: echo "::warning::Scout did not run (upstream tooling error); the contract was not analyzed in this run"
       - name: Fail on findings
+        if: steps.scout.outcome == 'success'
         run: |
           if [ -f "$RUNNER_TEMP/scout-out/FAIL" ]; then
             echo "::error::Scout reported findings, see the scout-report artifact"
