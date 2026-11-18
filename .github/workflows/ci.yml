@@ -49,7 +49,11 @@ jobs:
       SCOUT_VERSION: 0.3.17
     steps:
       - uses: actions/checkout@v4
+      # Non-blocking while upstream Scout 0.3.17 cannot build its own dylint_driver 4.1.2
+      # ("revparse_ext failed for master"). Real findings still fail the job in the next step.
       - name: Run Scout
+        id: scout
+        continue-on-error: true
         run: |
           mkdir -p "$RUNNER_TEMP/scout-out"
           docker run --rm --platform linux/amd64 \
@@ -59,6 +63,9 @@ jobs:
             -v "$GITHUB_WORKSPACE:/scoutme" \
             -v "$RUNNER_TEMP/scout-out:/output" \
             "coinfabrik/scout:$SCOUT_VERSION"
+      - name: Warn when Scout could not run
+        if: steps.scout.outcome == 'failure'
+        run: echo "::warning::Scout did not run (upstream tooling error); the contract was not analyzed in this run"
       - name: Fail on findings
         run: |
           if [ -f "$RUNNER_TEMP/scout-out/FAIL" ]; then
