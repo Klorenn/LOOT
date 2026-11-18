@@ -1,0 +1,18 @@
+{
+  "network": "testnet",
+  "passphrase": "Test SDF Network ; September 2015",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "verifier": "CAKYXVOVWTHGY4QJK4YCOH4Y56YWM4DSLFCOQUZDVQRFRRDVMD5W2KIQ",
+  "verifierWasmHash": "9d5d2388b795b069cef69649ba1e1755cf80cabccbf9f3ea7914588d40cea671",
+  "vkFingerprint": "3889d2e915b1118b40c0c825608bde088208f5d5b6e60ce4145b47a40fe070ef",
+  "releaseTag": "",
+  "ceremonyDir": "circuits/ceremony/release-2026-10-26",
+  "verificationKeySha256": "be190a8b021afed05cb7ac47846e9c4bea6fb8140e29ba2273ccf7d75b01a8b1",
+  "manifest": "contracts/verifier-mainnet/verifier-manifest.json",
+  "deployer": "GCSLDYI43DFIRREKYPAA553C2ZLD7GW5NYTTVXYRH63OFPQKK2JOMP5Q",
+  "deployedAt": "2026-11-18T20:33:16Z",
+  "txs": {
+    "verifierUpload": "8688d6d67a93ae401dad265538e415c0eb887c429aa9a09f105635703c78b152",
+    "verifierDeploy": "085b3c2aff26115e49d3532b5bd23e05c0674e154b1b439748a761c180a910d2"
+  }
+}
