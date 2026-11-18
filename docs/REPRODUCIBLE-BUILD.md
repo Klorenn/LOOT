@@ -9,7 +9,7 @@ Goal: the wasm deployed to mainnet is the exact file built by CI from a public t
 | --- | --- | --- |
 | Build workflow | `stellar-expert/soroban-build-workflow` commit `6b16426d...` (tag `v28.1.0`) | `.github/workflows/release-wasm.yml` |
 | stellar-cli | `28.1.0` (set by that workflow tag) | same |
-| Rust | `1.91.0`, target `wasm32v1-none` | `contracts/chest/rust-toolchain.toml`, `contracts/verifier-mainnet/rust-toolchain.toml` |
+| Rust | `1.92.0` (stellar-cli 28.1 refuses 1.91.0), target `wasm32v1-none` | `contracts/chest/rust-toolchain.toml`, `contracts/verifier-mainnet/rust-toolchain.toml` |
 | Dependencies | `Cargo.lock` committed in each contract dir (soroban-sdk 27.0.6 for the registry) | `contracts/*/Cargo.lock` |
 | Build command (inside the workflow) | `stellar contract build --optimize --package <pkg> --meta source_repo=github:Klorenn/LOOT` | upstream workflow |
 
@@ -34,7 +34,7 @@ Do not bump any of these between the tag and the deploy. Bumping the workflow ta
 ```bash
 cargo install --locked stellar-cli --version 28.1.0      # exactly the CLI the workflow uses
 git checkout contracts-v0.2.0
-cd contracts/chest                                        # rust-toolchain.toml installs 1.91.0 + wasm32v1-none
+cd contracts/chest                                        # rust-toolchain.toml installs 1.92.0 + wasm32v1-none
 stellar contract build --optimize --package chestzk-chest \
   --out-dir /tmp/out-chest --meta source_repo=github:Klorenn/LOOT
 shasum -a 256 /tmp/out-chest/*.wasm
