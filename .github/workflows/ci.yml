@@ -22,6 +22,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - name: Unit tests (vitest)
+        run: pnpm test
       - run: pnpm build
 
   contracts:
@@ -36,3 +38,99 @@ jobs:
           targets: wasm32-unknown-unknown
       - name: cargo test
         run: cargo test
+
+  # CoinFabrik Scout: static security analysis of the Soroban contract. fail_on_error (the action's
+  # default, set explicitly) fails the job when Scout reports findings; the markdown report is
+  # uploaded as an artifact either way.
+  scout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scout security analysis
+        id: scout
+        uses: CoinFabrik/scout-actions@v3.2
+        with:
+          working_directory: contracts/chest
+          fail_on_error: true
+      - name: Upload Scout report
+        if: always() && steps.scout.outputs.report != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-report
+          path: ${{ steps.scout.outputs.report }}
+
+  # Browser e2e of the registry v2 passkey claim, TESTNET ONLY (app/scripts/e2e-passkey-claim.mjs).
+  # Needs funded testnet secrets, so it skips cleanly (green) when they are absent (fork PRs).
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: e2e-testnet
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: app
+    env:
+      E2E_CREATOR_SECRET: ${{ secrets.E2E_CREATOR_SECRET }}
+      E2E_RELAYER_SECRET: ${{ secrets.E2E_RELAYER_SECRET }}
+    steps:
+      - name: Check testnet secrets
+        id: gate
+        working-directory: .
+        run: |
+          if [ -n "$E2E_CREATOR_SECRET" ] && [ -n "$E2E_RELAYER_SECRET" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::e2e skipped: E2E_CREATOR_SECRET / E2E_RELAYER_SECRET not available (fork PR or not configured)"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.enabled == 'true'
+      - uses: pnpm/action-setup@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Install app dependencies
+        if: steps.gate.outputs.enabled == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright (Chrome is preinstalled on the runner)
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" playwright-core@1.51.1
+          echo "PLAYWRIGHT=$RUNNER_TEMP/pw/node_modules/playwright-core/index.mjs" >> "$GITHUB_ENV"
+      - name: Build app (testnet, registry v2)
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          NEXT_PUBLIC_STELLAR_NETWORK: testnet
+          NEXT_PUBLIC_REGISTRY_VERSION: "2"
+          NEXT_PUBLIC_REGISTRY_V2_ID: CDCUQY2EI3D64YNMHULCIEQE2P4KOCZ2ZTQALZB3GZYPBY5JNQ7WDPMI
+          NEXT_PUBLIC_VERIFIER_V2_ID: CCFHJHU2DSVEYXRH7JE457654JB7N2RKDG5A5HJCKT42PZS3ZMMIZPTV
+        run: pnpm build
+      - name: Start app
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          RELAYER_SECRET: ${{ secrets.E2E_RELAYER_SECRET }}
+          RELAYER_API_KEY: ${{ secrets.E2E_RELAYER_API_KEY }}
+        run: |
+          nohup pnpm start -p 3123 > "$RUNNER_TEMP/app.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -fs -o /dev/null http://localhost:3123 && exit 0
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/app.log"
+          exit 1
+      - name: Passkey claim e2e (testnet)
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          CREATOR_SECRET: ${{ secrets.E2E_CREATOR_SECRET }}
+          REGISTRY_V2_ID: CDCUQY2EI3D64YNMHULCIEQE2P4KOCZ2ZTQALZB3GZYPBY5JNQ7WDPMI
+        run: node scripts/e2e-passkey-claim.mjs http://localhost:3123
+      - name: Show app log on failure
+        if: failure() && steps.gate.outputs.enabled == 'true'
+        run: tail -n 100 "$RUNNER_TEMP/app.log"
