@@ -145,6 +145,9 @@ jobs:
           # without a Blob token, so passkey signup cannot be relayed. Use a dedicated CI Blob store: the
           # chest metadata of the e2e chests (listed) is written there too.
           LOOT_READ_WRITE_TOKEN: ${{ secrets.E2E_BLOB_TOKEN }}
+          # Every request reaches the app from localhost, so all CI runs share one "IP" in the CI store and the
+          # default 3 wallet deploys per IP per day runs out after a few runs (429). CI store + testnet only.
+          RELAY_DEPLOY_PER_IP_PER_DAY: "50"
         run: |
           nohup pnpm start -p 3123 > "$GITHUB_WORKSPACE/app.log" 2>&1 &
           for _ in $(seq 1 60); do
