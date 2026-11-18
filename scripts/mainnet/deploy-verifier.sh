@@ -175,9 +175,24 @@ if [ -n "$RELEASE_TAG" ]; then
   N_WASM="$(fd -t f -i 'chestzk[-_]verifier.*\.wasm$' "$REL_DIR" | wc -l | tr -d ' ')"
   [ "$N_WASM" = 1 ] || die "release $RELEASE_TAG must have exactly one chestzk-verifier wasm (found $N_WASM: $(ls "$REL_DIR" | tr '\n' ' '))"
   REL_WASM="$(fd -t f -i 'chestzk[-_]verifier.*\.wasm$' "$REL_DIR")"
-  echo "  \$ gh attestation verify $(basename "$REL_WASM") --repo $RELEASE_REPO"
-  gh attestation verify "$REL_WASM" --repo "$RELEASE_REPO" >/dev/null 2>&1 \
-    || die "build attestation check failed for $(basename "$REL_WASM") (not built by $RELEASE_REPO CI?)"
+  # The wasm is built by the pinned reusable workflow (stellar-expert/soroban-build-workflow@6b16426), so the
+  # attestation is signed by that workflow while the source repo is $RELEASE_REPO. Require both.
+  echo "  \$ gh attestation verify $(basename "$REL_WASM") --repo $RELEASE_REPO --signer-repo stellar-expert/soroban-build-workflow"
+  ATT_JSON="$(gh attestation verify "$REL_WASM" --repo "$RELEASE_REPO" --signer-repo stellar-expert/soroban-build-workflow --format json 2>/dev/null)" \
+    || die "build attestation check failed for $(basename "$REL_WASM") (not built from $RELEASE_REPO by stellar-expert/soroban-build-workflow?)"
+  ATT_SIGNER="$(printf '%s' "$ATT_JSON" | jq -r '.[0].verificationResult.signature.certificate.buildSignerURI // empty')"
+  case "$ATT_SIGNER" in
+    *"/stellar-expert/soroban-build-workflow/.github/workflows/release.yml@6b16426dd3a61715ddddf83a2df322a6371fe071") ;;
+    *) die "attestation signer $ATT_SIGNER is not the pinned stellar-expert/soroban-build-workflow release.yml@6b16426" ;;
+  esac
+  ATT_REF="$(printf '%s' "$ATT_JSON" | jq -r '.[0].verificationResult.signature.certificate.sourceRepositoryRef // empty')"
+  echo "  attestation source ref: $ATT_REF"
+  if [ "$NETWORK" = mainnet ]; then
+    case "$ATT_REF" in
+      refs/heads/main|refs/tags/contracts-v*) ;;
+      *) die "mainnet needs a wasm built from main or a contracts-v* tag (attestation ref: $ATT_REF)" ;;
+    esac
+  fi
   echo "  attestation OK: built by $RELEASE_REPO GitHub Actions"
   mkdir -p "$OUT_DIR"
   cp "$REL_WASM" "$VER_WASM"
