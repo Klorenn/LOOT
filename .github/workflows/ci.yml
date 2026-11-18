@@ -39,25 +39,40 @@ jobs:
       - name: cargo test
         run: cargo test
 
-  # CoinFabrik Scout: static security analysis of the Soroban contract. fail_on_error (the action's
-  # default, set explicitly) fails the job when Scout reports findings; the markdown report is
-  # uploaded as an artifact either way.
+  # CoinFabrik Scout: static security analysis of the Soroban contract. scout-actions is unmaintained
+  # (its image builds dylint_driver 4.1.2, which no longer compiles), so this runs the official
+  # pinned image directly. `--cicd` makes Scout write a FAIL file when it has findings, which fails the
+  # job; the markdown report is uploaded as an artifact either way.
   scout:
     runs-on: ubuntu-latest
+    env:
+      SCOUT_VERSION: 0.3.17
     steps:
       - uses: actions/checkout@v4
-      - name: Scout security analysis
-        id: scout
-        uses: CoinFabrik/scout-actions@v3.2
-        with:
-          working_directory: contracts/chest
-          fail_on_error: true
+      - name: Run Scout
+        run: |
+          mkdir -p "$RUNNER_TEMP/scout-out"
+          docker run --rm --platform linux/amd64 \
+            -e INPUT_TARGET=/scoutme/contracts/chest \
+            -e SCOUT_OFFLINE=1 \
+            -e INPUT_SCOUT_ARGS="--output-format md-gh --output-path /output/report.md --cicd /output" \
+            -v "$GITHUB_WORKSPACE:/scoutme" \
+            -v "$RUNNER_TEMP/scout-out:/output" \
+            "coinfabrik/scout:$SCOUT_VERSION"
+      - name: Fail on findings
+        run: |
+          if [ -f "$RUNNER_TEMP/scout-out/FAIL" ]; then
+            echo "::error::Scout reported findings, see the scout-report artifact"
+            cat "$RUNNER_TEMP/scout-out/report.md" || true
+            exit 1
+          fi
       - name: Upload Scout report
-        if: always() && steps.scout.outputs.report != ''
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: scout-report
-          path: ${{ steps.scout.outputs.report }}
+          path: ${{ runner.temp }}/scout-out/report.md
+          if-no-files-found: warn
 
   # Browser e2e of the registry v2 passkey claim, TESTNET ONLY (app/scripts/e2e-passkey-claim.mjs).
   # Needs funded testnet secrets, so it skips cleanly (green) when they are absent (fork PRs).
@@ -73,16 +88,17 @@ jobs:
     env:
       E2E_CREATOR_SECRET: ${{ secrets.E2E_CREATOR_SECRET }}
       E2E_RELAYER_SECRET: ${{ secrets.E2E_RELAYER_SECRET }}
+      E2E_BLOB_TOKEN: ${{ secrets.E2E_BLOB_TOKEN }}
     steps:
       - name: Check testnet secrets
         id: gate
         working-directory: .
         run: |
-          if [ -n "$E2E_CREATOR_SECRET" ] && [ -n "$E2E_RELAYER_SECRET" ]; then
+          if [ -n "$E2E_CREATOR_SECRET" ] && [ -n "$E2E_RELAYER_SECRET" ] && [ -n "$E2E_BLOB_TOKEN" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::e2e skipped: E2E_CREATOR_SECRET / E2E_RELAYER_SECRET not available (fork PR or not configured)"
+            echo "::notice::e2e skipped: E2E_CREATOR_SECRET / E2E_RELAYER_SECRET / E2E_BLOB_TOKEN not available (fork PR or not configured)"
           fi
       - uses: actions/checkout@v4
         if: steps.gate.outputs.enabled == 'true'
@@ -117,13 +133,17 @@ jobs:
         env:
           RELAYER_SECRET: ${{ secrets.E2E_RELAYER_SECRET }}
           RELAYER_API_KEY: ${{ secrets.E2E_RELAYER_API_KEY }}
+          # The persistent relay limits (lib/persistent-limit.ts) fail closed with 503 rate_limit_unavailable
+          # without a Blob token, so passkey signup cannot be relayed. Use a dedicated CI Blob store: the
+          # chest metadata of the e2e chests (listed) is written there too.
+          LOOT_READ_WRITE_TOKEN: ${{ secrets.E2E_BLOB_TOKEN }}
         run: |
-          nohup pnpm start -p 3123 > "$RUNNER_TEMP/app.log" 2>&1 &
+          nohup pnpm start -p 3123 > "$GITHUB_WORKSPACE/app.log" 2>&1 &
           for _ in $(seq 1 60); do
             curl -fs -o /dev/null http://localhost:3123 && exit 0
             sleep 2
           done
-          cat "$RUNNER_TEMP/app.log"
+          cat "$GITHUB_WORKSPACE/app.log"
           exit 1
       - name: Passkey claim e2e (testnet)
         if: steps.gate.outputs.enabled == 'true'
@@ -133,4 +153,4 @@ jobs:
         run: node scripts/e2e-passkey-claim.mjs http://localhost:3123
       - name: Show app log on failure
         if: failure() && steps.gate.outputs.enabled == 'true'
-        run: tail -n 100 "$RUNNER_TEMP/app.log"
+        run: tail -n 200 "$GITHUB_WORKSPACE/app.log" || echo "no app log"
