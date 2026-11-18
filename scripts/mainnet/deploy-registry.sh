@@ -13,7 +13,12 @@
 #   SIM_SOURCE_ADDRESS      any funded mainnet G... address, used ONLY to simulate when SOURCE is unfunded/a bare key
 #   MAINNET_VERIFIER_ID     verifier contract the registry will point at (default: the ceremony verifier below).
 #                           Anything else is REFUSED unless it is this id.
-#   WASM_DIR                dir with chestzk_chest.wasm; else built from contracts/chest (needs rustup rustc >= 1.91)
+#   RELEASE_TAG             GitHub release from .github/workflows/release-wasm.yml holding the registry wasm.
+#                           REQUIRED with --execute: the wasm is downloaded from that release and its build
+#                           attestation is checked (gh attestation verify), so mainnet only gets a CI-built,
+#                           verifiable wasm. RELEASE_REPO defaults to Klorenn/LOOT.
+#   WASM_DIR                dry-run only: dir with chestzk_chest.wasm; else, without RELEASE_TAG, built locally from
+#                           contracts/chest (needs rustup rustc >= 1.91). Local builds are refused with --execute.
 #   RELAYER_FLOAT_XLM       default 5         HARD_CAP_XLM     default 80
 #   RPC_URL / HORIZON_URL   defaults https://mainnet.sorobanrpc.com / https://horizon.stellar.org
 set -euo pipefail
@@ -22,7 +27,7 @@ EXECUTE=0
 for a in "$@"; do
   case "$a" in
     --execute) EXECUTE=1 ;;
-    -h|--help) sed -n 2,18p "$0"; exit 0 ;;
+    -h|--help) sed -n 2,23p "$0"; exit 0 ;;
     *) echo "unknown arg: $a" >&2; exit 2 ;;
   esac
 done
@@ -59,6 +64,10 @@ xlm()  { awk -v s="$1" 'BEGIN{printf "%.4f", s/10000000}'; }
 add()  { awk -v a="$1" -v b="$2" 'BEGIN{printf "%.4f", a+b}'; }
 
 need stellar; need jq; need curl; need shasum; need node; need rg
+
+RELEASE_REPO="${RELEASE_REPO:-Klorenn/LOOT}"
+RELEASE_TAG="${RELEASE_TAG:-}"
+[ "$EXECUTE" = 0 ] || [ -n "$RELEASE_TAG" ] || die "--execute needs RELEASE_TAG (deploy only the CI-built release wasm, never a local build)"
 
 [ "$EXECUTE" = 1 ] && echo "MODE: EXECUTE (real mainnet transactions)" || echo "MODE: DRY-RUN (nothing is signed or sent; pass --execute to send)"
 
@@ -125,7 +134,24 @@ echo "  verifier wasm sha256 == ceremony release ($ONCHAIN_WASM) OK"
 # ---------------------------------------------------------------- wasm
 step "registry wasm"
 REG_WASM="$OUT_DIR/chestzk_chest.wasm"
-if [ -z "${WASM_DIR:-}" ]; then
+if [ -n "$RELEASE_TAG" ]; then
+  need gh
+  [ -z "${WASM_DIR:-}" ] || die "set RELEASE_TAG or WASM_DIR, not both"
+  REL_DIR="$(mktemp -d)"
+  echo "  \$ gh release download $RELEASE_TAG --repo $RELEASE_REPO --pattern '*.wasm'"
+  gh release download "$RELEASE_TAG" --repo "$RELEASE_REPO" --pattern '*.wasm' --dir "$REL_DIR" >/dev/null \
+    || die "could not download wasm assets of release $RELEASE_TAG from $RELEASE_REPO"
+  N_WASM="$(fd -t f -i 'chestzk[-_]chest.*\.wasm$' "$REL_DIR" | wc -l | tr -d ' ')"
+  [ "$N_WASM" = 1 ] || die "release $RELEASE_TAG must have exactly one chestzk-chest wasm (found $N_WASM: $(ls "$REL_DIR" | tr '\n' ' '))"
+  REL_WASM="$(fd -t f -i 'chestzk[-_]chest.*\.wasm$' "$REL_DIR")"
+  echo "  \$ gh attestation verify $(basename "$REL_WASM") --repo $RELEASE_REPO"
+  gh attestation verify "$REL_WASM" --repo "$RELEASE_REPO" >/dev/null 2>&1 \
+    || die "build attestation check failed for $(basename "$REL_WASM") (not built by $RELEASE_REPO CI?)"
+  echo "  attestation OK: built by $RELEASE_REPO GitHub Actions"
+  mkdir -p "$OUT_DIR"
+  cp "$REL_WASM" "$REG_WASM"
+elif [ -z "${WASM_DIR:-}" ]; then
+  warn "dry-run with a LOCAL build: hashes will not match the release; --execute requires RELEASE_TAG"
   RUSTV="$(rustc -V | awk '{print $2}')"
   [ "$(printf '%s\n1.91.0\n' "$RUSTV" | sort -V | head -1)" = "1.91.0" ] || die "rustc $RUSTV < 1.91.0 (soroban-sdk 27.0.6); use rustup's toolchain or set WASM_DIR"
   mkdir -p "$OUT_DIR"
@@ -223,10 +249,10 @@ mkdir -p deployments
 [ ! -f "$OUT_JSON" ] || die "$OUT_JSON appeared meanwhile; refusing to overwrite"
 jq -n --arg pass "$PASSPHRASE" --arg rpc "$RPC_URL" --arg reg "$REGISTRY" --arg ver "$VERIFIER_ID" --arg tok "$TOKEN" \
   --arg rh "$REG_HASH" --arg vh "$CEREMONY_VERIFIER_WASM_SHA256" --arg fp "$MANIFEST_FP" \
-  --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg t1 "$(txhash "$LOG/1.err")" --arg t2 "$(txhash "$LOG/2.err")" '{
+  --arg rt "$RELEASE_TAG" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg t1 "$(txhash "$LOG/1.err")" --arg t2 "$(txhash "$LOG/2.err")" '{
     network:"mainnet", version:2, passphrase:$pass, rpcUrl:$rpc,
     registry:$reg, verifier:$ver, token:$tok,
-    registryWasmHash:$rh, verifierWasmHash:$vh, vkFingerprint:$fp,
+    registryWasmHash:$rh, releaseTag:$rt, verifierWasmHash:$vh, vkFingerprint:$fp,
     deployedAt:$at, txs:{registryUpload:$t1, registryDeploy:$t2}
   }' > "$OUT_JSON"
 echo "  wrote $OUT_JSON"; jq . "$OUT_JSON"
