@@ -65,7 +65,7 @@ Hi $NEXT_NAME! Your turn in the Loot ceremony starts now and you have 24 h (unti
 - sha256 of the zkey: $PREV_SHA
 
 Steps (manual or with your AI agent): $ISSUE
-If you use the agent prompt, fill PREV_URL, PREV_SHA256 and MY_HANDLE with the values above.
+Easiest: paste the prompt below (already filled in) into Claude Code, Codex or OpenCode. It does everything and stops if a check fails.
 When done, post the zip, sha256, contribution hash and the declaration line on the issue from your own account, and reply here so I can pass the turn on. Thanks!
 
 ──────── español ────────
@@ -76,6 +76,22 @@ When done, post the zip, sha256, contribution hash and the declaration line on t
 - sha256 del zkey: $PREV_SHA
 
 Pasos (a mano o con tu agente de IA): $ISSUE
-Si usás el prompt para agentes, completá PREV_URL, PREV_SHA256 y MY_HANDLE con estos datos.
+Lo más fácil: pegá el prompt de abajo (ya viene completo) en Claude Code, Codex u OpenCode. Hace todo y se detiene si falla una verificación.
 Cuando termines, publicá en el issue desde tu cuenta el zip, el sha256, el contribution hash y la frase de declaración, y avisame acá para pasarle el turno al siguiente. ¡Gracias!
 EOF
+
+# Ready-to-paste agent prompt with this turn's values filled in.
+echo
+echo "──────── prompt for the AI agent (copy everything between the lines) ────────"
+python3 - "$ROOT/docs/ceremony/AGENT-PROMPT.md" "$PREV_URL" "$PREV_SHA" "${NEXT_HANDLE:-<my GitHub or X handle>}" "$FILE" "$NEXT_FILE" <<'PY'
+import sys
+path, url, sha, handle, prev, me = sys.argv[1:]
+s = open(path).read()
+start = s.index("```text") + len("```text\n")
+block = s[start:s.index("```", start)]
+old = block[block.index("My values:"):block.index("Fixed values")]
+new = (f"My values:\n- PREV_URL    = {url}\n- PREV_SHA256 = {sha}\n- MY_HANDLE   = {handle}\n"
+       f"- PREV = {prev}\n- ME   = {me}\n\n")
+print(block.replace(old, new), end="")
+PY
+echo "─────────────────────────────────────────────────────────────────────────────"
