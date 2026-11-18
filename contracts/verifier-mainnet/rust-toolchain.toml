@@ -1,0 +1,7 @@
+# Pinned so wasm builds are reproducible. Keep in sync with docs/REPRODUCIBLE-BUILD.md.
+# 1.91 is the minimum rustc for soroban-sdk 27.x dependencies; wasm32v1-none is the target
+# `stellar contract build` uses.
+[toolchain]
+channel = "1.91.0"
+profile = "minimal"
+targets = ["wasm32v1-none"]
